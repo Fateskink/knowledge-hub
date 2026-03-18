@@ -1,0 +1,282 @@
+---
+title: "MVC Pattern: Model-View-Controller Explained in Detail"
+description: "Learn the MVC architecture pattern from its history, core principles, data flow, MVP/MVVM variants to practical examples with Express.js, Django, and Spring."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["mvc", "architecture", "design-pattern", "express", "django", "spring", "mvp", "mvvm"]
+featured: false
+order: 9
+sources:
+  - title: "Martin Fowler - GUI Architectures"
+    url: "https://martinfowler.com/eaaDev/uiArchs.html"
+  - title: "MDN Web Docs - MVC"
+    url: "https://developer.mozilla.org/en-US/docs/Glossary/MVC"
+  - title: "Microsoft - ASP.NET MVC Overview"
+    url: "https://learn.microsoft.com/en-us/aspnet/core/mvc/overview"
+---
+
+# MVC Pattern: Model-View-Controller Explained in Detail
+
+MVC (Model-View-Controller) is one of the oldest and most widely adopted architectural patterns in software development history. Whether you are building web applications with Express.js, Django, or Spring, chances are you have already encountered MVC. This article explains what MVC is, how it works, and when you should (or should not) use it.
+
+## What is MVC?
+
+MVC stands for **Model-View-Controller** — an architectural pattern that divides an application into three interconnected components, each handling a distinct responsibility:
+
+- **Model**: Manages data and business logic
+- **View**: Renders the user interface
+- **Controller**: Coordinates between Model and View
+
+<Callout type="info">MVC was invented by Trygve Reenskaug in 1979 at Xerox PARC, originally designed for the Smalltalk programming language. It was one of the first formally named software architecture patterns and remains widely used over 45 years later.</Callout>
+
+## The Three Components of MVC
+
+### Model — The Heart of the Application
+
+The Model is responsible for managing **data**, **state**, and **business logic**. It has no knowledge of the View or Controller — it is completely independent.
+
+Key responsibilities of the Model:
+- Data access and persistence (database, API, file system)
+- Data validation
+- Business logic execution (calculations, business rules)
+- Notifying observers when data changes (in the Observer pattern variant)
+
+### View — The User Interface
+
+The View is responsible for **presenting data** from the Model to the user. It contains no business logic and focuses solely on rendering and display.
+
+Key responsibilities of the View:
+- Rendering HTML, CSS, and templates
+- Displaying data received from the Model
+- Capturing user interactions and forwarding them to the Controller
+- Updating the display when the Model changes
+
+### Controller — The Coordinator
+
+The Controller acts as the **intermediary** between the Model and View. It receives user input (through the View), processes routing logic, invokes the Model for data operations, and selects the appropriate View for rendering the response.
+
+Key responsibilities of the Controller:
+- Receiving and processing HTTP requests (in web applications)
+- Invoking Model methods for reading/writing data
+- Selecting the View for rendering results
+- Handling navigation and routing
+
+## Data Flow in MVC
+
+<Diagram chart="graph LR\n    U[User] -->|1. Send request| C[Controller]\n    C -->|2. Request data| M[Model]\n    M -->|3. Return data| C\n    C -->|4. Pass data| V[View]\n    V -->|5. Render| U" />
+
+A typical request flow in an MVC web application:
+
+1. **User** sends a request (e.g., navigates to `/products/123`)
+2. **Controller** receives the request and determines the action to perform
+3. **Controller** calls the **Model** to retrieve product data for ID 123
+4. **Model** queries the database and returns a Product object
+5. **Controller** passes the data to the appropriate **View**
+6. **View** renders HTML with the product data and returns it to the user
+
+## Practical Example: Express.js MVC
+
+Below is the structure of an Express.js application following the MVC pattern:
+
+```
+project/
+├── models/
+│   └── product.model.js
+├── views/
+│   └── product.ejs
+├── controllers/
+│   └── product.controller.js
+├── routes/
+│   └── product.routes.js
+└── app.js
+```
+
+### Model — product.model.js
+
+```javascript
+// models/product.model.js
+const db = require('../config/database');
+
+class Product {
+  static async findById(id) {
+    const result = await db.query(
+      'SELECT * FROM products WHERE id = $1',
+      [id]
+    );
+    return result.rows[0];
+  }
+
+  static async findAll({ category, limit = 20 }) {
+    let query = 'SELECT * FROM products';
+    const params = [];
+
+    if (category) {
+      query += ' WHERE category = $1';
+      params.push(category);
+    }
+
+    query += ` LIMIT ${limit}`;
+    const result = await db.query(query, params);
+    return result.rows;
+  }
+
+  static async create(data) {
+    const { name, price, description } = data;
+    // Validation — business logic belongs in the Model
+    if (price < 0) throw new Error('Price cannot be negative');
+
+    const result = await db.query(
+      'INSERT INTO products (name, price, description) VALUES ($1, $2, $3) RETURNING *',
+      [name, price, description]
+    );
+    return result.rows[0];
+  }
+}
+
+module.exports = Product;
+```
+
+### Controller — product.controller.js
+
+```javascript
+// controllers/product.controller.js
+const Product = require('../models/product.model');
+
+const productController = {
+  async show(req, res) {
+    try {
+      const product = await Product.findById(req.params.id);
+      if (!product) {
+        return res.status(404).render('error', { message: 'Product not found' });
+      }
+      res.render('product', { product });
+    } catch (error) {
+      res.status(500).render('error', { message: 'Internal server error' });
+    }
+  },
+
+  async index(req, res) {
+    const products = await Product.findAll({
+      category: req.query.category,
+    });
+    res.render('products', { products });
+  },
+
+  async create(req, res) {
+    try {
+      const product = await Product.create(req.body);
+      res.redirect(`/products/${product.id}`);
+    } catch (error) {
+      res.status(400).render('productForm', { error: error.message });
+    }
+  },
+};
+
+module.exports = productController;
+```
+
+### View — product.ejs
+
+```html
+<!-- views/product.ejs -->
+<div class="product-detail">
+  <h1><%= product.name %></h1>
+  <p class="price">$<%= product.price.toFixed(2) %></p>
+  <p class="description"><%= product.description %></p>
+  <a href="/products">&larr; Back to list</a>
+</div>
+```
+
+<Callout type="tip">In Express.js, route files map URLs to Controller actions. Other frameworks (like Rails and Django) integrate routing into their configuration, but the underlying principle is the same.</Callout>
+
+## MVC Across Popular Frameworks
+
+Major frameworks all implement MVC or a variation of it:
+
+- **Ruby on Rails**: Classic MVC — the framework that popularized MVC for web development
+- **Django (Python)**: Uses the **MVT** (Model-View-Template) variant, where Django's View is equivalent to a Controller, and Template is equivalent to a View
+- **Spring MVC (Java)**: MVC with annotation-based routing and dependency injection
+- **ASP.NET MVC (C#)**: MVC with convention over configuration
+- **Laravel (PHP)**: MVC with Eloquent ORM and Blade templating
+
+<Callout type="warning">Django uses different terminology but follows the same principles as MVC. Django's View is essentially the Controller, and its Template is the View. Keep this in mind when switching between frameworks.</Callout>
+
+## Variants: MVP and MVVM
+
+Over time, MVC has evolved into several variants to accommodate different platforms and requirements.
+
+### MVP — Model-View-Presenter
+
+<Diagram chart="graph LR\n    V[View] <-->|Interaction| P[Presenter]\n    P <-->|Data| M[Model]\n    V -.->|Display| U[User]" />
+
+In MVP, the **Presenter** replaces the Controller. Key differences:
+- The View is more active — it exposes an interface that the Presenter calls
+- The Presenter holds a reference to the View through an interface
+- There is no direct connection between Model and View
+- Popular in Android development (before MVVM) and WinForms
+
+### MVVM — Model-View-ViewModel
+
+<Diagram chart="graph LR\n    V[View] -->|Data Binding| VM[ViewModel]\n    VM -->|Updates| M[Model]\n    M -->|Notifies| VM\n    VM -->|Auto-updates| V" />
+
+In MVVM, the **ViewModel** replaces the Controller. Key differences:
+- Uses **two-way data binding** between the View and ViewModel
+- The ViewModel has no knowledge of the specific View
+- The View automatically updates when the ViewModel changes (reactive)
+- Popular in WPF, Xamarin, Angular, Vue.js, and SwiftUI
+
+## Comparing MVC vs MVP vs MVVM
+
+<ComparisonTable
+  headers={["Criteria", "MVC", "MVP", "MVVM"]}
+  rows={[
+    ["Intermediary", "Controller", "Presenter", "ViewModel"],
+    ["Data binding", "No", "No", "Yes (two-way)"],
+    ["View-Model link", "Indirect via Controller", "Through Presenter interface", "Via data binding"],
+    ["Testability", "Medium", "High", "High"],
+    ["Complexity", "Low", "Medium", "High"],
+    ["Typical frameworks", "Rails, Django, Spring", "Android (legacy), WinForms", "Vue.js, Angular, WPF"],
+    ["Best suited for", "Server-side web", "Desktop, Mobile", "SPA, Modern desktop"]
+  ]}
+/>
+
+## Advantages and Disadvantages of MVC
+
+### Advantages
+
+- **Separation of Concerns**: Each component has a clear responsibility, making code easier to understand and maintain
+- **Parallel development**: Frontend and backend developers can work simultaneously on Views and Models
+- **Reusability**: A single Model can serve multiple Views (web, mobile, API)
+- **Testability**: Models can be unit tested independently without a UI
+- **Large community**: Most developers are already familiar with MVC
+
+### Disadvantages
+
+- **Fat Controller problem**: As applications grow, Controllers tend to accumulate too much logic
+- **Tight coupling between Controller and View**: Reusing Controllers across different Views is difficult
+- **Not ideal for complex UIs**: Single-page applications with complex state management need more powerful solutions (MVVM, Flux/Redux)
+- **Boilerplate**: Every feature requires creating the full Model-View-Controller triad
+
+<Callout type="danger">Avoid placing business logic in Controllers (the Fat Controller anti-pattern). Controllers should only coordinate — call the Model for business processing, then select a View for rendering. If a Controller grows too long, extract the logic into a Service layer.</Callout>
+
+## When Should You Use MVC?
+
+**Well suited for:**
+- Server-side rendered (SSR) web applications
+- CRUD applications with straightforward data flows
+- Teams already familiar with the MVC pattern
+- Small to medium projects that need basic structure
+
+**Not ideal for:**
+- Complex SPAs with rich client-side state — consider MVVM or Flux/Redux
+- Complex microservice systems — consider DDD or Clean Architecture
+- Real-time applications with intricate data flows — consider Event-Driven Architecture
+- Very small projects (landing pages, scripts) — MVC adds unnecessary overhead
+
+## Summary
+
+MVC is a foundational architectural pattern that every developer should understand. Regardless of the framework you use, understanding the principles of separating Model, View, and Controller will help you write better-structured code. From MVC, you can progress to more advanced patterns like MVP, MVVM, or Clean Architecture — all built on the same philosophy: **separation of concerns**.
+
+<Callout type="tip">Next step: Learn about Domain-Driven Design (DDD) to understand how to organize complex business logic within the Model layer, especially when your application outgrows what simple MVC can handle.</Callout>

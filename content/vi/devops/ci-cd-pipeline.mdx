@@ -1,0 +1,310 @@
+---
+title: "CI/CD Pipeline"
+description: "Tìm hiểu về CI/CD pipeline: khái niệm, các giai đoạn, GitHub Actions và cách xây dựng quy trình tự động hóa triển khai ứng dụng."
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["ci-cd", "github-actions", "devops", "automation", "pipeline", "deployment"]
+featured: true
+order: 2
+sources:
+  - title: "GitHub Actions Documentation"
+    url: "https://docs.github.com/en/actions"
+  - title: "CI/CD Concepts - GitLab"
+    url: "https://about.gitlab.com/topics/ci-cd/"
+  - title: "Continuous Integration - Martin Fowler"
+    url: "https://martinfowler.com/articles/continuousIntegration.html"
+  - title: "GitHub Actions Marketplace"
+    url: "https://github.com/marketplace?type=actions"
+---
+
+# CI/CD Pipeline
+
+Trong phát triển phần mềm hiện đại, việc tự động hóa quy trình build, test và deploy là yếu tố then chốt để đảm bảo chất lượng và tốc độ phân phối sản phẩm. CI/CD (Continuous Integration / Continuous Delivery) là phương pháp giúp bạn làm điều đó. Bài viết này sẽ giới thiệu các khái niệm cơ bản về CI/CD, các giai đoạn trong pipeline, và hướng dẫn bạn xây dựng pipeline thực tế với GitHub Actions.
+
+## CI/CD là gì?
+
+**Continuous Integration (CI)** là quy trình tự động merge code của các developer vào một nhánh chung thường xuyên, đồng thời chạy build và test tự động để phát hiện lỗi sớm.
+
+**Continuous Delivery (CD)** là quy trình tự động hóa việc chuyển giao phần mềm qua các môi trường (staging, production) sau khi code đã vượt qua các bước kiểm tra.
+
+<Diagram chart="graph LR\n    A[Developer Push Code] --> B[CI: Build & Test]\n    B --> C{Tests Pass?}\n    C -->|Có| D[CD: Deploy to Staging]\n    C -->|Không| E[Thông báo lỗi]\n    E --> A\n    D --> F[Review & QA]\n    F --> G[CD: Deploy to Production]\n    G --> H[Monitoring]" />
+
+<Callout type="info">CI/CD không chỉ là công cụ mà còn là một văn hóa làm việc. Nó khuyến khích developer commit code thường xuyên, viết test đầy đủ và luôn đảm bảo code sẵn sàng để deploy bất cứ lúc nào.</Callout>
+
+## Các giai đoạn của CI/CD Pipeline
+
+Một CI/CD pipeline điển hình bao gồm các giai đoạn sau:
+
+<Diagram chart="graph TD\n    A[Source] --> B[Build]\n    B --> C[Unit Tests]\n    C --> D[Integration Tests]\n    D --> E[Code Quality & Security Scan]\n    E --> F[Build Artifact / Docker Image]\n    F --> G[Deploy to Staging]\n    G --> H[Acceptance Tests]\n    H --> I[Deploy to Production]\n    I --> J[Monitoring & Alerting]" />
+
+### 1. Source (Mã nguồn)
+
+Pipeline được kích hoạt khi có thay đổi trong repository -- thường là khi developer push code hoặc tạo pull request.
+
+### 2. Build
+
+Mã nguồn được biên dịch, các dependencies được cài đặt, và ứng dụng được đóng gói.
+
+### 3. Test
+
+Các loại test được chạy tự động:
+- **Unit tests**: Kiểm tra từng hàm, module riêng lẻ
+- **Integration tests**: Kiểm tra sự tương tác giữa các thành phần
+- **End-to-end tests**: Kiểm tra toàn bộ luồng ứng dụng
+
+### 4. Code Quality & Security
+
+- Lint và format check
+- Quét lỗ hổng bảo mật (SAST/DAST)
+- Kiểm tra độ phủ code (code coverage)
+
+### 5. Deploy
+
+Ứng dụng được triển khai tới môi trường staging hoặc production.
+
+<Callout type="tip">Nên sử dụng chiến lược deploy an toàn như blue-green deployment hoặc canary release để giảm rủi ro khi cập nhật production.</Callout>
+
+## GitHub Actions
+
+GitHub Actions là nền tảng CI/CD tích hợp sẵn trong GitHub. Nó cho phép bạn định nghĩa các workflow bằng file YAML và chạy chúng tự động dựa trên các sự kiện (push, pull request, schedule, v.v.).
+
+### Các khái niệm chính
+
+- **Workflow**: Một quy trình tự động được định nghĩa trong file YAML
+- **Event**: Sự kiện kích hoạt workflow (push, pull_request, schedule, ...)
+- **Job**: Một tập hợp các bước (steps) chạy trên cùng một runner
+- **Step**: Một lệnh đơn hoặc action được thực thi
+- **Action**: Một đơn vị tái sử dụng (reusable) -- có thể tự viết hoặc dùng từ Marketplace
+- **Runner**: Máy ảo thực thi workflow (GitHub-hosted hoặc self-hosted)
+
+### Ví dụ: CI/CD cho dự án Node.js
+
+Dưới đây là một workflow hoàn chỉnh cho dự án Node.js, bao gồm test, build và deploy:
+
+```yaml
+# .github/workflows/ci-cd.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # Job 1: Lint và Test
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm run test -- --coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+
+  # Job 2: Build ứng dụng
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: dist/
+
+  # Job 3: Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: dist/
+
+      - name: Deploy to staging server
+        run: |
+          echo "Deploying to staging..."
+          # Thêm lệnh deploy thực tế ở đây
+          # Ví dụ: rsync, scp, hoặc dùng CLI của cloud provider
+
+  # Job 4: Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: dist/
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production..."
+          # Thêm lệnh deploy thực tế ở đây
+```
+
+<Callout type="warning">Không bao giờ lưu secrets (API keys, passwords, tokens) trực tiếp trong file YAML. Sử dụng GitHub Secrets (`Settings > Secrets and variables > Actions`) và truy cập bằng cú pháp `$\{{ secrets.MY_SECRET }}`.</Callout>
+
+### Giải thích cấu trúc workflow
+
+```yaml
+on:
+  push:
+    branches: [main, develop]    # Chạy khi push vào main hoặc develop
+  pull_request:
+    branches: [main]             # Chạy khi tạo PR vào main
+```
+
+**`needs`** định nghĩa thứ tự thực thi giữa các jobs:
+
+```yaml
+build:
+  needs: test          # build chỉ chạy sau khi test thành công
+deploy-staging:
+  needs: build         # deploy chỉ chạy sau khi build thành công
+```
+
+**`if`** điều kiện để quyết định có chạy job hay không:
+
+```yaml
+if: github.ref == 'refs/heads/main'   # Chỉ deploy production từ nhánh main
+```
+
+## Ví dụ: Workflow với Docker
+
+Nếu bạn sử dụng Docker, đây là cách build và push Docker image trong pipeline:
+
+```yaml
+# .github/workflows/docker-build.yml
+name: Docker Build & Push
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            myuser/myapp:latest
+            myuser/myapp:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+```
+
+## Các công cụ CI/CD phổ biến
+
+| Công cụ | Ưu điểm | Nhược điểm |
+|---------|---------|------------|
+| GitHub Actions | Tích hợp GitHub, Marketplace phong phú, free cho public repos | Giới hạn cho private repos |
+| GitLab CI | Tích hợp GitLab, pipeline mạnh mẽ | Yêu cầu GitLab ecosystem |
+| Jenkins | Linh hoạt, nhiều plugins, self-hosted | Cấu hình phức tạp, cần tự quản lý server |
+| CircleCI | Nhanh, dễ cấu hình | Chi phí tăng khi scale |
+| AWS CodePipeline | Tích hợp AWS, bảo mật | Giới hạn trong AWS ecosystem |
+
+<Callout type="tip">Nếu bạn đang sử dụng GitHub làm repository, GitHub Actions là lựa chọn đơn giản và hiệu quả nhất. Nó được tích hợp sẵn, có Marketplace phong phú và miễn phí cho các dự án open source.</Callout>
+
+## Best Practices
+
+### 1. Giữ pipeline nhanh
+
+- Chạy các job song song khi có thể
+- Sử dụng cache cho dependencies (`actions/cache` hoặc `cache` trong `setup-node`)
+- Chỉ chạy những test cần thiết trong từng giai đoạn
+
+### 2. Fail fast
+
+- Đặt các bước dễ thất bại trước (lint, unit test) lên đầu pipeline
+- Sử dụng `continue-on-error: false` (mặc định) để dừng lại ngay khi có lỗi
+
+### 3. Environment và Approval
+
+- Sử dụng environments (`staging`, `production`) để kiểm soát deploy
+- Cấu hình approval rules cho production deployment
+- Giới hạn ai có quyền deploy lên production
+
+### 4. Monitoring và Rollback
+
+- Thiết lập alerting sau khi deploy (uptime, error rate, response time)
+- Có kế hoạch rollback rõ ràng khi deploy thất bại
+- Sử dụng versioning cho artifacts và Docker images
+
+<Diagram chart="graph LR\n    A[Commit Code] --> B[CI Pipeline]\n    B --> C[Automated Tests]\n    C --> D[Build Artifact]\n    D --> E[Deploy Staging]\n    E --> F[Manual Review]\n    F --> G[Deploy Production]\n    G --> H[Health Check]\n    H -->|Fail| I[Rollback]\n    H -->|Pass| J[Done]" />
+
+## Kết luận
+
+CI/CD pipeline là xương sống của quy trình phát triển phần mềm hiện đại. Nó giúp giảm lỗi do con người, tăng tốc độ phân phối và đảm bảo chất lượng code. Bắt đầu với một pipeline đơn giản (lint + test + build), sau đó mở rộng dần khi dự án phát triển. GitHub Actions là điểm khởi đầu tuyệt vời cho bất kỳ dự án nào trên GitHub.

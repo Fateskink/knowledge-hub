@@ -1,0 +1,332 @@
+---
+title: "RackNerd VPS: Complete Guide to Deploying Your Projects"
+description: "Learn about RackNerd - an affordable VPS platform, how to purchase a VPS, configure your server, and deploy Node.js, Next.js, and Docker applications"
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["racknerd", "vps", "deploy", "nodejs", "nextjs", "docker", "nginx", "devops", "hosting"]
+featured: true
+order: 5
+sources:
+  - title: "RackNerd - Deploy Node.js on Ubuntu"
+    url: "https://blog.racknerd.com/how-to-deploy-a-node-js-app-on-an-ubuntu-server/"
+  - title: "RackNerd - Node.js in Docker"
+    url: "https://blog.racknerd.com/a-complete-beginners-guide-to-install-latest-node-in-docker-container/"
+  - title: "Buy and Setup RackNerd VPS Step by Step"
+    url: "https://webshanks.com/buy-setup-racknerd-vps-step-by-step/"
+  - title: "RackNerd Review 2026"
+    url: "https://sites.google.com/view/thecrackedpavement/racknerd-review-2026-dirt-cheap-vps-hosting-that-actually-works"
+  - title: "Top 10 Low-Cost VPS Providers 2026"
+    url: "https://www.nucamp.co/blog/top-10-low-cost-vps-providers-in-2026-affordable-alternatives-to-aws-azure-gcp-and-vercel"
+  - title: "RackNerd Official"
+    url: "https://www.racknerd.com"
+---
+
+# RackNerd VPS: Complete Guide to Deploying Your Projects
+
+When you have a side project, a small API, or a personal blog that needs its own server, cost is almost always the first concern. RackNerd is one of the most affordable VPS providers available today, letting you own a dedicated server for less than a dollar per month. This guide walks you through the entire process: choosing and purchasing a VPS, securing your server, and deploying Node.js or Next.js applications using PM2 or Docker.
+
+## What Is RackNerd?
+
+RackNerd is a VPS (Virtual Private Server) provider headquartered in California, USA. It operates as an IaaS (Infrastructure as a Service) provider specializing in budget-friendly VPS hosting with reliable performance, serving both individual developers and small businesses.
+
+**Key highlights of RackNerd:**
+
+- **Extensive infrastructure:** 21 datacenters across 20 locations worldwide, spanning the US, Europe, and Asia. You can pick the datacenter closest to your target audience for the best latency.
+- **KVM Virtualization:** RackNerd uses KVM (Kernel-based Virtual Machine) technology, which is full virtualization rather than OpenVZ. This means you get your own dedicated kernel, guaranteed RAM allocation, and full Docker compatibility.
+- **Industry recognition:** RackNerd has been featured on the Inc. 5000 and Inc. Regionals Pacific lists, demonstrating strong growth and credibility in the hosting industry.
+- **Legendary deals:** Known for extraordinary Black Friday and New Year promotions, often 50-70% cheaper than regular pricing.
+
+<Callout type="tip">RackNerd's renewal price does NOT increase from the initial purchase price. This is extremely rare in the hosting industry, where most providers double or triple the price upon renewal. If you buy a plan at $11.29/year, you will pay exactly $11.29 when it renews.</Callout>
+
+## Pricing and VPS Plans
+
+RackNerd offers a range of plans at various price points. Here are the notable New Year 2026 deals:
+
+- **1GB RAM, 1 vCPU, 21GB SSD, 1.5TB bandwidth** = $11.29/year (~$0.94/month)
+- **2GB RAM, 1 vCPU, 35GB SSD, 2.5TB bandwidth** = $17.98/year (~$1.50/month)
+- **3.5GB RAM, 2 vCPU, 45GB SSD, 7TB bandwidth** = $32.49/year (~$2.70/month)
+- **6GB RAM, 4 vCPU, 140GB SSD, 12TB bandwidth** = ~$5/month
+
+<ComparisonTable headers={["Provider", "Starting Price", "Technology", "Datacenters", "Best For"]} rows={[["RackNerd", "~$1-5/mo", "KVM SSD", "21 DCs (US, EU, Asia)", "Side projects, blogs, small APIs"], ["Hetzner", "~€3.79/mo", "Shared vCPU", "4 regions (DE/FI/US/SG)", "EU projects, high performance needs"], ["Contabo", "~€4.50/mo", "4vCPU 6GB RAM", "EU/US/Asia/AU", "RAM-heavy workloads, slower setup OK"], ["DigitalOcean", "$4-6/mo", "KVM SSD, Managed", "14 regions worldwide", "Production apps, better UX needed"], ["AWS Lightsail", "$3.50-5/mo", "AWS Ecosystem", "Global", "AWS ecosystem integration"]]} />
+
+<Callout type="info">RackNerd is best suited for side projects, personal blogs, small APIs, Discord/Telegram bots, or any project that needs affordable VPS hosting with stable performance. If you need managed services, auto-scaling, or strict uptime SLAs, consider DigitalOcean or AWS instead.</Callout>
+
+## How to Purchase a RackNerd VPS (Step by Step)
+
+The purchasing process on RackNerd is straightforward:
+
+1. **Visit** [racknerd.com](https://www.racknerd.com) and navigate to **KVM VPS** plans.
+2. **Select your plan:** Recommended 2GB RAM or higher for Next.js, 1GB RAM for small APIs or bots.
+3. **Choose a datacenter:** Los Angeles, New York, Dallas, Seattle, Amsterdam, Strasbourg, and more. Pick the location closest to your target users.
+4. **Choose your OS:** Recommended **Ubuntu 22.04 LTS** (or Ubuntu 24.04 LTS if available). This is a stable, long-term support release with the largest community.
+5. **Complete payment:** RackNerd accepts PayPal, Credit Cards, and Cryptocurrency. Annual billing cycles offer the best rates.
+6. **Receive your credentials:** After payment, you will receive an email containing your server's IP address, root password, and SSH port.
+
+<Callout type="warning">Save the credentials email carefully and change your root password immediately after your first login. Never share these credentials with anyone.</Callout>
+
+## Initial Server Configuration
+
+Once you have your VPS, the first step is to secure it and configure the basics. These are essential steps you should never skip:
+
+```bash
+# SSH into your server (replace YOUR_IP and YOUR_PORT with values from the email)
+ssh root@YOUR_IP -p YOUR_PORT
+
+# Change root password
+passwd
+
+# Update the system
+apt update && apt upgrade -y
+
+# Create a new user (avoid using root for daily operations)
+adduser deploy
+usermod -aG sudo deploy
+
+# Switch to the new user
+su - deploy
+```
+
+Next, set up SSH key authentication for secure, passwordless login:
+
+```bash
+# On your LOCAL machine (not the server)
+ssh-keygen -t ed25519 -C "your_email@example.com"
+ssh-copy-id deploy@YOUR_IP -p YOUR_PORT
+```
+
+After confirming that SSH key login works, disable password authentication:
+
+```bash
+# On the server, edit SSH configuration
+sudo nano /etc/ssh/sshd_config
+# Find and change: PasswordAuthentication no
+sudo systemctl restart sshd
+```
+
+Finally, install and configure the firewall:
+
+```bash
+sudo apt install ufw -y
+sudo ufw allow OpenSSH
+sudo ufw allow 80
+sudo ufw allow 443
+sudo ufw enable
+```
+
+## Deploying Node.js / Next.js Applications
+
+### Installing Node.js
+
+Install Node.js 20.x (LTS) from the NodeSource repository:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node -v  # Verify the version
+npm -v
+```
+
+### Cloning Your Code and Installing Dependencies
+
+```bash
+cd /home/deploy
+git clone https://github.com/your-username/your-repo.git
+cd your-repo
+npm install
+npm run build  # Required for Next.js production builds
+```
+
+### PM2 - Process Manager
+
+PM2 keeps your Node.js application running continuously. It automatically restarts the app on crashes and after server reboots:
+
+```bash
+sudo npm install -g pm2
+
+# Start your application
+pm2 start npm --name "my-app" -- start
+
+# Configure auto-start on system boot
+pm2 startup systemd
+pm2 save
+
+# Useful commands
+pm2 list          # List all processes
+pm2 logs my-app   # View logs
+pm2 restart my-app # Restart the app
+pm2 monit         # Real-time monitoring dashboard
+```
+
+### Nginx Reverse Proxy
+
+Install Nginx to forward requests from port 80 to your Node.js application:
+
+```bash
+sudo apt install nginx -y
+sudo nano /etc/nginx/sites-available/my-app
+```
+
+Configuration content:
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+Enable the configuration:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/my-app /etc/nginx/sites-enabled/
+sudo nginx -t        # Test configuration syntax
+sudo systemctl restart nginx
+```
+
+### SSL with Let's Encrypt
+
+Install a free SSL certificate to enable HTTPS:
+
+```bash
+sudo apt install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+```
+
+Certbot will automatically configure Nginx to redirect HTTP to HTTPS and set up automatic certificate renewal.
+
+## Deploying with Docker
+
+If you prefer a more modern and manageable approach, Docker is an excellent choice:
+
+```bash
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker deploy
+newgrp docker  # Apply the new group immediately
+
+# Install Docker Compose plugin
+sudo apt install docker-compose-plugin -y
+
+# Verify installation
+docker --version
+docker compose version
+```
+
+## Docker Compose Deployment (Real-World Example)
+
+Here is a complete `docker-compose.yml` file for a Next.js + PostgreSQL + Nginx stack:
+
+```yaml
+version: '3.8'
+services:
+  app:
+    build: .
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://user:pass@db:5432/mydb
+      - NODE_ENV=production
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16
+    restart: always
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_USER=user
+      - POSTGRES_DB=mydb
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./certbot/conf:/etc/letsencrypt
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+```
+
+Managing your stack:
+
+```bash
+docker compose up -d        # Start in detached mode
+docker compose logs -f      # Follow logs
+docker compose ps           # View container status
+docker compose down         # Stop all containers
+```
+
+<Callout type="tip">Use a `.env` file to manage environment variables instead of hardcoding them in docker-compose.yml. Add `.env` to your `.gitignore` to prevent accidentally committing secrets to your repository.</Callout>
+
+## Monitoring and Maintenance
+
+After deployment, regular server monitoring is essential:
+
+- **htop:** View real-time RAM and CPU usage. Install with `sudo apt install htop -y`.
+- **pm2 monit:** Monitor Node.js processes when using PM2.
+- **docker stats:** View resource usage of running containers when using Docker.
+- **Automatic security updates:** Install `unattended-upgrades` to automatically apply security patches.
+
+```bash
+sudo apt install unattended-upgrades -y
+sudo dpkg-reconfigure --priority=low unattended-upgrades
+```
+
+- **Backups:** Use `rsync` to back up data to your local machine, or create snapshots from RackNerd's SolusVM management panel.
+
+## Tips for Saving Money and Optimizing Performance
+
+When running a VPS with limited RAM, these tips will help you get the most out of your resources:
+
+**Create a swap file when RAM is limited:**
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+**Enable gzip compression in Nginx** to reduce bandwidth usage:
+
+```nginx
+gzip on;
+gzip_types text/plain text/css application/json application/javascript text/xml;
+gzip_min_length 1000;
+```
+
+**Use SQLite instead of PostgreSQL** for small projects - this saves significant RAM (PostgreSQL uses ~100-200MB of RAM at idle).
+
+**Consider Caddy** as an alternative to Nginx if you want simpler auto-SSL. Caddy automatically obtains and renews SSL certificates without any additional configuration.
+
+<Diagram chart="graph LR\n    A[Local Dev] -->|git push| B[GitHub]\n    B -->|git pull / webhook| C[RackNerd VPS]\n    C --> D[Nginx / Caddy]\n    D -->|Reverse Proxy| E[PM2 / Docker]\n    E --> F[Node.js / Next.js App]\n    F --> G[Database: PostgreSQL / SQLite]" />
+
+## Conclusion
+
+RackNerd is an excellent choice for developers who want an affordable VPS to deploy side projects, blogs, APIs, or bots. With basic plans starting at less than a dollar per month, you get full control over your server with proper KVM virtualization. The workflow from purchasing a VPS, securing the server, to deploying Node.js/Next.js applications with PM2 or Docker is quite straightforward when you follow each step. Start small, optimize gradually, and scale up when the need arises.
+
+<Callout type="info">Always remember to back up your data regularly and keep your server's security updates current. Affordable VPS hosting does not mean you can afford to be lax about security.</Callout>

@@ -1,0 +1,220 @@
+---
+title: "Claude Models: Opus 4.6, Sonnet 4.6, and Haiku 4.5 Compared"
+description: "A detailed comparison of the three Claude model tiers available in Claude Code. Understand pricing, performance characteristics, and when to use each model for optimal development workflows."
+category: "claude-code"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 9
+tags: ["claude-code", "opus", "sonnet", "haiku", "models", "pricing", "comparison"]
+featured: true
+order: 3
+sources:
+  - title: "Claude Models Overview - Anthropic Docs"
+    url: "https://docs.anthropic.com/en/docs/about-claude/models"
+  - title: "Claude Code Model Selection"
+    url: "https://docs.anthropic.com/en/docs/claude-code/overview"
+  - title: "Anthropic Pricing"
+    url: "https://www.anthropic.com/pricing"
+---
+
+## The Claude Model Family
+
+Claude Code gives you access to Anthropic's full lineup of Claude models. Each model tier is designed for different use cases, balancing intelligence, speed, and cost. Choosing the right model for the right task is one of the most impactful decisions you can make when working with Claude Code.
+
+<Diagram chart="graph TD\n    A[Claude Model Family] --> B[Opus 4.6]\n    A --> C[Sonnet 4.6]\n    A --> D[Haiku 4.5]\n    B --> B1[Highest Intelligence]\n    B --> B2[Complex Reasoning]\n    B --> B3[Premium Pricing]\n    C --> C1[Balanced Performance]\n    C --> C2[Great for Daily Coding]\n    C --> C3[Moderate Pricing]\n    D --> D1[Fastest Response]\n    D --> D2[Simple Tasks]\n    D --> D3[Lowest Cost]" />
+
+## Model Overview
+
+### Claude Opus 4.6
+
+Opus is Anthropic's most capable model. It excels at complex reasoning, nuanced understanding, and tasks that require deep analysis across large codebases. Opus 4.6 features an extended context window of up to 1 million tokens, making it exceptional for tasks involving extensive files or long conversation histories.
+
+**Best for:**
+- Architectural decisions and system design
+- Complex multi-file refactoring
+- Debugging subtle, hard-to-reproduce issues
+- Security audits and code review
+- Understanding and working with unfamiliar, large codebases
+
+### Claude Sonnet 4.6
+
+Sonnet is the workhorse model, the default choice in Claude Code. It delivers strong coding performance at a significantly lower cost than Opus. Sonnet 4.6 strikes an excellent balance between intelligence and responsiveness, making it ideal for the vast majority of daily development tasks.
+
+**Best for:**
+- Day-to-day feature development
+- Writing and editing code
+- Running test suites and fixing failures
+- Code review and pull requests
+- General Q&A about your codebase
+
+### Claude Haiku 4.5
+
+Haiku is the fastest and most cost-effective model. While it has less reasoning depth than Opus or Sonnet, it is remarkably capable for straightforward tasks and excels when speed and volume matter more than depth.
+
+**Best for:**
+- Quick lookups and simple questions
+- Code formatting and linting fixes
+- Generating boilerplate code
+- Simple file operations
+- High-volume, low-complexity automation
+
+<Callout type="info">
+Claude Code defaults to Sonnet 4.6 for interactive sessions. You can switch models at any time using the `/model` command or the `--model` flag when launching Claude Code.
+</Callout>
+
+## Detailed Comparison
+
+<ComparisonTable
+  headers={["Characteristic", "Opus 4.6", "Sonnet 4.6", "Haiku 4.5"]}
+  rows={[
+    ["Intelligence", "Highest", "High", "Good"],
+    ["Speed (time to first token)", "Slower", "Fast", "Fastest"],
+    ["Context Window", "Up to 1M tokens", "200K tokens", "200K tokens"],
+    ["Max Output Tokens", "32K tokens", "16K tokens", "8K tokens"],
+    ["Input Pricing (per 1M tokens)", "$15.00", "$3.00", "$0.80"],
+    ["Output Pricing (per 1M tokens)", "$75.00", "$15.00", "$4.00"],
+    ["Complex Reasoning", "Excellent", "Very Good", "Adequate"],
+    ["Code Generation Quality", "Excellent", "Excellent", "Good"],
+    ["Multi-File Operations", "Excellent", "Very Good", "Limited"],
+    ["Default in Claude Code", "No", "Yes", "No"]
+  ]}
+/>
+
+<Callout type="warning">
+Pricing is based on token usage. A typical coding session might consume 10K-100K input tokens and 2K-20K output tokens per interaction. Monitor your usage if you are on API billing to avoid unexpected costs.
+</Callout>
+
+## Switching Models in Claude Code
+
+### At Launch
+
+```bash
+# Use Opus for a complex task
+claude --model claude-opus-4-20250918
+
+# Use Haiku for quick lookups
+claude --model claude-haiku-4-5-20241022
+
+# Default (Sonnet)
+claude
+```
+
+### During a Session
+
+Use the `/model` slash command to switch models mid-conversation:
+
+```
+/model claude-opus-4-20250918
+```
+
+This is particularly useful when you start exploring a problem with Sonnet and realize you need Opus-level reasoning for a specific sub-task.
+
+### In Configuration
+
+Set your preferred default model in your Claude Code settings:
+
+```json
+{
+  "model": "claude-sonnet-4-20250514",
+  "smallModel": "claude-haiku-4-5-20241022"
+}
+```
+
+The `smallModel` setting determines which model is used for background tasks like summarization and context compression.
+
+## Cost Optimization Strategies
+
+Understanding the cost dynamics helps you use Claude Code efficiently without sacrificing quality.
+
+<Diagram chart="graph LR\n    A[Task Arrives] --> B{Complexity?}\n    B -->|Simple lookup| C[Haiku]\n    B -->|Standard coding| D[Sonnet]\n    B -->|Complex analysis| E[Opus]\n    C --> F[Low Cost]\n    D --> G[Moderate Cost]\n    E --> H[Higher Cost]\n    F --> I[Fast Result]\n    G --> I\n    H --> I" />
+
+### Strategy 1: Right-Size Your Model
+
+Not every task needs Opus. Use this decision framework:
+
+**Use Haiku when:**
+- You know exactly what you want and just need it typed out
+- The task is mechanical (rename variables, add imports, format code)
+- You need fast iteration on small changes
+
+**Use Sonnet when:**
+- You are writing new features or fixing bugs
+- You need the model to understand context and make decisions
+- You want good code review feedback
+
+**Use Opus when:**
+- The bug is subtle and requires reasoning across many files
+- You are making architectural decisions
+- You need to understand a complex, unfamiliar codebase
+- Security or correctness is critical
+
+### Strategy 2: Start Small, Escalate
+
+Begin with Sonnet for most tasks. If you notice the model struggling, missing context, or producing suboptimal results, escalate to Opus. This approach keeps costs down while ensuring quality when it matters.
+
+```bash
+# Start with Sonnet
+claude
+
+# If the task proves too complex, switch mid-session
+> /model claude-opus-4-20250918
+> Let's revisit that architecture question with more depth
+```
+
+### Strategy 3: Use Compact Mode
+
+Long conversations consume more tokens. Use the `/compact` command to compress your conversation history, reducing the input tokens sent with each subsequent message.
+
+```
+/compact
+```
+
+This is especially valuable during extended Opus sessions where input costs are $15 per million tokens.
+
+### Strategy 4: Leverage the Small Model
+
+Claude Code uses a smaller model for background operations like context summarization. Ensure your `smallModel` is set to Haiku for cost efficiency:
+
+```json
+{
+  "smallModel": "claude-haiku-4-5-20241022"
+}
+```
+
+## Performance Benchmarks in Practice
+
+While synthetic benchmarks provide one perspective, real-world coding performance varies by task type. Here is what developers typically experience:
+
+<ComparisonTable
+  headers={["Task Type", "Opus 4.6", "Sonnet 4.6", "Haiku 4.5"]}
+  rows={[
+    ["Simple function generation", "Excellent (overkill)", "Excellent", "Very Good"],
+    ["Multi-file refactoring", "Excellent", "Good", "Struggles"],
+    ["Bug diagnosis (complex)", "Excellent", "Good", "Poor"],
+    ["Test writing", "Excellent", "Excellent", "Good"],
+    ["Code explanation", "Excellent (most thorough)", "Very Good", "Good (concise)"],
+    ["API integration", "Excellent", "Very Good", "Adequate"],
+    ["Architecture design", "Excellent", "Good", "Not Recommended"],
+    ["Response time", "3-10 seconds", "1-4 seconds", "0.5-2 seconds"]
+  ]}
+/>
+
+<Callout type="tip">
+For teams on a budget, a good rule of thumb is to use Sonnet for 80% of tasks, Opus for 15% of complex tasks, and Haiku for 5% of simple, high-volume operations. This typically yields the best cost-to-quality ratio.
+</Callout>
+
+## Context Window Considerations
+
+The context window determines how much information the model can process in a single interaction. This is critical for Claude Code because it needs to hold your conversation history, file contents, and tool results all within the context window.
+
+- **Opus 4.6 (1M tokens)**: Can hold approximately 700K words, enough for an entire medium-sized codebase
+- **Sonnet 4.6 (200K tokens)**: About 140K words, sufficient for most individual tasks
+- **Haiku 4.5 (200K tokens)**: Same window as Sonnet but with less reasoning depth
+
+When working on large projects, Opus's extended context window becomes a significant advantage. It can reason about more files simultaneously without losing track of earlier context.
+
+## Making the Right Choice
+
+The model you choose should match your task, not your ego. There is no shame in using Haiku for simple tasks, and there is no waste in using Opus when the problem demands it. The key is being intentional about your selection and adjusting as the task evolves.
+
+Claude Code makes this easy by allowing seamless model switching within a session. Start with Sonnet, observe the quality of responses, and escalate or simplify as needed. Over time, you will develop an intuition for which tasks benefit from each model tier.

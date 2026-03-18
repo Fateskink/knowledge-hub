@@ -1,0 +1,197 @@
+---
+title: "Circuits and Logic Gates: How Hardware Does Math"
+description: "Learn the fundamentals of electronic circuits — resistors, capacitors, inductors — then build up to logic gates, truth tables, half and full adders, and flip-flops that form the basis of all digital computing."
+category: "hardware"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 9
+tags: ["logic-gates", "circuits", "adder", "flip-flop", "electronics", "digital-logic", "truth-tables", "boolean-algebra"]
+featured: false
+order: 5
+sources:
+  - title: "Digital Logic Design — All About Circuits"
+    url: "https://www.allaboutcircuits.com/textbook/digital/"
+  - title: "Boolean Algebra and Logic Gates — Khan Academy"
+    url: "https://www.khanacademy.org/computing/ap-computer-science-principles/computers-101"
+  - title: "Electronics Fundamentals — SparkFun"
+    url: "https://learn.sparkfun.com/tutorials/what-is-electricity"
+  - title: "Flip-Flops and Sequential Logic — MIT OpenCourseWare"
+    url: "https://ocw.mit.edu/courses/6-004-computation-structures-spring-2017/"
+---
+
+# Circuits and Logic Gates: How Hardware Does Math
+
+Computers do not understand words, images, or ideas. At the lowest level, they only understand two things: on and off, high voltage and low voltage, 1 and 0. Every video you stream, every message you send, and every calculation you make is ultimately performed by circuits that manipulate these binary signals using logic gates. To truly understand how computers work, you need to start here — at the circuit level.
+
+<Callout type="info">
+Everything in digital computing — from a simple calculator to a multi-billion-dollar data center — is built from the same handful of basic logic gates. The complexity comes from combining them, not from any single gate being complex.
+</Callout>
+
+## Basic Electronic Components
+
+Before diving into digital logic, let us understand the three fundamental passive electronic components that appear in virtually every circuit.
+
+### Resistor
+
+A resistor opposes the flow of electric current. It is the most common electronic component, used to control voltage levels, limit current, and divide voltages. Resistance is measured in ohms. Ohm's Law defines the relationship between voltage (V), current (I), and resistance (R):
+
+**V = I x R**
+
+If you apply 5 volts across a 1,000-ohm resistor, 5 milliamps of current will flow (5V / 1000 ohms = 0.005A).
+
+### Capacitor
+
+A capacitor stores electrical energy in an electric field between two conductive plates separated by an insulating material (dielectric). Capacitance is measured in farads. Capacitors are crucial for:
+
+- **Filtering:** Smoothing out voltage fluctuations in power supplies.
+- **Timing:** Combined with resistors, they create time delays (RC circuits).
+- **Memory:** DRAM uses tiny capacitors to store individual bits.
+- **Decoupling:** Absorbing voltage spikes near sensitive chips.
+
+### Inductor
+
+An inductor stores energy in a magnetic field when current flows through a coil of wire. Inductance is measured in henrys. Inductors resist changes in current — they oppose increasing current by generating a reverse voltage and oppose decreasing current by trying to maintain it. They are used in power regulation, filtering, and wireless charging systems.
+
+<Diagram chart="graph LR\n    R[Resistor\nOpposes current flow\nV = IR] --> C[Capacitor\nStores charge\nQ = CV]\n    C --> L[Inductor\nStores magnetic energy\nV = L di/dt]\n    R --> COMBO[Combined in circuits:\nFilters, Timers, Oscillators,\nPower Supplies]" />
+
+## Logic Gates and Truth Tables
+
+Logic gates are circuits that implement Boolean logic operations. Each gate takes one or more binary inputs and produces a single binary output according to a fixed rule. Here are the fundamental gates and their truth tables.
+
+### NOT Gate (Inverter)
+
+The simplest gate — it has one input and one output. It flips the input: 0 becomes 1, and 1 becomes 0.
+
+| Input A | Output |
+|---------|--------|
+| 0       | 1      |
+| 1       | 0      |
+
+### AND Gate
+
+Output is 1 only when ALL inputs are 1.
+
+| Input A | Input B | Output |
+|---------|---------|--------|
+| 0       | 0       | 0      |
+| 0       | 1       | 0      |
+| 1       | 0       | 0      |
+| 1       | 1       | 1      |
+
+### OR Gate
+
+Output is 1 when ANY input is 1.
+
+| Input A | Input B | Output |
+|---------|---------|--------|
+| 0       | 0       | 0      |
+| 0       | 1       | 1      |
+| 1       | 0       | 1      |
+| 1       | 1       | 1      |
+
+### NAND Gate
+
+The inverse of AND — output is 0 only when all inputs are 1. NAND is called a universal gate because any other gate can be constructed from NAND gates alone.
+
+| Input A | Input B | Output |
+|---------|---------|--------|
+| 0       | 0       | 1      |
+| 0       | 1       | 1      |
+| 1       | 0       | 1      |
+| 1       | 1       | 0      |
+
+### XOR Gate (Exclusive OR)
+
+Output is 1 when inputs are different.
+
+| Input A | Input B | Output |
+|---------|---------|--------|
+| 0       | 0       | 0      |
+| 0       | 1       | 1      |
+| 1       | 0       | 1      |
+| 1       | 1       | 0      |
+
+<Callout type="tip">
+The XOR gate is essential for arithmetic circuits. Notice that its output matches the sum column of binary addition (ignoring the carry). This is not a coincidence — it is exactly why XOR gates are the core of adder circuits.
+</Callout>
+
+## Building an Adder: How Circuits Do Math
+
+The ability to add numbers is the foundation of all arithmetic in a computer. Subtraction, multiplication, and division are all built on top of addition. Let us build an adder from logic gates.
+
+### Half Adder
+
+A half adder adds two single-bit numbers (A and B) and produces a Sum and a Carry.
+
+<Diagram chart="graph LR\n    A[Input A] --> XOR[XOR Gate]\n    B[Input B] --> XOR\n    A --> AND[AND Gate]\n    B --> AND\n    XOR --> S[Sum]\n    AND --> C[Carry]" />
+
+| A | B | Sum | Carry |
+|---|---|-----|-------|
+| 0 | 0 | 0   | 0     |
+| 0 | 1 | 1   | 0     |
+| 1 | 0 | 1   | 0     |
+| 1 | 1 | 0   | 1     |
+
+The Sum is A XOR B. The Carry is A AND B. Just two gates and we can add single-bit numbers. But the half adder has a limitation: it cannot handle a carry input from a previous addition.
+
+### Full Adder
+
+A full adder adds three bits: A, B, and a Carry-in (Cin) from the previous column. It produces a Sum and a Carry-out (Cout).
+
+<Diagram chart="graph LR\n    A[Input A] --> XOR1[XOR]\n    B[Input B] --> XOR1\n    XOR1 --> XOR2[XOR]\n    Cin[Carry In] --> XOR2\n    XOR2 --> Sum[Sum]\n    A --> AND1[AND]\n    B --> AND1\n    XOR1 --> AND2[AND]\n    Cin --> AND2\n    AND1 --> OR[OR]\n    AND2 --> OR\n    OR --> Cout[Carry Out]" />
+
+| A | B | Cin | Sum | Cout |
+|---|---|-----|-----|------|
+| 0 | 0 | 0   | 0   | 0    |
+| 0 | 0 | 1   | 1   | 0    |
+| 0 | 1 | 0   | 1   | 0    |
+| 0 | 1 | 1   | 0   | 1    |
+| 1 | 0 | 0   | 1   | 0    |
+| 1 | 0 | 1   | 0   | 1    |
+| 1 | 1 | 0   | 0   | 1    |
+| 1 | 1 | 1   | 1   | 1    |
+
+### Ripple Carry Adder
+
+To add multi-bit numbers, chain full adders together. The carry-out of each adder feeds into the carry-in of the next. An 8-bit adder uses 8 full adders in series.
+
+<Diagram chart="graph LR\n    FA0[Full Adder\nBit 0] -->|Carry| FA1[Full Adder\nBit 1]\n    FA1 -->|Carry| FA2[Full Adder\nBit 2]\n    FA2 -->|Carry| FA3[Full Adder\nBit 3]\n    FA3 -->|Carry| OVF[Overflow/Carry Out]" />
+
+<Callout type="warning">
+The ripple carry adder has a significant drawback: each stage must wait for the carry from the previous stage before it can produce its result. For a 64-bit adder, the carry must ripple through all 64 stages. Real CPUs use more sophisticated designs like **carry-lookahead adders** that calculate carries in parallel, dramatically reducing delay.
+</Callout>
+
+## Flip-Flops: Remembering One Bit
+
+Logic gates alone are combinational — their output depends only on current inputs. To build memory and sequential circuits, we need elements that can store state. The most fundamental storage element is the flip-flop.
+
+### SR Latch
+
+The simplest memory element uses two cross-coupled NOR gates (or NAND gates). It has two inputs — Set (S) and Reset (R) — and stores one bit.
+
+<Diagram chart="graph LR\n    S[Set] --> NOR1[NOR]\n    NOR2_out[Q-bar] --> NOR1\n    NOR1 --> Q[Q - Output]\n    R[Reset] --> NOR2[NOR]\n    Q --> NOR2\n    NOR2 --> NOR2_out" />
+
+- When S=1 and R=0: Q becomes 1 (the bit is set).
+- When S=0 and R=1: Q becomes 0 (the bit is reset).
+- When S=0 and R=0: Q holds its previous value — the latch remembers.
+- When S=1 and R=1: Invalid state (both outputs try to be 0), which must be avoided.
+
+### D Flip-Flop
+
+The D (Data) flip-flop is the most commonly used flip-flop in digital design. It captures the value of the data input (D) at a specific moment — the rising edge of the clock signal — and holds that value until the next clock edge.
+
+Every register in a CPU is built from D flip-flops. An 8-bit register is simply 8 D flip-flops sharing the same clock signal. A 64-bit register uses 64. The register file in a modern CPU contains thousands of flip-flops.
+
+<Callout type="info">
+The connection from basic components to a working computer is direct and traceable. Transistors form logic gates. Logic gates form adders and flip-flops. Adders become the ALU. Flip-flops become registers and memory. Combine the ALU, registers, and a control unit, and you have a CPU. There is no magic — just layers of well-understood engineering.
+</Callout>
+
+## From Gates to Processors
+
+The journey from a single transistor to a working processor is a masterclass in abstraction:
+
+<Diagram chart="graph TD\n    T[Transistors] --> LG[Logic Gates\nNOT, AND, OR, XOR]\n    LG --> COMB[Combinational Circuits\nAdders, Multiplexers, Decoders]\n    LG --> SEQ[Sequential Circuits\nFlip-Flops, Registers, Counters]\n    COMB --> ALU[ALU - Arithmetic Logic Unit]\n    SEQ --> REG[Register File]\n    SEQ --> MEM[Memory Arrays]\n    ALU --> CPU[CPU]\n    REG --> CPU\n    MEM --> CPU\n    CPU --> COMP[Complete Computer System]" />
+
+Each layer hides the complexity of the layer below. A software developer writing Python does not think about flip-flops, just as a flip-flop designer does not think about individual electron movements in the transistor. This abstraction is what makes modern computing possible — no single person could hold all the details in their head simultaneously.
+
+Understanding circuits and logic gates gives you X-ray vision into the machines we use every day. You begin to see that a computer is not a mysterious black box but a beautifully engineered stack of simple components, each doing a small job, combining to accomplish extraordinary things.

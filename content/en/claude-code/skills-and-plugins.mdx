@@ -1,0 +1,268 @@
+---
+title: "Claude Code Skills and Plugins: Extending Your AI Assistant"
+description: "Learn how to use and create custom skills in Claude Code to extend its capabilities with reusable, shareable prompt-based workflows for common development tasks."
+category: "claude-code"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 7
+tags: ["claude-code", "skills", "plugins", "automation", "slash-commands"]
+featured: false
+order: 2
+sources:
+  - title: "Claude Code Skills - Anthropic Docs"
+    url: "https://docs.anthropic.com/en/docs/claude-code/skills"
+  - title: "Claude Code Configuration"
+    url: "https://docs.anthropic.com/en/docs/claude-code/settings"
+---
+
+## Understanding Skills in Claude Code
+
+Skills are one of Claude Code's most powerful extensibility features. A skill is essentially a **reusable prompt template** that can be invoked via a slash command. Skills allow you to encapsulate complex instructions, coding standards, or multi-step workflows into a single, easy-to-trigger command.
+
+When you type `/` in a Claude Code session, you see a list of available skills. Some are built-in, and others can be custom-defined by you or your team.
+
+<Diagram chart="graph TD\n    A[Skill Invocation] --> B{Skill Type}\n    B -->|Built-in| C[Pre-packaged Skills]\n    B -->|Project-level| D[.claude/skills/]\n    B -->|User-level| E[~/.claude/skills/]\n    C --> F[Execute Skill Logic]\n    D --> F\n    E --> F\n    F --> G[Claude Processes Prompt]\n    G --> H[Actions Taken]" />
+
+## Built-in Skills
+
+Claude Code ships with several built-in skills that handle common development workflows:
+
+### `/commit` - Smart Git Commits
+
+The commit skill analyzes your staged and unstaged changes, generates a meaningful commit message following conventional commit standards, and creates the commit for you.
+
+```bash
+# Stage your changes, then invoke the skill
+git add .
+# In Claude Code session:
+/commit
+```
+
+Claude will examine the diff, understand the nature of the changes, and propose a well-structured commit message.
+
+### `/review-pr` - Pull Request Review
+
+This skill reviews a pull request, analyzing the code changes for potential bugs, style issues, and architectural concerns.
+
+```bash
+/review-pr 142
+```
+
+### `/pr` - Create Pull Requests
+
+Generates a pull request with a descriptive title and detailed body summarizing the changes.
+
+<Callout type="tip">
+Built-in skills are designed to follow best practices out of the box. The `/commit` skill, for example, will never force-push or amend previous commits without your explicit permission.
+</Callout>
+
+## Creating Custom Skills
+
+Custom skills are markdown files (`.md`) placed in specific directories. Each file becomes a slash command named after the file.
+
+### Skill File Structure
+
+A skill file is simply a markdown document containing instructions for Claude. The filename (without extension) becomes the command name.
+
+```markdown
+<!-- File: .claude/skills/add-tests.md -->
+# Add Tests
+
+When this skill is invoked, analyze the specified file or module and:
+
+1. Identify all public functions and methods
+2. Determine the testing framework used in this project
+3. Generate comprehensive unit tests covering:
+   - Happy path scenarios
+   - Edge cases
+   - Error handling
+4. Place tests in the appropriate test directory following project conventions
+5. Run the tests to verify they pass
+
+Always use the existing test patterns found in the project.
+```
+
+### Skill Locations
+
+Skills can be defined at three levels, each with different scope:
+
+<ComparisonTable
+  headers={["Location", "Scope", "Use Case"]}
+  rows={[
+    [".claude/skills/", "Project-level (shared with team)", "Team coding standards, project-specific workflows"],
+    ["~/.claude/skills/", "User-level (personal)", "Personal preferences, cross-project utilities"],
+    ["Built-in", "Global (all users)", "Common tasks like commits and PRs"]
+  ]}
+/>
+
+### Project-Level Skills
+
+Place skill files in your project's `.claude/skills/` directory. These are committed to version control and shared with your entire team.
+
+```bash
+mkdir -p .claude/skills
+```
+
+```markdown
+<!-- .claude/skills/api-endpoint.md -->
+# Create API Endpoint
+
+When creating a new API endpoint:
+
+1. Create the route handler in `src/routes/`
+2. Add input validation using Zod schemas in `src/schemas/`
+3. Implement the business logic in `src/services/`
+4. Add error handling with proper HTTP status codes
+5. Write integration tests in `tests/integration/`
+6. Update the OpenAPI spec in `docs/openapi.yaml`
+
+Follow RESTful conventions. Use kebab-case for URL paths.
+Always include request/response type definitions.
+```
+
+Once saved, any team member can invoke this with `/api-endpoint` in their Claude Code session.
+
+### User-Level Skills
+
+For personal skills that span all your projects, place them in `~/.claude/skills/`:
+
+```markdown
+<!-- ~/.claude/skills/refactor.md -->
+# Refactor Code
+
+When refactoring the specified code:
+
+1. First explain the current structure and its issues
+2. Propose the refactored approach with rationale
+3. Implement the changes incrementally
+4. Ensure all existing tests still pass
+5. Add tests for any new code paths
+
+Prefer composition over inheritance.
+Follow the Single Responsibility Principle.
+Keep functions under 20 lines when possible.
+```
+
+<Callout type="info">
+User-level skills take precedence over project-level skills when there is a naming conflict. Built-in skills can be overridden by both project-level and user-level skills.
+</Callout>
+
+## Advanced Skill Patterns
+
+### Parameterized Skills
+
+Skills can reference arguments passed after the command. Claude interprets the natural language context following the slash command.
+
+```markdown
+<!-- .claude/skills/migrate-component.md -->
+# Migrate Component
+
+Migrate the specified React component:
+
+1. Convert from class component to functional component with hooks
+2. Replace lifecycle methods with useEffect
+3. Convert local state to useState
+4. Preserve all existing props and their types
+5. Update any tests for the migrated component
+6. Verify the component renders correctly
+```
+
+Usage:
+
+```
+/migrate-component the UserProfile component in src/components/
+```
+
+### Multi-Step Workflow Skills
+
+Skills can encode complex, multi-step workflows:
+
+```markdown
+<!-- .claude/skills/feature-scaffold.md -->
+# Feature Scaffold
+
+Create a complete feature scaffold with the following structure:
+
+1. **Component**: Create a React component in `src/features/{name}/`
+2. **Hook**: Create a custom hook in `src/features/{name}/hooks/`
+3. **Types**: Define TypeScript interfaces in `src/features/{name}/types.ts`
+4. **API Layer**: Create API client functions in `src/features/{name}/api.ts`
+5. **Tests**: Create test files for component and hook
+6. **Story**: Create a Storybook story for the component
+7. **Index**: Create a barrel export file
+
+Ask for the feature name if not provided.
+```
+
+<Diagram chart="graph LR\n    A[/feature-scaffold] --> B[Create Component]\n    B --> C[Create Hook]\n    C --> D[Define Types]\n    D --> E[API Layer]\n    E --> F[Write Tests]\n    F --> G[Create Story]\n    G --> H[Barrel Export]" />
+
+### Skills with Coding Standards
+
+One of the most valuable uses of skills is encoding your team's coding standards:
+
+```markdown
+<!-- .claude/skills/code-review.md -->
+# Code Review
+
+Review the current changes against our team standards:
+
+## Checks
+- [ ] No console.log statements (use logger utility)
+- [ ] All functions have JSDoc comments
+- [ ] Error handling uses custom AppError class
+- [ ] Database queries use parameterized statements
+- [ ] API responses follow our standard envelope format
+- [ ] No hardcoded strings (use i18n keys)
+- [ ] Components have display names for React DevTools
+- [ ] Accessibility: interactive elements have aria labels
+
+Report findings grouped by severity: critical, warning, suggestion.
+```
+
+## Skills Best Practices
+
+<Callout type="warning">
+Avoid making skills too broad or vague. A skill that says "make the code better" gives Claude too much latitude. Specific, actionable instructions produce consistently better results.
+</Callout>
+
+### Writing Effective Skills
+
+1. **Be specific**: Clearly state what the skill should do, step by step
+2. **Reference project conventions**: Mention file paths, naming patterns, and tools used in your project
+3. **Include constraints**: State what the skill should NOT do
+4. **Provide examples**: When possible, include example output or patterns to follow
+5. **Keep them focused**: One skill per workflow; compose multiple skills for complex tasks
+
+### Organizing Skills
+
+```
+.claude/skills/
+  commit.md           # Override default commit behavior
+  review.md           # Code review checklist
+  api-endpoint.md     # Create new API endpoints
+  migration.md        # Database migration workflow
+  deploy-check.md     # Pre-deployment verification
+```
+
+### Sharing Skills Across Teams
+
+Since project-level skills live in `.claude/skills/`, they are version-controlled alongside your code. This means:
+
+- New team members automatically get all project skills
+- Skills evolve with your codebase through pull requests
+- You can review skill changes just like code changes
+
+<Callout type="tip">
+Consider creating a `README.md` inside your `.claude/skills/` directory that documents each skill's purpose and usage. This helps team members discover and understand available skills without reading each file.
+</Callout>
+
+## Debugging Skills
+
+If a skill is not behaving as expected:
+
+1. **Check the file location**: Ensure the `.md` file is in the correct directory
+2. **Verify the filename**: The slash command matches the filename (without `.md`)
+3. **Test incrementally**: Start with simple instructions and add complexity
+4. **Review Claude's interpretation**: Ask Claude to explain what it understood from the skill before executing
+
+Skills transform Claude Code from a general-purpose AI assistant into a customized development partner that knows your team's workflows, standards, and preferences. Start with a few simple skills and expand as you discover patterns in your daily work.

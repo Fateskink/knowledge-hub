@@ -1,0 +1,308 @@
+---
+title: "Redis và Caching"
+description: "Tìm hiểu Redis, các cấu trúc dữ liệu của Redis, caching strategies như Cache-aside, Write-through, Write-back, và ứng dụng Pub/Sub, session management."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["redis", "caching", "cache", "pub-sub", "session", "performance", "in-memory"]
+featured: false
+order: 6
+sources:
+  - title: "Redis Official Documentation"
+    url: "https://redis.io/docs/"
+  - title: "Redis University"
+    url: "https://university.redis.io/"
+  - title: "AWS Caching Best Practices"
+    url: "https://aws.amazon.com/caching/best-practices/"
+  - title: "Redis GitHub Repository"
+    url: "https://github.com/redis/redis"
+---
+
+# Redis và Caching
+
+Redis (Remote Dictionary Server) là một hệ thống lưu trữ dữ liệu in-memory, hoạt động như database, cache và message broker. Với tốc độ đọc/ghi cực nhanh (hàng trăm nghìn thao tác mỗi giây), Redis là lựa chọn hàng đầu cho caching và các ứng dụng cần hiệu suất cao.
+
+## Redis là gì?
+
+Redis lưu trữ dữ liệu trong bộ nhớ RAM thay vì ổ cứng, nên tốc độ truy cập nhanh hơn database truyền thống hàng trăm lần. Redis hỗ trợ nhiều cấu trúc dữ liệu phong phú, không chỉ đơn giản là key-value store.
+
+<Diagram chart="graph TD\n    A[Ứng dụng] --> B{Redis Cache}\n    B -->|Cache Hit| A\n    B -->|Cache Miss| C[Database\nPostgreSQL/MySQL]\n    C -->|Dữ liệu| B\n    B -->|Lưu cache và trả về| A" />
+
+### Các cấu trúc dữ liệu của Redis
+
+```bash
+# STRING - Cấu trúc đơn giản nhất
+SET user:name "Nguyen Van A"
+GET user:name
+# => "Nguyen Van A"
+
+SET counter 0
+INCR counter      # => 1
+INCRBY counter 5  # => 6
+
+# Đặt TTL (Time To Live) - tự động xóa sau 3600 giây
+SET session:abc123 "user-data" EX 3600
+
+# HASH - Lưu object (giống dictionary)
+HSET user:1 name "Nguyen Van A" email "a@example.com" age 28
+HGET user:1 name          # => "Nguyen Van A"
+HGETALL user:1            # => Tất cả các field
+
+# LIST - Danh sách có thứ tự
+LPUSH notifications:user1 "Bạn có đơn hàng mới"
+LPUSH notifications:user1 "Ai đó đã like bài viết của bạn"
+LRANGE notifications:user1 0 -1  # Lấy tất cả
+
+# SET - Tập hợp không trùng lặp
+SADD online:users "user1" "user2" "user3"
+SISMEMBER online:users "user1"  # => 1 (true)
+SMEMBERS online:users           # => Tất cả members
+
+# SORTED SET - Tập hợp có điểm số
+ZADD leaderboard 100 "player1" 200 "player2" 150 "player3"
+ZREVRANGE leaderboard 0 2 WITHSCORES  # Top 3 cao nhất
+ZRANK leaderboard "player1"            # Thứ hạng
+```
+
+<Callout type="info">Redis lưu dữ liệu trong RAM nên rất nhanh nhưng dung lượng có hạn và đắt hơn. Chỉ cache những dữ liệu được truy cập thường xuyên và chấp nhận được độ trễ nhất định nếu cache miss. Dữ liệu quan trọng nên được lưu trong database chính.</Callout>
+
+## Caching Strategies
+
+### 1. Cache-Aside (Lazy Loading)
+
+Ứng dụng tự quản lý cache: kiểm tra cache trước, nếu không có thì truy vấn database rồi lưu vào cache.
+
+<Diagram chart="graph TD\n    A[Client Request] --> B{Cache có dữ liệu?}\n    B -->|Có - Cache Hit| C[Trả về từ Cache]\n    B -->|Không - Cache Miss| D[Truy vấn Database]\n    D --> E[Lưu vào Cache]\n    E --> F[Trả về Client]" />
+
+```typescript
+import Redis from 'ioredis';
+const redis = new Redis();
+
+// Cache-Aside pattern
+async function getProduct(productId: string) {
+  const cacheKey = `product:${productId}`;
+
+  // 1. Kiểm tra cache
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    console.log('Cache HIT');
+    return JSON.parse(cached);
+  }
+
+  // 2. Cache miss - truy vấn database
+  console.log('Cache MISS');
+  const product = await db.query(
+    'SELECT * FROM products WHERE id = $1',
+    [productId]
+  );
+
+  // 3. Lưu vào cache với TTL 30 phút
+  await redis.set(cacheKey, JSON.stringify(product), 'EX', 1800);
+
+  return product;
+}
+
+// Khi cập nhật dữ liệu, xóa cache
+async function updateProduct(productId: string, data: any) {
+  await db.query(
+    'UPDATE products SET name = $1, price = $2 WHERE id = $3',
+    [data.name, data.price, productId]
+  );
+
+  // Xóa cache để lần truy vấn sau sẽ lấy dữ liệu mới
+  await redis.del(`product:${productId}`);
+}
+```
+
+### 2. Write-Through
+
+Dữ liệu được ghi đồng thời vào cache và database. Đảm bảo cache luôn đồng bộ với database.
+
+```typescript
+async function saveUser(userId: string, userData: any) {
+  // Ghi vào database
+  await db.query(
+    'INSERT INTO users (id, name, email) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET name = $2, email = $3',
+    [userId, userData.name, userData.email]
+  );
+
+  // Ghi vào cache ngay lập tức
+  await redis.set(
+    `user:${userId}`,
+    JSON.stringify(userData),
+    'EX', 3600
+  );
+}
+```
+
+### 3. Write-Back (Write-Behind)
+
+Dữ liệu ghi vào cache trước, rồi đồng bộ vào database sau (batch hoặc định kỳ). Nhanh hơn nhưng có nguy cơ mất dữ liệu.
+
+```typescript
+// Write-Back: Ghi vào cache trước, đồng bộ database sau
+async function incrementPageView(pageId: string) {
+  // Ghi vào Redis ngay lập tức (rất nhanh)
+  await redis.hincrby('page-views', pageId, 1);
+}
+
+// Chạy định kỳ để đồng bộ vào database
+async function syncPageViewsToDatabase() {
+  const views = await redis.hgetall('page-views');
+
+  for (const [pageId, count] of Object.entries(views)) {
+    await db.query(
+      'UPDATE pages SET view_count = view_count + $1 WHERE id = $2',
+      [parseInt(count), pageId]
+    );
+  }
+
+  // Reset counter trong Redis
+  await redis.del('page-views');
+}
+
+// Đồng bộ mỗi 5 phút
+setInterval(syncPageViewsToDatabase, 5 * 60 * 1000);
+```
+
+<Callout type="warning">Write-Back nhanh nhưng có nguy cơ mất dữ liệu nếu Redis bị crash trước khi đồng bộ. Chỉ sử dụng cho dữ liệu có thể chấp nhận mất (ví dụ: view count, analytics). Không dùng cho dữ liệu tài chính hoặc giao dịch quan trọng.</Callout>
+
+## Pub/Sub với Redis
+
+Redis hỗ trợ Publish/Subscribe để gửi tin nhắn realtime giữa các thành phần:
+
+```typescript
+// === Publisher ===
+import Redis from 'ioredis';
+const publisher = new Redis();
+
+// Gửi thông báo khi có order mới
+async function notifyNewOrder(order: any) {
+  await publisher.publish('orders:new', JSON.stringify({
+    orderId: order.id,
+    userId: order.userId,
+    total: order.total,
+    timestamp: Date.now()
+  }));
+}
+
+// === Subscriber ===
+const subscriber = new Redis();
+
+subscriber.subscribe('orders:new', 'orders:cancelled', (err, count) => {
+  console.log(`Đã subscribe ${count} channels`);
+});
+
+subscriber.on('message', (channel, message) => {
+  const data = JSON.parse(message);
+
+  switch (channel) {
+    case 'orders:new':
+      console.log('Order mới:', data.orderId);
+      sendEmailNotification(data);
+      break;
+    case 'orders:cancelled':
+      console.log('Order bị hủy:', data.orderId);
+      processRefund(data);
+      break;
+  }
+});
+```
+
+<Callout type="tip">Redis Pub/Sub là "fire and forget" -- nếu subscriber không online khi tin nhắn được gửi, nó sẽ mất tin nhắn đó. Nếu cần đảm bảo tin nhắn không bị mất, hãy sử dụng Redis Streams hoặc message broker như RabbitMQ.</Callout>
+
+## Session Management
+
+Redis là lựa chọn lý tưởng để lưu trữ session trong ứng dụng web, đặc biệt khi có nhiều server (horizontal scaling):
+
+```typescript
+// Express.js với Redis session store
+import express from 'express';
+import session from 'express-session';
+import RedisStore from 'connect-redis';
+import Redis from 'ioredis';
+
+const app = express();
+const redis = new Redis();
+
+app.use(session({
+  store: new RedisStore({ client: redis }),
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: true,       // Chỉ gửi qua HTTPS
+    httpOnly: true,      // Không cho JavaScript truy cập
+    maxAge: 24 * 60 * 60 * 1000  // 1 ngày
+  }
+}));
+
+// Sử dụng session
+app.post('/login', async (req, res) => {
+  const user = await authenticateUser(req.body);
+  if (user) {
+    req.session.userId = user.id;
+    req.session.role = user.role;
+    res.json({ success: true });
+  }
+});
+
+app.get('/profile', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Chưa đăng nhập' });
+  }
+  // ... lấy thông tin user
+});
+```
+
+## Rate Limiting với Redis
+
+```typescript
+// Rate limiter đơn giản với Redis
+async function rateLimit(
+  userId: string,
+  limit: number = 100,
+  windowSeconds: number = 60
+): Promise<boolean> {
+  const key = `ratelimit:${userId}`;
+
+  const current = await redis.incr(key);
+
+  if (current === 1) {
+    // Lần đầu tiên, đặt thời gian hết hạn
+    await redis.expire(key, windowSeconds);
+  }
+
+  if (current > limit) {
+    return false; // Đã vượt giới hạn
+  }
+
+  return true; // Cho phép
+}
+
+// Sử dụng trong middleware
+app.use(async (req, res, next) => {
+  const allowed = await rateLimit(req.ip, 100, 60);
+  if (!allowed) {
+    return res.status(429).json({
+      error: 'Quá nhiều request. Vui lòng thử lại sau.'
+    });
+  }
+  next();
+});
+```
+
+## Redis Persistence
+
+Dù lưu dữ liệu trong RAM, Redis có thể lưu xuống ổ cứng để phòng trường hợp restart:
+
+| Phương pháp | Mô tả | Ưu điểm | Nhược điểm |
+|------------|-------|---------|-----------|
+| RDB (Snapshotting) | Lưu snapshot định kỳ | Nhanh khi khởi động lại | Có thể mất dữ liệu giữa 2 lần snapshot |
+| AOF (Append Only File) | Ghi log mọi thao tác | Mất dữ liệu tối thiểu | File lớn, khởi động chậm hơn |
+| RDB + AOF | Kết hợp cả hai | An toàn và hiệu suất | Cần nhiều ổ đĩa hơn |
+
+## Kết luận
+
+Redis là công cụ đa năng, không chỉ là cache mà còn là message broker, session store, rate limiter và nhiều hơn nữa. Việc chọn đúng caching strategy và hiểu các cấu trúc dữ liệu của Redis sẽ giúp bạn xây dựng ứng dụng với hiệu suất cao và khả năng mở rộng tốt.

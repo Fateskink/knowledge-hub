@@ -1,0 +1,162 @@
+---
+title: "What Is RAG? Retrieval-Augmented Generation Explained"
+description: "Learn how Retrieval-Augmented Generation (RAG) combines the power of LLMs with real-time knowledge retrieval to produce accurate, grounded answers — including how embeddings and vector databases work."
+category: "ai-basics"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 9
+tags: ["rag", "retrieval-augmented-generation", "embeddings", "vector-database", "llm"]
+featured: false
+order: 5
+sources:
+  - title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks — Lewis et al., 2020"
+    url: "https://arxiv.org/abs/2005.11401"
+  - title: "What Is Retrieval-Augmented Generation? — NVIDIA"
+    url: "https://www.nvidia.com/en-us/glossary/retrieval-augmented-generation/"
+  - title: "Building RAG Applications — LangChain Documentation"
+    url: "https://python.langchain.com/docs/tutorials/rag/"
+---
+
+# What Is RAG? Retrieval-Augmented Generation Explained
+
+Large Language Models are impressive, but they have a fundamental problem: their knowledge is frozen at the time of training. Ask an LLM about something that happened last week, about your company's internal documentation, or about a niche technical topic, and it may produce an answer that is outdated, wrong, or entirely fabricated.
+
+**Retrieval-Augmented Generation (RAG)** solves this problem by giving the LLM access to external knowledge at the time it generates a response. Instead of relying solely on what it learned during training, a RAG system first retrieves relevant documents from a knowledge base, then provides those documents to the LLM as context for generating its answer.
+
+<Callout type="info">
+Think of RAG like an open-book exam. Without RAG, the LLM must answer from memory alone. With RAG, it can look up the relevant information before answering — leading to more accurate, up-to-date, and verifiable responses.
+</Callout>
+
+## Why RAG Matters
+
+There are several reasons RAG has become one of the most widely adopted patterns in AI applications:
+
+1. **Reduced hallucinations:** When the LLM generates answers based on retrieved documents rather than memory, it is far less likely to make things up.
+2. **Current information:** RAG can access up-to-date documents, even if the LLM's training data is months or years old.
+3. **Domain-specific knowledge:** You can connect the LLM to your company's private documents, product manuals, or internal wikis — knowledge it was never trained on.
+4. **Verifiability:** RAG systems can cite their sources, letting users verify the accuracy of the response.
+5. **Cost efficiency:** It is far cheaper to update a document database than to retrain or fine-tune an LLM.
+
+## How RAG Works: The Complete Pipeline
+
+A RAG system operates in two main phases: **indexing** (preparing your documents) and **retrieval + generation** (answering questions).
+
+<Diagram chart="graph TD\n    subgraph Indexing Phase\n    A[Documents] --> B[Chunk Documents]\n    B --> C[Generate Embeddings]\n    C --> D[Store in Vector Database]\n    end\n    subgraph Query Phase\n    E[User Question] --> F[Generate Query Embedding]\n    F --> G[Search Vector Database]\n    G --> H[Retrieve Relevant Chunks]\n    H --> I[Build Prompt with Context]\n    I --> J[LLM Generates Answer]\n    end\n    D -.-> G" />
+
+### Phase 1: Indexing
+
+Before you can answer questions, you need to prepare your knowledge base.
+
+**Step 1: Collect Documents.** Gather the documents you want the system to know about — PDFs, web pages, Markdown files, database records, API responses, or any other text source.
+
+**Step 2: Chunk the Documents.** Long documents need to be split into smaller, manageable pieces called **chunks**. A chunk might be a paragraph, a section, or a fixed number of tokens (typically 200-1000 tokens).
+
+<Callout type="tip">
+Chunking strategy matters a lot. Chunks that are too small lose context; chunks that are too large dilute the relevant information. A common approach is to use overlapping chunks — each chunk shares some text with its neighbors to preserve context at the boundaries.
+</Callout>
+
+**Step 3: Generate Embeddings.** Each chunk is converted into a numerical vector (an embedding) using an embedding model. These vectors capture the semantic meaning of the text — chunks about similar topics end up with similar vectors.
+
+**Step 4: Store in a Vector Database.** The embeddings are stored in a specialized database designed for fast similarity search. Popular vector databases include Pinecone, Weaviate, Chroma, Qdrant, and pgvector (for PostgreSQL).
+
+### Phase 2: Retrieval and Generation
+
+When a user asks a question, the system retrieves relevant context and generates an answer.
+
+**Step 1: Embed the Query.** The user's question is converted into an embedding vector using the same embedding model.
+
+**Step 2: Similarity Search.** The query embedding is compared against all chunk embeddings in the vector database. The most similar chunks (typically the top 3-10) are retrieved.
+
+**Step 3: Build the Prompt.** The retrieved chunks are inserted into the LLM's prompt as context, along with the user's original question.
+
+**Step 4: Generate the Answer.** The LLM reads the provided context and generates a response grounded in that information.
+
+## Understanding Embeddings
+
+Embeddings are the foundation of RAG. They translate text into a mathematical space where meaning is represented by position.
+
+<Diagram chart="graph LR\n    A[How do I reset my password?] --> B[Embedding Model]\n    B --> C[Vector: 0.12, -0.45, 0.78, ...]\n    D[I forgot my login credentials] --> B\n    B --> E[Vector: 0.11, -0.43, 0.80, ...]\n    F[Best pizza recipes] --> B\n    B --> G[Vector: -0.67, 0.22, -0.31, ...]" />
+
+Notice that the first two sentences, while using completely different words, are semantically similar — they are both about account access problems. Their embedding vectors would be very close to each other. The pizza recipe sentence is about a completely different topic, so its vector would be far away.
+
+This is the magic that makes RAG work: **semantic search** finds relevant documents based on meaning, not just keyword matching. A query about "resetting credentials" will match documents about "password recovery" even if those exact words never appear.
+
+### Popular Embedding Models
+
+<ComparisonTable headers={["Model", "Provider", "Dimensions", "Best For"]} rows={[["text-embedding-3-large", "OpenAI", "3072", "High-accuracy general use"], ["text-embedding-3-small", "OpenAI", "1536", "Cost-efficient general use"], ["Cohere Embed v3", "Cohere", "1024", "Multilingual search"], ["BGE-large", "BAAI (open source)", "1024", "Open-source alternative"], ["Voyage-3", "Voyage AI", "1024", "Code and technical documents"], ["Gemini Embedding", "Google", "768", "Google Cloud integration"]]} />
+
+## Vector Databases: The Knowledge Store
+
+A vector database is a specialized data store optimized for storing and searching high-dimensional vectors. Unlike traditional databases that search by exact match or keyword, vector databases perform **approximate nearest neighbor (ANN)** search to find the most similar vectors efficiently.
+
+<Diagram chart="graph TD\n    A[Traditional Database] --> B[Exact Match: SELECT * WHERE name = 'John']\n    C[Vector Database] --> D[Similarity Search: Find vectors closest to query vector]\n    D --> E[Returns ranked results by similarity score]" />
+
+### Why Not Just Use a Regular Database?
+
+A traditional keyword search for "How do I fix a broken deployment pipeline?" might miss a document titled "Troubleshooting CI/CD Issues" because the exact words do not match. A vector database would find it because the semantic meaning is similar.
+
+<Callout type="info">
+Many organizations use a hybrid approach: combine vector similarity search with traditional keyword search (like BM25) and merge the results. This technique, called **hybrid search**, often outperforms either method alone.
+</Callout>
+
+### Popular Vector Databases
+
+<ComparisonTable headers={["Database", "Type", "Key Feature"]} rows={[["Pinecone", "Cloud-managed", "Fully managed, easy to scale"], ["Weaviate", "Open source / Cloud", "Built-in hybrid search"], ["Chroma", "Open source", "Lightweight, great for prototyping"], ["Qdrant", "Open source / Cloud", "High performance, Rust-based"], ["pgvector", "PostgreSQL extension", "Use your existing Postgres database"], ["Milvus", "Open source", "Designed for billion-scale datasets"]]} />
+
+## RAG in Practice: A Concrete Example
+
+Imagine you are building a customer support chatbot for a software company. Here is how RAG would work:
+
+1. **Index your knowledge base:** Chunk and embed all your product documentation, FAQs, troubleshooting guides, and release notes.
+
+2. **Customer asks:** "How do I configure SSO with Okta?"
+
+3. **Retrieve:** The system finds the 5 most relevant chunks from your documentation — the SSO setup guide, the Okta integration page, and a troubleshooting FAQ about SSO errors.
+
+4. **Generate:** The LLM receives these chunks as context and generates a step-by-step answer specific to your product, citing the relevant documentation sections.
+
+Without RAG, the LLM would either hallucinate configuration steps or give generic SSO advice that does not apply to your product.
+
+## Advanced RAG Techniques
+
+As RAG has matured, several advanced techniques have emerged.
+
+### Multi-Query RAG
+
+Instead of searching with just the user's question, generate multiple variations of the query to capture different aspects of the intent. This increases the chance of finding all relevant documents.
+
+### Re-Ranking
+
+After initial retrieval, use a more powerful (but slower) model to re-rank the results by relevance. The initial vector search is fast but approximate; a re-ranker improves precision.
+
+### Contextual Compression
+
+Retrieved chunks often contain irrelevant information alongside the useful parts. A compression step extracts only the portions relevant to the question before passing them to the LLM.
+
+### Agentic RAG
+
+Combine RAG with an AI agent that can decide when to search, what to search for, and whether the retrieved results are sufficient — or if it needs to reformulate the query and search again.
+
+<Diagram chart="graph TD\n    A[User Question] --> B[Agent Decides Strategy]\n    B --> C[Search Knowledge Base]\n    C --> D{Results Sufficient?}\n    D -->|No| E[Reformulate Query]\n    E --> C\n    D -->|Yes| F[Generate Answer]\n    F --> G{Answer Quality OK?}\n    G -->|No| B\n    G -->|Yes| H[Return to User]" />
+
+## Common RAG Pitfalls
+
+<Callout type="warning">
+RAG is not a silver bullet. These common pitfalls can undermine the quality of your RAG system.
+</Callout>
+
+- **Poor chunking:** If chunks are too large or split in the wrong places, retrieval quality suffers.
+- **Irrelevant retrieval:** The top search results may not actually answer the question. Always evaluate retrieval quality separately from generation quality.
+- **Missing context:** Sometimes the answer requires information spread across multiple documents. Ensure your retrieval strategy can surface all relevant pieces.
+- **Stale data:** If your knowledge base is not kept up to date, RAG will serve outdated information — confidently.
+- **Over-reliance on context:** The LLM might ignore its own knowledge and rely too heavily on retrieved (possibly irrelevant) context.
+
+## When to Use RAG vs. Fine-Tuning
+
+<ComparisonTable headers={["Factor", "RAG", "Fine-Tuning"]} rows={[["Knowledge updates", "Easy — update the database", "Hard — retrain the model"], ["Cost", "Lower — only indexing cost", "Higher — GPU training cost"], ["Customization", "Facts and knowledge", "Behavior and style"], ["Setup complexity", "Moderate", "High"], ["Best for", "Q&A over documents, knowledge bases", "Changing how the model writes or reasons"]]} />
+
+<Callout type="tip">
+In many real-world applications, the best approach combines both: fine-tune the model for the desired tone and behavior, then use RAG to provide current, accurate knowledge.
+</Callout>
+
+RAG has become the standard pattern for building AI applications that need accurate, up-to-date, and domain-specific knowledge. Whether you are building a customer support bot, an internal knowledge assistant, or a research tool, understanding RAG is essential for creating AI systems that people can actually trust.

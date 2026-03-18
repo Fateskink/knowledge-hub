@@ -1,0 +1,302 @@
+---
+title: "Git và GitHub"
+description: "Hướng dẫn đầy đủ về Git và GitHub - từ các lệnh cơ bản như init, commit, branch đến pull request, issues và GitHub Actions."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 14
+tags: ["git", "github", "version-control", "lap-trinh", "cong-cu"]
+featured: false
+order: 4
+sources:
+  - title: "Git Official Documentation"
+    url: "https://git-scm.com/doc"
+  - title: "GitHub Docs"
+    url: "https://docs.github.com/"
+  - title: "Atlassian Git Tutorials"
+    url: "https://www.atlassian.com/git/tutorials"
+---
+
+# Git và GitHub
+
+Git là hệ thống quản lý phiên bản (version control) phổ biến nhất thế giới, giúp bạn theo dõi mọi thay đổi trong code. GitHub là nền tảng lưu trữ mã nguồn trực tuyến, nơi các lập trình viên cộng tác và chia sẻ dự án. Hiểu và sử dụng thành thạo Git và GitHub là kỹ năng bắt buộc của mọi lập trình viên.
+
+## Git là gì?
+
+Git là một hệ thống quản lý phiên bản phân tán (distributed version control system) được tạo bởi Linus Torvalds vào năm 2005. Git giúp bạn:
+
+- **Theo dõi lịch sử thay đổi**: Mọi thay đổi đều được ghi lại.
+- **Làm việc nhóm**: Nhiều người có thể làm việc trên cùng dự án.
+- **Phục hồi dễ dàng**: Quay lại bất kỳ phiên bản nào trước đó.
+- **Thí nghiệm an toàn**: Tạo branch để thử nghiệm mà không ảnh hưởng code chính.
+
+<Callout type="info">Git lưu trữ toàn bộ lịch sử dự án trên máy tính của bạn (local), không cần kết nối internet để sử dụng các lệnh cơ bản.</Callout>
+
+## Cài đặt và cấu hình Git
+
+```bash
+# Kiểm tra phiên bản Git
+git --version
+
+# Cấu hình thông tin cá nhân (chỉ cần làm 1 lần)
+git config --global user.name "Tên Của Bạn"
+git config --global user.email "email@example.com"
+
+# Xem cấu hình hiện tại
+git config --list
+```
+
+## Các lệnh Git cơ bản
+
+### Khởi tạo và Commit
+
+```bash
+# Khởi tạo repository mới
+git init
+
+# Kiểm tra trạng thái
+git status
+
+# Thêm file vào staging area
+git add ten_file.py          # Thêm 1 file
+git add .                    # Thêm tất cả file
+
+# Tạo commit
+git commit -m "Mô tả thay đổi ngắn gọn"
+
+# Xem lịch sử commit
+git log
+git log --oneline            # Xem rút gọn
+git log --oneline --graph    # Xem dạng cây
+```
+
+<Callout type="tip">Viết commit message rõ ràng và cụ thể. Thay vì "fix bug", hãy viết "Fix lỗi đăng nhập khi mật khẩu có ký tự đặc biệt".</Callout>
+
+### Quy trình làm việc cơ bản với Git
+
+<Diagram chart="graph LR\n    A[Working Directory] -->|git add| B[Staging Area]\n    B -->|git commit| C[Local Repository]\n    C -->|git push| D[Remote Repository]\n    D -->|git pull| A\n    C -->|git checkout| A" />
+
+## Branch - Nhánh
+
+Branch cho phép bạn làm việc trên nhiều tính năng đồng thời mà không ảnh hưởng lẫn nhau.
+
+```bash
+# Xem các branch hiện có
+git branch
+
+# Tạo branch mới
+git branch feature/dang-nhap
+
+# Chuyển sang branch khác
+git checkout feature/dang-nhap
+
+# Tạo và chuyển sang branch mới (lệnh tắt)
+git checkout -b feature/dang-ky
+
+# Xóa branch (sau khi đã merge)
+git branch -d feature/dang-nhap
+```
+
+### Mô hình branch phổ biến (Git Flow)
+
+<Diagram chart="graph LR\n    A[main] --> B[develop]\n    B --> C[feature/login]\n    B --> D[feature/signup]\n    C -->|merge| B\n    D -->|merge| B\n    B -->|release| E[release/v1.0]\n    E -->|merge| A\n    A --> F[hotfix/bug-fix]\n    F -->|merge| A\n    F -->|merge| B" />
+
+<Callout type="info">Git Flow là mô hình phổ biến cho dự án lớn. Với dự án nhỏ, bạn có thể dùng GitHub Flow đơn giản hơn: chỉ có main và feature branches.</Callout>
+
+## Merge và Rebase
+
+### Merge
+
+Merge kết hợp thay đổi từ branch này vào branch khác, giữ nguyên lịch sử.
+
+```bash
+# Chuyển về branch chính
+git checkout main
+
+# Merge branch feature vào main
+git merge feature/dang-nhap
+
+# Nếu có conflict (xung đột)
+# 1. Mở file bị conflict và sửa thủ công
+# 2. Thêm file đã sửa vào staging
+git add ten_file.py
+# 3. Hoàn thành merge
+git commit -m "Merge feature/dang-nhap vào main"
+```
+
+### Rebase
+
+Rebase di chuyển các commit của branch hiện tại lên đầu branch khác, tạo lịch sử tuyến tính.
+
+```bash
+# Đang ở branch feature
+git checkout feature/dang-nhap
+
+# Rebase lên main
+git rebase main
+
+# Nếu có conflict, sửa rồi tiếp tục
+git add ten_file.py
+git rebase --continue
+```
+
+<Callout type="warning">Không rebase các branch đã được push lên remote và đang được người khác sử dụng. Rebase thay đổi lịch sử commit và có thể gây xung đột cho đồng đội.</Callout>
+
+### So sánh Merge và Rebase
+
+<ComparisonTable
+  headers={["Tiêu chí", "Merge", "Rebase"]}
+  rows={[
+    ["Lịch sử", "Giữ nguyên lịch sử gốc", "Tạo lịch sử tuyến tính"],
+    ["Merge commit", "Tạo merge commit", "Không tạo merge commit"],
+    ["An toàn", "An toàn hơn", "Có thể gây vấn đề nếu dùng sai"],
+    ["Khi nào dùng", "Merge feature vào main", "Cập nhật feature với main mới nhất"],
+    ["Cho nhóm", "Phù hợp cho nhóm", "Chủ yếu cho branch cá nhân"]
+  ]}
+/>
+
+## GitHub cơ bản
+
+GitHub là nền tảng lưu trữ Git repository trực tuyến với nhiều tính năng cộng tác.
+
+### Push và Pull
+
+```bash
+# Kết nối repository local với GitHub
+git remote add origin https://github.com/username/repo.git
+
+# Đẩy code lên GitHub
+git push -u origin main
+
+# Tải code từ GitHub
+git pull origin main
+
+# Sao chép repository từ GitHub
+git clone https://github.com/username/repo.git
+```
+
+### Pull Request (PR)
+
+Pull Request là cách chính để đóng góp code trong GitHub. Đây là quy trình:
+
+```bash
+# 1. Tạo branch mới cho tính năng
+git checkout -b feature/them-gio-hang
+
+# 2. Code và commit
+git add .
+git commit -m "Thêm chức năng giỏ hàng"
+
+# 3. Push branch lên GitHub
+git push -u origin feature/them-gio-hang
+
+# 4. Trên GitHub: Tạo Pull Request
+# 5. Đồng đội review code
+# 6. Merge PR sau khi được chấp nhận
+```
+
+<Diagram chart="graph TD\n    A[Tạo Branch] --> B[Code và Commit]\n    B --> C[Push lên GitHub]\n    C --> D[Tạo Pull Request]\n    D --> E[Code Review]\n    E --> F{Được chấp nhận?}\n    F -->|Có| G[Merge vào main]\n    F -->|Không| H[Sửa code theo feedback]\n    H --> B" />
+
+### Issues
+
+Issues được dùng để theo dõi bug, yêu cầu tính năng và các nhiệm vụ cần làm.
+
+```markdown
+## Mô tả bug
+Khi người dùng nhập mật khẩu có ký tự đặc biệt (#, @, !),
+hệ thống hiển thị lỗi 500.
+
+## Các bước tái hiện
+1. Vào trang đăng nhập
+2. Nhập email: test@example.com
+3. Nhập mật khẩu: P@ss#word!
+4. Nhấn nút "Đăng nhập"
+
+## Kết quả mong đợi
+Đăng nhập thành công.
+
+## Kết quả thực tế
+Hiển thị trang lỗi 500.
+```
+
+### GitHub Actions
+
+GitHub Actions là công cụ CI/CD tích hợp, tự động chạy các tác vụ khi có sự kiện (push, PR, ...).
+
+```yaml
+# .github/workflows/ci.yml
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cài đặt Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cài đặt dependencies
+        run: pip install -r requirements.txt
+      - name: Chạy tests
+        run: python -m pytest
+```
+
+<Callout type="tip">Bắt đầu với một workflow CI đơn giản để chạy tests tự động khi push code. Điều này giúp phát hiện lỗi sớm và đảm bảo chất lượng code.</Callout>
+
+## File .gitignore
+
+File `.gitignore` chỉ định các file và thư mục mà Git sẽ bỏ qua, không theo dõi.
+
+```bash
+# .gitignore cho dự án Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+*.db
+*.sqlite3
+.DS_Store
+node_modules/
+dist/
+build/
+*.log
+```
+
+<Callout type="danger">Không bao giờ commit các file chứa thông tin nhạy cảm như mật khẩu, API key hay token. Sử dụng .gitignore và biến môi trường (.env) để bảo vệ thông tin.</Callout>
+
+## Các lệnh Git hữu ích khác
+
+```bash
+# Xem thay đổi chưa commit
+git diff
+
+# Lưu tạm thay đổi (stash)
+git stash
+git stash pop           # Lấy lại thay đổi
+
+# Hủy bỏ thay đổi chưa staged
+git checkout -- ten_file.py
+
+# Sửa commit message cuối cùng
+git commit --amend -m "Message mới"
+
+# Xem ai sửa dòng nào (blame)
+git blame ten_file.py
+
+# Tạo tag cho phiên bản
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+## Kết luận
+
+Git và GitHub là những công cụ không thể thiếu trong quy trình phát triển phần mềm hiện đại. Bắt đầu từ những lệnh cơ bản như `init`, `add`, `commit`, rồi dần dần học thêm về branch, merge và pull request. Thực hành thường xuyên với các dự án cá nhân và đóng góp vào các dự án mã nguồn mở trên GitHub sẽ giúp bạn nhanh chóng thành thạo các công cụ này.

@@ -1,0 +1,337 @@
+---
+title: "Basic Algorithms"
+description: "Learn fundamental algorithm concepts: Big O notation, sorting and searching algorithms, and essential data structures."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["algorithms", "big-o", "sorting", "searching", "data-structures", "computer-science"]
+featured: false
+order: 2
+sources:
+  - title: "Introduction to Algorithms - MIT OpenCourseWare"
+    url: "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/"
+  - title: "Big-O Cheat Sheet"
+    url: "https://www.bigocheatsheet.com/"
+  - title: "VisuAlgo - Visualizing Algorithms"
+    url: "https://visualgo.net/"
+  - title: "GeeksforGeeks - Data Structures"
+    url: "https://www.geeksforgeeks.org/data-structures/"
+---
+
+# Basic Algorithms
+
+An algorithm is a step-by-step procedure for solving a specific problem. Understanding algorithms helps you write more efficient code, optimize performance, and is an essential foundation for every programmer. This article introduces the fundamental algorithm concepts that every developer should know.
+
+## Big O Notation - Measuring Efficiency
+
+Big O notation describes how an algorithm's performance scales relative to the input size (n). It helps you understand how much slower an algorithm becomes as the data grows.
+
+<Diagram chart="graph LR\n    A[O 1 - Constant] --> B[O log n - Logarithmic]\n    B --> C[O n - Linear]\n    C --> D[O n log n - Log-linear]\n    D --> E[O n^2 - Quadratic]\n    E --> F[O 2^n - Exponential]\n    F --> G[O n! - Factorial]" />
+
+### Common Time Complexities
+
+| Big O | Name | Example | Performance |
+|-------|------|---------|-------------|
+| O(1) | Constant | Array access by index | Excellent |
+| O(log n) | Logarithmic | Binary search | Very good |
+| O(n) | Linear | Iterating through an array | Fair |
+| O(n log n) | Log-linear | Merge Sort, Quick Sort | Good |
+| O(n^2) | Quadratic | Bubble Sort, nested loops | Poor |
+| O(2^n) | Exponential | Subset generation | Very poor |
+
+```python
+# Illustrating different time complexities
+
+# O(1) - Constant: does not depend on input size
+def get_first_element(arr):
+    return arr[0] if arr else None
+
+# O(n) - Linear: iterates through the entire array
+def find_maximum(arr):
+    maximum = arr[0]
+    for element in arr:
+        if element > maximum:
+            maximum = element
+    return maximum
+
+# O(n^2) - Quadratic: nested loops
+def has_duplicate_pair(arr):
+    for i in range(len(arr)):
+        for j in range(i + 1, len(arr)):
+            if arr[i] == arr[j]:
+                return True
+    return False
+```
+
+<Callout type="tip">When analyzing Big O, we care about the worst case and drop constants. For example, O(2n) simplifies to O(n), and O(n + 100) simplifies to O(n).</Callout>
+
+## Sorting Algorithms
+
+Sorting is one of the most fundamental operations in programming. Below are the most commonly taught sorting algorithms.
+
+### Bubble Sort
+
+Bubble Sort compares each pair of adjacent elements and swaps them if they are in the wrong order. Simple but slow.
+
+```python
+def bubble_sort(arr):
+    n = len(arr)
+    for i in range(n):
+        swapped = False
+        for j in range(0, n - i - 1):
+            if arr[j] > arr[j + 1]:
+                arr[j], arr[j + 1] = arr[j + 1], arr[j]
+                swapped = True
+        if not swapped:
+            break
+    return arr
+
+# Usage
+data = [64, 34, 25, 12, 22, 11, 90]
+print(f"Before: {data}")
+print(f"After:  {bubble_sort(data.copy())}")
+```
+
+```javascript
+// Bubble Sort in JavaScript
+function bubbleSort(arr) {
+  const n = arr.length;
+  for (let i = 0; i < n; i++) {
+    let swapped = false;
+    for (let j = 0; j < n - i - 1; j++) {
+      if (arr[j] > arr[j + 1]) {
+        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+        swapped = true;
+      }
+    }
+    if (!swapped) break;
+  }
+  return arr;
+}
+
+console.log(bubbleSort([64, 34, 25, 12, 22, 11, 90]));
+```
+
+### Merge Sort
+
+Merge Sort uses the "divide and conquer" strategy -- it splits the array into smaller parts, sorts each part, then merges them back together.
+
+<Diagram chart="graph TD\n    A[38 27 43 3 9 82 10] --> B[38 27 43 3]\n    A --> C[9 82 10]\n    B --> D[38 27]\n    B --> E[43 3]\n    C --> F[9 82]\n    C --> G[10]\n    D --> H[27 38]\n    E --> I[3 43]\n    F --> J[9 82]\n    H --> K[3 27 38 43]\n    I --> K\n    J --> L[9 10 82]\n    G --> L\n    K --> M[3 9 10 27 38 43 82]\n    L --> M" />
+
+```python
+def merge_sort(arr):
+    if len(arr) <= 1:
+        return arr
+
+    mid = len(arr) // 2
+    left = merge_sort(arr[:mid])
+    right = merge_sort(arr[mid:])
+
+    return merge(left, right)
+
+def merge(left, right):
+    result = []
+    i = j = 0
+
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            result.append(left[i])
+            i += 1
+        else:
+            result.append(right[j])
+            j += 1
+
+    result.extend(left[i:])
+    result.extend(right[j:])
+    return result
+
+# Usage
+data = [38, 27, 43, 3, 9, 82, 10]
+print(f"Before: {data}")
+print(f"After:  {merge_sort(data)}")
+```
+
+<Callout type="info">Merge Sort has O(n log n) complexity in all cases, while Bubble Sort has O(n^2). With 1 million elements, Merge Sort is thousands of times faster.</Callout>
+
+## Searching Algorithms
+
+### Linear Search
+
+Iterate through each element until the target value is found. Time complexity: O(n).
+
+```python
+def linear_search(arr, target):
+    for i, element in enumerate(arr):
+        if element == target:
+            return i
+    return -1
+
+data = [4, 2, 7, 1, 9, 3]
+index = linear_search(data, 7)
+print(f"Found 7 at index: {index}")  # Output: 2
+```
+
+### Binary Search
+
+Only works on sorted arrays. It repeatedly divides the search interval in half. Time complexity: O(log n).
+
+```python
+def binary_search(arr, target):
+    left, right = 0, len(arr) - 1
+
+    while left <= right:
+        mid = (left + right) // 2
+
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            left = mid + 1
+        else:
+            right = mid - 1
+
+    return -1
+
+data = [1, 3, 5, 7, 9, 11, 13, 15]
+index = binary_search(data, 9)
+print(f"Found 9 at index: {index}")  # Output: 4
+```
+
+```javascript
+// Binary Search in JavaScript
+function binarySearch(arr, target) {
+  let left = 0;
+  let right = arr.length - 1;
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+
+    if (arr[mid] === target) return mid;
+    if (arr[mid] < target) left = mid + 1;
+    else right = mid - 1;
+  }
+
+  return -1;
+}
+
+const data = [1, 3, 5, 7, 9, 11, 13, 15];
+console.log(`Found 9 at index: ${binarySearch(data, 9)}`);
+```
+
+<Callout type="warning">Binary search only works on sorted arrays. If the array is unsorted, you must sort it first or use linear search instead.</Callout>
+
+## Essential Data Structures
+
+Data structures define how data is organized and stored for efficient access and modification.
+
+<Diagram chart="graph TD\n    A[Data Structures] --> B[Linear]\n    A --> C[Non-Linear]\n    B --> D[Array]\n    B --> E[Linked List]\n    B --> F[Stack]\n    B --> G[Queue]\n    C --> H[Tree]\n    C --> I[Graph]\n    C --> J[Hash Table]" />
+
+### Stack - LIFO (Last In, First Out)
+
+A stack is like a pile of plates: you add to the top and remove from the top.
+
+```python
+class Stack:
+    def __init__(self):
+        self.items = []
+
+    def push(self, value):
+        """Add an element to the top of the stack."""
+        self.items.append(value)
+
+    def pop(self):
+        """Remove and return the top element."""
+        if self.is_empty():
+            raise IndexError("Stack is empty!")
+        return self.items.pop()
+
+    def peek(self):
+        """View the top element without removing it."""
+        if self.is_empty():
+            raise IndexError("Stack is empty!")
+        return self.items[-1]
+
+    def is_empty(self):
+        return len(self.items) == 0
+
+    def size(self):
+        return len(self.items)
+
+# Usage
+stack = Stack()
+stack.push(1)
+stack.push(2)
+stack.push(3)
+print(f"Top of stack: {stack.peek()}")     # 3
+print(f"Popped: {stack.pop()}")            # 3
+print(f"New top: {stack.peek()}")          # 2
+```
+
+### Queue - FIFO (First In, First Out)
+
+A queue is like a line at a store: the first person in line gets served first.
+
+```python
+from collections import deque
+
+class Queue:
+    def __init__(self):
+        self.items = deque()
+
+    def enqueue(self, value):
+        """Add an element to the back of the queue."""
+        self.items.append(value)
+
+    def dequeue(self):
+        """Remove and return the front element."""
+        if self.is_empty():
+            raise IndexError("Queue is empty!")
+        return self.items.popleft()
+
+    def is_empty(self):
+        return len(self.items) == 0
+
+# Usage
+queue = Queue()
+queue.enqueue("Customer 1")
+queue.enqueue("Customer 2")
+queue.enqueue("Customer 3")
+print(f"Serving: {queue.dequeue()}")  # Customer 1
+print(f"Serving: {queue.dequeue()}")  # Customer 2
+```
+
+### Hash Table
+
+Hash tables allow data access by key with an average time complexity of O(1).
+
+```javascript
+// Hash tables in JavaScript
+// In practice, JavaScript Objects and Maps are hash tables
+
+const students = new Map();
+students.set("S001", { name: "Alice Johnson", gpa: 3.85 });
+students.set("S002", { name: "Bob Smith", gpa: 3.92 });
+students.set("S003", { name: "Carol White", gpa: 3.50 });
+
+// O(1) access
+console.log(students.get("S002")); // { name: "Bob Smith", gpa: 3.92 }
+
+// O(1) existence check
+console.log(students.has("S001")); // true
+```
+
+## Algorithm Comparison Summary
+
+| Algorithm | Average Complexity | Worst Case | Notes |
+|-----------|-------------------|------------|-------|
+| Bubble Sort | O(n^2) | O(n^2) | Simple, slow |
+| Merge Sort | O(n log n) | O(n log n) | Fast, stable |
+| Quick Sort | O(n log n) | O(n^2) | Fast in practice |
+| Linear Search | O(n) | O(n) | Works on any array |
+| Binary Search | O(log n) | O(log n) | Requires sorted array |
+
+<Callout type="tip">To practice algorithms, use platforms like LeetCode, HackerRank, or Codeforces. Start with Easy problems and gradually increase the difficulty.</Callout>
+
+## Conclusion
+
+Algorithms and data structures are the foundation of programming. Mastering these concepts not only helps you write better code but also prepares you for technical interviews at top companies. Start practicing with the simple examples shown here and gradually work toward more complex problems.

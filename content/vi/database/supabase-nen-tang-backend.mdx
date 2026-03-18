@@ -1,0 +1,330 @@
+---
+title: "Supabase - Nền tảng Backend"
+description: "Tìm hiểu Supabase - nền tảng backend mã nguồn mở xây dựng trên PostgreSQL, cung cấp Authentication, Storage, Realtime và nhiều tính năng khác."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["supabase", "postgresql", "backend", "baas", "firebase", "realtime", "authentication"]
+featured: true
+order: 2
+sources:
+  - title: "Supabase Official Documentation"
+    url: "https://supabase.com/docs"
+  - title: "Supabase GitHub Repository"
+    url: "https://github.com/supabase/supabase"
+  - title: "Firebase Official Documentation"
+    url: "https://firebase.google.com/docs"
+  - title: "PostgreSQL Documentation"
+    url: "https://www.postgresql.org/docs/"
+---
+
+# Supabase - Nền tảng Backend
+
+Supabase là một nền tảng Backend-as-a-Service (BaaS) mã nguồn mở, được xem là thay thế Firebase nhưng xây dựng trên nền tảng PostgreSQL. Thay vì phải tự xây dựng backend từ đầu, Supabase cung cấp sẵn database, authentication, storage, realtime subscriptions và edge functions.
+
+## Supabase là gì?
+
+Supabase kết hợp nhiều công cụ mã nguồn mở thành một nền tảng thống nhất:
+
+<Diagram chart="graph TD\n    A[Supabase Platform] --> B[PostgreSQL Database]\n    A --> C[GoTrue - Authentication]\n    A --> D[Storage - File Management]\n    A --> E[Realtime - WebSocket]\n    A --> F[Edge Functions - Deno]\n    A --> G[PostgREST - Auto API]\n    B --> H[Row Level Security]\n    G --> I[REST API tự động]\n    E --> J[Database Changes]\n    E --> K[Broadcast]\n    E --> L[Presence]" />
+
+### Các thành phần chính
+
+- **PostgreSQL**: Cơ sở dữ liệu quan hệ mạnh mẽ, đầy đủ tính năng
+- **PostgREST**: Tự động tạo REST API từ schema của database
+- **GoTrue**: Hệ thống xác thực hỗ trợ email, OAuth, magic link
+- **Realtime**: Lắng nghe thay đổi database qua WebSocket
+- **Storage**: Lưu trữ và quản lý file (ảnh, video, tài liệu)
+- **Edge Functions**: Serverless functions chạy trên Deno
+
+<Callout type="info">Supabase là mã nguồn mở 100%. Bạn có thể tự host trên server riêng hoặc sử dụng dịch vụ cloud của Supabase. Đây là điểm khác biệt lớn so với Firebase -- bạn không bị khóa vào một nhà cung cấp (vendor lock-in).</Callout>
+
+## Bắt đầu với Supabase
+
+### Cài đặt và kết nối
+
+```bash
+# Cài đặt Supabase client cho JavaScript/TypeScript
+npm install @supabase/supabase-js
+```
+
+```typescript
+// Khởi tạo Supabase client
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = 'https://your-project.supabase.co';
+const supabaseAnonKey = 'your-anon-key';
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+```
+
+### CRUD Operations
+
+```typescript
+// Thêm dữ liệu mới
+const { data, error } = await supabase
+  .from('posts')
+  .insert({
+    title: 'Bài viết đầu tiên',
+    content: 'Nội dung bài viết...',
+    author_id: user.id,
+    published: true
+  })
+  .select();
+
+// Đọc dữ liệu với filter và sắp xếp
+const { data: posts } = await supabase
+  .from('posts')
+  .select(`
+    id,
+    title,
+    content,
+    created_at,
+    author:users(name, avatar_url)
+  `)
+  .eq('published', true)
+  .order('created_at', { ascending: false })
+  .limit(10);
+
+// Cập nhật dữ liệu
+const { data: updated } = await supabase
+  .from('posts')
+  .update({ title: 'Tiêu đề mới' })
+  .eq('id', postId)
+  .select();
+
+// Xóa dữ liệu
+const { error: deleteError } = await supabase
+  .from('posts')
+  .delete()
+  .eq('id', postId);
+```
+
+<Callout type="tip">Supabase tự động tạo REST API từ cấu trúc database của bạn. Bất kỳ bảng nào bạn tạo trong PostgreSQL đều có thể truy cập qua API mà không cần viết code backend.</Callout>
+
+## Authentication
+
+Supabase cung cấp hệ thống xác thực hoàn chỉnh với nhiều phương thức:
+
+```typescript
+// Đăng ký bằng email
+const { data, error } = await supabase.auth.signUp({
+  email: 'user@example.com',
+  password: 'secure-password-123'
+});
+
+// Đăng nhập bằng email
+const { data, error } = await supabase.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'secure-password-123'
+});
+
+// Đăng nhập bằng Google OAuth
+const { data, error } = await supabase.auth.signInWithOAuth({
+  provider: 'google',
+  options: {
+    redirectTo: 'https://myapp.com/callback'
+  }
+});
+
+// Đăng nhập bằng Magic Link (không cần mật khẩu)
+const { data, error } = await supabase.auth.signInWithOtp({
+  email: 'user@example.com'
+});
+
+// Lắng nghe thay đổi trạng thái đăng nhập
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Auth event:', event);
+  console.log('Session:', session);
+});
+
+// Đăng xuất
+await supabase.auth.signOut();
+```
+
+## Realtime Subscriptions
+
+Một trong những tính năng mạnh nhất của Supabase là khả năng lắng nghe thay đổi dữ liệu trong thời gian thực:
+
+```typescript
+// Lắng nghe thay đổi trên bảng messages
+const channel = supabase
+  .channel('messages-channel')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',        // INSERT, UPDATE, DELETE
+      schema: 'public',
+      table: 'messages',
+      filter: 'room_id=eq.123'
+    },
+    (payload) => {
+      console.log('Thay đổi:', payload.eventType);
+      console.log('Dữ liệu mới:', payload.new);
+      console.log('Dữ liệu cũ:', payload.old);
+    }
+  )
+  .subscribe();
+
+// Presence -- theo dõi người dùng trực tuyến
+const presenceChannel = supabase.channel('room-1');
+
+presenceChannel
+  .on('presence', { event: 'sync' }, () => {
+    const state = presenceChannel.presenceState();
+    console.log('Người dùng online:', state);
+  })
+  .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+    console.log('Người dùng mới tham gia:', newPresences);
+  })
+  .subscribe(async (status) => {
+    if (status === 'SUBSCRIBED') {
+      await presenceChannel.track({
+        user_id: user.id,
+        username: user.name,
+        online_at: new Date().toISOString()
+      });
+    }
+  });
+```
+
+<Diagram chart="graph LR\n    A[Client A] -->|Subscribe| B[Supabase Realtime]\n    C[Client B] -->|Insert data| D[PostgreSQL]\n    D -->|Change event| B\n    B -->|Broadcast| A\n    B -->|Broadcast| E[Client C]" />
+
+## Row Level Security (RLS)
+
+Supabase sử dụng Row Level Security của PostgreSQL để bảo mật dữ liệu ở cấp hàng:
+
+```sql
+-- Bật RLS cho bảng posts
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+
+-- Chỉ cho phép người dùng đọc bài viết đã publish
+CREATE POLICY "Anyone can read published posts"
+  ON posts FOR SELECT
+  USING (published = true);
+
+-- Chỉ cho phép tác giả sửa bài viết của mình
+CREATE POLICY "Authors can update own posts"
+  ON posts FOR UPDATE
+  USING (auth.uid() = author_id)
+  WITH CHECK (auth.uid() = author_id);
+
+-- Chỉ cho phép người đăng nhập tạo bài viết
+CREATE POLICY "Authenticated users can create posts"
+  ON posts FOR INSERT
+  WITH CHECK (auth.uid() = author_id);
+
+-- Chỉ cho phép tác giả xóa bài viết của mình
+CREATE POLICY "Authors can delete own posts"
+  ON posts FOR DELETE
+  USING (auth.uid() = author_id);
+```
+
+<Callout type="warning">Luôn bật Row Level Security cho mọi bảng chứa dữ liệu nhạy cảm. Nếu không bật RLS, bất kỳ ai có anon key đều có thể đọc và ghi dữ liệu qua API.</Callout>
+
+## Storage
+
+```typescript
+// Upload file
+const { data, error } = await supabase.storage
+  .from('avatars')
+  .upload(`public/${userId}/avatar.png`, file, {
+    cacheControl: '3600',
+    upsert: true
+  });
+
+// Lấy URL công khai
+const { data: urlData } = supabase.storage
+  .from('avatars')
+  .getPublicUrl(`public/${userId}/avatar.png`);
+
+// Tạo URL có thời hạn
+const { data: signedUrl } = await supabase.storage
+  .from('private-docs')
+  .createSignedUrl('report.pdf', 3600); // 1 giờ
+```
+
+## So sánh Supabase vs Firebase
+
+<ComparisonTable
+  headers={["Tiêu chí", "Supabase", "Firebase"]}
+  rows={[
+    ["Database", "PostgreSQL (Relational)", "Firestore (NoSQL Document)"],
+    ["Mã nguồn mở", "Có, 100% open source", "Không, Google proprietary"],
+    ["Self-hosting", "Hỗ trợ", "Không hỗ trợ"],
+    ["Truy vấn", "SQL đầy đủ + REST API", "Document queries, hạn chế"],
+    ["Realtime", "PostgreSQL changes + Broadcast", "Firestore listeners"],
+    ["Auth", "GoTrue (email, OAuth, SSO)", "Firebase Auth (tương tự)"],
+    ["Storage", "S3-compatible", "Google Cloud Storage"],
+    ["Pricing", "Free tier rộng rãi, dự đoán được", "Free tier, có thể tăng đột ngột"],
+    ["Vendor lock-in", "Thấp (có thể tự host)", "Cao (phụ thuộc Google)"]
+  ]}
+/>
+
+<Callout type="tip">Nếu bạn đã quen với SQL và muốn kiểm soát dữ liệu tốt hơn, Supabase là lựa chọn lý tưởng. Nếu bạn cần ecosystem phong phú với ML Kit, Analytics, Crashlytics tích hợp sẵn, Firebase vẫn có ưu thế.</Callout>
+
+## Ví dụ ứng dụng: Chat Realtime đơn giản
+
+```typescript
+// Component React cho chat realtime với Supabase
+import { useEffect, useState } from 'react';
+import { supabase } from './supabaseClient';
+
+function ChatRoom({ roomId }: { roomId: string }) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+
+  useEffect(() => {
+    // Tải tin nhắn cũ
+    const loadMessages = async () => {
+      const { data } = await supabase
+        .from('messages')
+        .select('*, user:users(name)')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true });
+      setMessages(data || []);
+    };
+    loadMessages();
+
+    // Lắng nghe tin nhắn mới
+    const channel = supabase
+      .channel(`room-${roomId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `room_id=eq.${roomId}`
+      }, (payload) => {
+        setMessages(prev => [...prev, payload.new]);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [roomId]);
+
+  const sendMessage = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('messages').insert({
+      room_id: roomId,
+      user_id: user?.id,
+      content: newMessage
+    });
+    setNewMessage('');
+  };
+
+  return (
+    <div>
+      {messages.map(msg => (
+        <div key={msg.id}>{msg.content}</div>
+      ))}
+      <input value={newMessage} onChange={e => setNewMessage(e.target.value)} />
+      <button onClick={sendMessage}>Gửi</button>
+    </div>
+  );
+}
+```
+
+## Kết luận
+
+Supabase mang lại sự kết hợp tuyệt vời giữa sức mạnh của PostgreSQL và sự tiện lợi của BaaS. Với khả năng tự host, mã nguồn mở và cộng đồng ngày càng lớn, Supabase đang trở thành lựa chọn hàng đầu cho các dự án từ startup đến enterprise.

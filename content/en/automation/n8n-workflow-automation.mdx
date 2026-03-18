@@ -1,0 +1,231 @@
+---
+title: "n8n - Workflow Automation"
+description: "Learn about n8n, the self-hosted workflow automation platform. Compare n8n vs Zapier vs Make, and build your first automated workflow."
+category: "automation"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 10
+tags: ["n8n", "automation", "workflow", "zapier", "make", "integromat", "webhook", "self-hosted"]
+featured: true
+order: 1
+sources:
+  - title: "n8n Official Documentation"
+    url: "https://docs.n8n.io/"
+  - title: "n8n GitHub Repository"
+    url: "https://github.com/n8n-io/n8n"
+  - title: "Zapier vs n8n Comparison"
+    url: "https://n8n.io/vs-zapier/"
+  - title: "n8n Workflow Templates"
+    url: "https://n8n.io/workflows/"
+---
+
+# n8n - Workflow Automation
+
+In modern software development, automating repetitive tasks is crucial for productivity. n8n (pronounced "nodemation") is an open-source workflow automation platform that lets you connect different applications and services to create automated processes without writing much code.
+
+## What is n8n?
+
+n8n is a **self-hosted workflow automation** tool that provides a visual drag-and-drop interface for building automated workflows. Unlike SaaS solutions such as Zapier or Make, n8n allows you to run on your own servers, giving you full control over your data without being limited by paid service tiers.
+
+<Callout type="info">n8n supports over 400 built-in integrations with popular services like Slack, Google Sheets, GitHub, PostgreSQL, HTTP Request, and many more.</Callout>
+
+### Key Features
+
+- **Self-hosted**: Run on your own server with complete data control
+- **Fair-code license**: Open source with a fair code license
+- **Visual editor**: Drag-and-drop interface for building workflows
+- **Code when needed**: JavaScript/TypeScript support in Function nodes
+- **400+ integrations**: Connect with hundreds of services
+- **Webhook support**: Receive data from any source via HTTP
+- **Error handling**: Handle errors with dedicated error branches
+- **Credential management**: Securely manage authentication credentials
+
+## n8n Architecture
+
+<Diagram chart="graph TD\n    A[Trigger Node] -->|Start| B[Processing Node 1]\n    B --> C{Condition}\n    C -->|True| D[Action Node A]\n    C -->|False| E[Action Node B]\n    D --> F[Output Node]\n    E --> F\n    subgraph n8n Engine\n    G[Workflow Engine] --> H[Node Executor]\n    H --> I[Credential Manager]\n    H --> J[Error Handler]\n    end" />
+
+Every workflow in n8n consists of **nodes** connected together:
+
+- **Trigger Node**: Initiates the workflow (Webhook, Cron, Event...)
+- **Processing Node**: Processes data (Function, Set, IF, Switch...)
+- **Action Node**: Performs actions (send email, create record, call API...)
+- **Output Node**: Final result of the workflow
+
+## Comparing n8n vs Zapier vs Make
+
+<ComparisonTable headers={["Criteria", "n8n", "Zapier", "Make (Integromat)"]} rows={[["Pricing", "Free (self-host) or from $20/mo (cloud)", "From $19.99/month", "From $9/month"], ["Self-hosting", "Yes", "No", "No"], ["Open source", "Yes (fair-code)", "No", "No"], ["Integrations", "400+", "6000+", "1500+"], ["Custom code", "JavaScript/TypeScript", "Limited", "Limited"], ["Workflow complexity", "Very high (branching, looping)", "Medium", "High"], ["Interface", "Visual node editor", "Linear steps", "Visual flowchart"], ["Error handling", "Built-in error branch", "Basic", "Error handler"], ["Community", "Growing", "Large", "Medium"]]} />
+
+<Callout type="tip">If you need data control and don't want to rely on third-party services, n8n is the best choice. If you need many pre-built integrations and don't mind paying, Zapier may be more suitable.</Callout>
+
+## Installing n8n
+
+### Using Docker (Recommended)
+
+```bash
+# Run n8n with Docker
+docker run -it --rm \
+  --name n8n \
+  -p 5678:5678 \
+  -v n8n_data:/home/node/.n8n \
+  docker.n8n.io/n8nio/n8n
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=your-secure-password
+      - WEBHOOK_URL=https://your-domain.com/
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  n8n_data:
+```
+
+### Using npm
+
+```bash
+# Install globally
+npm install n8n -g
+
+# Start n8n
+n8n start
+```
+
+<Callout type="warning">When deploying to production, always use HTTPS and configure authentication. Never expose n8n on a public network without security measures in place.</Callout>
+
+## Example Workflow: Webhook to Notification Pipeline
+
+Here is a typical workflow: receive data from a webhook, process it, and send notifications via Slack.
+
+<Diagram chart="graph LR\n    A[Webhook Trigger] --> B[Function: Process Data]\n    B --> C{Check Condition}\n    C -->|Urgent| D[Slack: Send Alert]\n    C -->|Normal| E[Google Sheets: Store]\n    D --> F[Email: Notify]\n    E --> F" />
+
+### Step 1: Create Webhook Trigger
+
+The Webhook node creates a URL endpoint to receive external data:
+
+```json
+{
+  "node": "Webhook",
+  "parameters": {
+    "httpMethod": "POST",
+    "path": "incoming-data",
+    "responseMode": "onReceived",
+    "responseData": "allEntries"
+  }
+}
+```
+
+### Step 2: Process Data with Function Node
+
+```javascript
+// Function Node - Process incoming data
+const items = $input.all();
+
+return items.map(item => {
+  const data = item.json;
+
+  return {
+    json: {
+      name: data.name || 'Unknown',
+      email: data.email || '',
+      priority: data.priority || 'normal',
+      message: data.message || '',
+      timestamp: new Date().toISOString(),
+      isUrgent: data.priority === 'urgent'
+    }
+  };
+});
+```
+
+### Step 3: Conditional Branching and Actions
+
+Use the **IF node** to branch processing based on priority level:
+
+```javascript
+// IF Node condition
+// Check: {{ $json.isUrgent }} === true
+// True branch  -> Send Slack + Email
+// False branch -> Save to Google Sheets
+```
+
+### Step 4: Send Slack Notification
+
+```json
+{
+  "node": "Slack",
+  "parameters": {
+    "channel": "#alerts",
+    "text": "URGENT ALERT: {{ $json.name }} - {{ $json.message }}",
+    "attachments": [
+      {
+        "color": "#ff0000",
+        "fields": [
+          { "title": "Email", "value": "{{ $json.email }}" },
+          { "title": "Time", "value": "{{ $json.timestamp }}" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Common Use Cases
+
+### 1. DevOps Automation
+
+- Receive GitHub webhook on new PR -> run tests -> notify results
+- Monitor server health -> alert on issues
+
+### 2. Marketing Automation
+
+- Collect leads from forms -> save to CRM -> send welcome email
+- Sync email lists between platforms
+
+### 3. Data Pipelines
+
+- Collect data from multiple APIs -> clean -> store in database
+- Generate periodic reports and send via email
+
+### 4. Customer Support
+
+- Receive new ticket -> auto-classify -> assign to appropriate agent
+- Send automated follow-up notifications
+
+<Callout type="tip">Start with simple workflows and gradually increase complexity. n8n provides a workflow template library at n8n.io/workflows for reference and learning.</Callout>
+
+## Error Handling in n8n
+
+n8n provides robust error handling mechanisms:
+
+```javascript
+// Error Workflow - Called when an error occurs
+const error = $input.first().json;
+
+return [{
+  json: {
+    errorMessage: error.message,
+    errorNode: error.node?.name,
+    workflow: error.workflow?.name,
+    timestamp: new Date().toISOString(),
+    severity: 'high'
+  }
+}];
+```
+
+<Diagram chart="graph TD\n    A[Main Workflow] -->|Error occurs| B[Error Trigger]\n    B --> C[Log error to DB]\n    B --> D[Send Slack notification]\n    B --> E[Email admin]\n    A -->|Success| F[Complete]" />
+
+## Conclusion
+
+n8n is a powerful and flexible workflow automation tool, especially suited for developers and teams who want complete control over their automation processes. With self-hosting capabilities, custom code support, and a growing community, n8n is a worthy choice when building automation systems.
+
+<Callout type="info">To get started, visit docs.n8n.io to read the official documentation and build your first workflow. The n8n community on Discord and the forum is also very active in supporting new users.</Callout>

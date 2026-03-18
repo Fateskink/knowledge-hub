@@ -1,0 +1,321 @@
+---
+title: "Mạch điện tử và Cổng Logic - Nền tảng của máy tính số"
+description: "Tìm hiểu về mạch điện tử cơ bản (điện trở, tụ điện, cuộn cảm), cổng logic (AND, OR, NOT, XOR, NAND), mạch cộng (adder), và mạch flip-flop."
+category: "hardware"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["mach-dien-tu", "cong-logic", "adder", "flip-flop", "truth-table", "dien-tu-so", "hardware"]
+featured: false
+order: 5
+sources:
+  - title: "Wikipedia - Logic Gate"
+    url: "https://en.wikipedia.org/wiki/Logic_gate"
+  - title: "All About Circuits - Digital Logic"
+    url: "https://www.allaboutcircuits.com/textbook/digital/"
+  - title: "Nand2Tetris - Build a Computer from First Principles"
+    url: "https://www.nand2tetris.org/"
+  - title: "MIT OpenCourseWare - Computation Structures"
+    url: "https://ocw.mit.edu/courses/6-004-computation-structures-spring-2017/"
+---
+
+# Mạch điện tử và Cổng Logic - Nền tảng của máy tính số
+
+Mọi phép tính mà máy tính thực hiện - từ việc cộng 2 số đơn giản đến render video 4K - đều được thực hiện bởi các mạch điện tử. Bài viết này sẽ đưa bạn từ những linh kiện cơ bản nhất (điện trở, tụ điện) đến các cổng logic và mạch tính toán, giúp bạn hiểu máy tính "làm toán" như thế nào ở cấp độ vật lý.
+
+## Linh kiện điện tử cơ bản
+
+Trước khi nói về mạch số (digital), hãy hiểu 3 linh kiện tương tự (analog) cơ bản:
+
+### Điện trở (Resistor)
+
+Điện trở **cản trở dòng điện**, kiểm soát lượng dòng điện chạy qua mạch. Đơn vị: Ohm (Omega).
+
+```
+Định luật Ohm: V = I x R
+
+V = Điện áp (Volt)
+I = Cường độ dòng điện (Ampere)
+R = Điện trở (Ohm)
+
+Ví dụ: Điện áp 5V, điện trở 1000 Ohm
+-> Dòng điện = 5/1000 = 0.005A = 5mA
+```
+
+### Tụ điện (Capacitor)
+
+Tụ điện **lưu trữ năng lượng điện** trong điện trường. Nó có thể sạc và xả điện. Đơn vị: Farad (F).
+
+Ứng dụng trong máy tính:
+- **DRAM**: Mỗi bit nhớ là 1 tụ điện (sạc = 1, xả = 0).
+- **Lọc nhiễu**: Làm mịn điện áp nguồn.
+- **Mạch định thời**: Kết hợp với điện trở tạo độ trễ thời gian.
+
+### Cuộn cảm (Inductor)
+
+Cuộn cảm **lưu trữ năng lượng trong từ trường** khi dòng điện chạy qua. Đơn vị: Henry (H).
+
+Ứng dụng: bộ nguồn (power supply), lọc nhiễu, mạch cộng hưởng (radio, NFC).
+
+<Callout type="info">Ba linh kiện này (R, C, L) kết hợp với transistor tạo nên mọi mạch điện tử trên thế giới. Từ điện thoại đến vệ tinh, từ máy tính đến robot - tất cả đều xây dựng từ các viên gạch cơ bản này.</Callout>
+
+## Cổng Logic - Ngôn ngữ của máy tính
+
+Máy tính làm việc với hệ nhị phân: chỉ có **0** (tắt/thấp) và **1** (bật/cao). Cổng logic là mạch điện thực hiện các phép toán trên các giá trị 0 và 1.
+
+### Các cổng logic cơ bản
+
+<ComparisonTable
+  headers={["Cổng", "Ký hiệu", "Mô tả", "Số Transistor"]}
+  rows={[
+    ["NOT", "¬A", "Đảo ngược: 0→1, 1→0", "2 (CMOS)"],
+    ["AND", "A ∧ B", "1 chỉ khi CẢ HAI là 1", "6"],
+    ["OR", "A ∨ B", "1 khi ÍT NHẤT MỘT là 1", "6"],
+    ["NAND", "¬(A ∧ B)", "Đảo của AND", "4"],
+    ["NOR", "¬(A ∨ B)", "Đảo của OR", "4"],
+    ["XOR", "A ⊕ B", "1 khi hai đầu vào KHÁC nhau", "8-12"],
+    ["XNOR", "¬(A ⊕ B)", "1 khi hai đầu vào GIỐNG nhau", "8-12"]
+  ]}
+/>
+
+### Bảng chân lý (Truth Table)
+
+Bảng chân lý liệt kê **tất cả các đầu vào có thể** và đầu ra tương ứng:
+
+```
+NOT:           AND:           OR:            XOR:
+A | Out        A  B | Out     A  B | Out     A  B | Out
+0 |  1         0  0 |  0      0  0 |  0      0  0 |  0
+1 |  0         0  1 |  0      0  1 |  1      0  1 |  1
+               1  0 |  0      1  0 |  1      1  0 |  1
+               1  1 |  1      1  1 |  1      1  1 |  0
+
+NAND:          NOR:
+A  B | Out     A  B | Out
+0  0 |  1      0  0 |  1
+0  1 |  1      0  1 |  0
+1  0 |  1      1  0 |  0
+1  1 |  0      1  1 |  0
+```
+
+<Callout type="tip">NAND và NOR được gọi là "cổng phổ dụng" (universal gates) vì bạn có thể xây dựng BẤT KỲ cổng logic nào chỉ từ NAND (hoặc chỉ từ NOR). Đây là lý do NAND được dùng làm đơn vị cơ bản trong thiết kế chip.</Callout>
+
+### Ứng dụng thực tế của cổng logic
+
+```python
+# Cổng logic trong lập trình tương đương với toán tử bitwise
+
+a = 0b1010  # 10 trong hệ nhị phân
+b = 0b1100  # 12 trong hệ nhị phân
+
+print(f"AND:  {a & b:04b}")   # 1000 (8)  - bit 1 chỉ khi cả hai là 1
+print(f"OR:   {a | b:04b}")   # 1110 (14) - bit 1 khi ít nhất một là 1
+print(f"XOR:  {a ^ b:04b}")   # 0110 (6)  - bit 1 khi hai bit khác nhau
+print(f"NOT:  {~a & 0xF:04b}")# 0101 (5)  - đảo tất cả bit
+```
+
+## Mạch Cộng (Adder) - Máy tính "làm toán" như thế nào
+
+Đây là phần thú vị nhất: cách cổng logic thực hiện phép tính số học.
+
+### Half Adder - Mạch cộng nửa
+
+Half Adder cộng **2 bit** và cho ra **Sum** (tổng) và **Carry** (nhớ):
+
+```
+Half Adder:
+A  B | Sum  Carry
+0  0 |  0    0
+0  1 |  1    0
+1  0 |  1    0
+1  1 |  0    1     <- 1+1=10 (nhị phân), Sum=0, Carry=1
+
+Công thức:
+Sum   = A XOR B
+Carry = A AND B
+```
+
+<Diagram chart="graph LR
+    A[A] --> XOR[XOR Gate]
+    B[B] --> XOR
+    A --> AND[AND Gate]
+    B --> AND
+    XOR --> S[Sum]
+    AND --> C[Carry]
+    style XOR fill:#3498db,color:#fff
+    style AND fill:#e74c3c,color:#fff
+    style S fill:#2ecc71,color:#fff
+    style C fill:#f39c12,color:#fff" />
+
+### Full Adder - Mạch cộng đầy đủ
+
+Full Adder cộng **3 bit** (A, B, và Carry In từ hàng trước):
+
+```
+Full Adder:
+A  B  Cin | Sum  Cout
+0  0   0  |  0    0
+0  0   1  |  1    0
+0  1   0  |  1    0
+0  1   1  |  0    1
+1  0   0  |  1    0
+1  0   1  |  0    1
+1  1   0  |  0    1
+1  1   1  |  1    1
+
+Công thức:
+Sum  = A XOR B XOR Cin
+Cout = (A AND B) OR (Cin AND (A XOR B))
+```
+
+<Diagram chart="graph LR
+    A[A] --> XOR1[XOR]
+    B[B] --> XOR1
+    XOR1 --> XOR2[XOR]
+    Cin[Carry In] --> XOR2
+    XOR2 --> Sum[Sum]
+    A --> AND1[AND]
+    B --> AND1
+    XOR1 --> AND2[AND]
+    Cin --> AND2
+    AND1 --> OR[OR]
+    AND2 --> OR
+    OR --> Cout[Carry Out]
+    style XOR1 fill:#3498db,color:#fff
+    style XOR2 fill:#3498db,color:#fff
+    style AND1 fill:#e74c3c,color:#fff
+    style AND2 fill:#e74c3c,color:#fff
+    style OR fill:#f39c12,color:#fff
+    style Sum fill:#2ecc71,color:#fff
+    style Cout fill:#2ecc71,color:#fff" />
+
+### Mạch cộng nhiều bit (Ripple Carry Adder)
+
+Để cộng số 8-bit, nối 8 Full Adder lại, Carry Out của mỗi tầng làm Carry In cho tầng tiếp theo:
+
+```
+Cộng 2 số 4-bit: A = 0101 (5), B = 0011 (3)
+
+     A3 B3    A2 B2    A1 B1    A0 B0
+      |  |     |  |     |  |     |  |
+     [FA3] <--[FA2] <--[FA1] <--[FA0] <-- Cin=0
+      |  |     |  |     |  |     |  |
+     Cout S3        S2        S1        S0
+
+Kết quả: Cout=0, S=1000 = 8. Đúng! 5 + 3 = 8
+```
+
+<Callout type="info">Một phép cộng 64-bit trong CPU hiện đại dùng khoảng 64 Full Adder, nhưng có các kỹ thuật tối ưu (như Carry Lookahead Adder) để tăng tốc, giảm thời gian từ O(n) xuống O(log n) với n là số bit.</Callout>
+
+## Mạch Flip-Flop - Bộ nhớ 1 bit
+
+Flip-flop là mạch có thể **lưu trữ 1 bit** dữ liệu. Nó là nền tảng của register trong CPU và SRAM.
+
+### SR Flip-Flop
+
+Dùng 2 cổng NOR (hoặc NAND) nối chéo:
+
+```
+SR Flip-Flop (NOR):
+
+S ──┐
+    ├──[NOR]──┬── Q  (đầu ra)
+R ──┤    ┌────┘
+    │    │
+    │    └────┐
+    └──[NOR]──┴── Q' (đầu ra đảo)
+
+Bảng trạng thái:
+S  R | Q (tiếp theo)  | Mô tả
+0  0 | Q (giữ nguyên) | Giữ trạng thái
+1  0 | 1              | Set (đặt lên 1)
+0  1 | 0              | Reset (xóa về 0)
+1  1 | Không xác định | Cấm!
+```
+
+### D Flip-Flop
+
+Phiên bản cải tiến, có thêm tín hiệu **Clock**. Dữ liệu chỉ được lưu khi có xung clock:
+
+```
+D Flip-Flop:
+- D (Data): Dữ liệu đầu vào
+- CLK (Clock): Tín hiệu đồng hồ
+- Q: Đầu ra
+
+Khi CLK chuyển từ 0->1 (cạnh lên):
+  Q = D (lưu giá trị hiện tại của D)
+Khi CLK = 0:
+  Q giữ nguyên (không đổi)
+```
+
+<Callout type="tip">D Flip-Flop là thành phần cơ bản nhất của bộ nhớ trong CPU. Một register 64-bit được tạo từ 64 D Flip-Flop. Cache SRAM cũng dựa trên cấu trúc tương tự. Mỗi khi bạn lưu một biến trong chương trình, nó được lưu trữ trong hàng triệu flip-flop nhỏ bé này.</Callout>
+
+### Từ Flip-Flop đến Register và Bộ nhớ
+
+```
+1 D Flip-Flop          = 1 bit nhớ
+8 D Flip-Flop          = 1 byte (1 ký tự)
+64 D Flip-Flop         = 1 register 64-bit
+64 x 16 = 1024 FF      = 16 register (trong CPU)
+Hàng triệu FF          = Cache L1 (32-64 KB)
+Hàng tỷ FF/Capacitor   = RAM (16-64 GB)
+```
+
+## Mạch tổ hợp vs Mạch tuần tự
+
+### Mạch tổ hợp (Combinational)
+- Đầu ra **chỉ phụ thuộc vào đầu vào hiện tại**.
+- Không có bộ nhớ, không nhớ trạng thái trước.
+- Ví dụ: cổng logic, adder, multiplexer, decoder.
+
+### Mạch tuần tự (Sequential)
+- Đầu ra phụ thuộc vào **đầu vào hiện tại VÀ trạng thái trước đó**.
+- Có bộ nhớ (flip-flop).
+- Ví dụ: counter (bộ đếm), register, FSM (máy trạng thái hữu hạn).
+
+<Diagram chart="graph TD
+    subgraph Combinational[Mạch tổ hợp]
+        I1[Đầu vào] --> LOGIC[Cổng Logic]
+        LOGIC --> O1[Đầu ra]
+    end
+    subgraph Sequential[Mạch tuần tự]
+        I2[Đầu vào] --> LOGIC2[Cổng Logic]
+        LOGIC2 --> O2[Đầu ra]
+        LOGIC2 --> FF[Flip-Flop\nBộ nhớ]
+        FF -->|Trạng thái| LOGIC2
+        CLK[Clock] --> FF
+    end
+    style LOGIC fill:#3498db,color:#fff
+    style LOGIC2 fill:#e74c3c,color:#fff
+    style FF fill:#f39c12,color:#fff" />
+
+## Ứng dụng: Từ cổng logic đến máy tính
+
+Tất cả các thành phần của CPU đều xây dựng từ các mạch cơ bản này:
+
+- **ALU** = Nhiều Adder + cổng logic + multiplexer
+- **Register** = Nhiều D Flip-Flop
+- **Control Unit** = Máy trạng thái hữu hạn (FSM) + decoder
+- **Cache** = Ma trận SRAM (flip-flop) + mạch điều khiển
+
+```
+Nand2Tetris - Xây dựng máy tính từ NAND:
+
+NAND Gate
+  -> NOT, AND, OR, XOR
+    -> Half Adder, Full Adder
+      -> ALU (16-bit)
+    -> Multiplexer, Demultiplexer
+      -> Memory (RAM)
+    -> D Flip-Flop
+      -> Register, Program Counter
+        -> CPU
+          -> Máy tính hoàn chỉnh!
+```
+
+<Callout type="tip">Nếu bạn muốn hiểu sâu hơn, khóa học miễn phí "Nand2Tetris" (nand2tetris.org) hướng dẫn bạn xây dựng một máy tính hoàn chỉnh từ cổng NAND, bước từng bước. Đây là một trong những khóa học computer science hay nhất từng có.</Callout>
+
+## Tóm tắt
+
+Mạch điện tử và cổng logic là lớp nền tảng thấp nhất của máy tính số. Từ 3 linh kiện cơ bản (điện trở, tụ điện, cuộn cảm) và transistor, chúng ta xây dựng cổng logic, từ cổng logic xây dựng mạch tính toán (adder) và mạch nhớ (flip-flop), và từ đó xây dựng toàn bộ CPU. Hiểu được lớp này giúp bạn có góc nhìn toàn diện về cách máy tính thực sự hoạt động.

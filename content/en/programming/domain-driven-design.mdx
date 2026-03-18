@@ -1,0 +1,355 @@
+---
+title: "Domain-Driven Design (DDD): Building Software Around Business Domains"
+description: "Learn Domain-Driven Design from Ubiquitous Language, Bounded Contexts, Entities, Value Objects, and Aggregates to a practical e-commerce example with TypeScript."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["ddd", "domain-driven-design", "architecture", "microservices", "typescript", "bounded-context"]
+featured: false
+order: 10
+sources:
+  - title: "Eric Evans - Domain-Driven Design: Tackling Complexity in the Heart of Software"
+    url: "https://www.domainlanguage.com/ddd/"
+  - title: "Martin Fowler - Domain-Driven Design"
+    url: "https://martinfowler.com/tags/domain%20driven%20design.html"
+  - title: "Microsoft - Domain-Driven Design"
+    url: "https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/"
+---
+
+# Domain-Driven Design (DDD): Building Software Around Business Domains
+
+As applications grow, business logic becomes increasingly complex, and simple patterns like MVC are no longer sufficient to manage that complexity. Domain-Driven Design (DDD) emerged as a methodology that helps development teams tackle business complexity by placing the **domain** (the business problem space) at the center of software design.
+
+## What is DDD?
+
+Domain-Driven Design is a software development approach introduced by Eric Evans in his landmark book of the same name in 2003. The core ideas of DDD are:
+
+- **Software should reflect the domain** (business area) it serves
+- **Development teams must deeply understand the business**, not just code to specifications
+- **Language in code must match the language** used by domain experts
+
+<Callout type="info">DDD is not a framework or library — it is a philosophy and a collection of design principles. You can apply DDD with any programming language or technology stack.</Callout>
+
+## Why Do We Need DDD?
+
+In many projects, code becomes hard to understand not because of missing design patterns, but because **the code does not accurately reflect the business domain**:
+
+- Developers use different terms than domain experts, leading to miscommunication
+- Business logic is scattered across controllers, services, and utilities, making maintenance difficult
+- No clear boundaries between business areas mean that changes in one place ripple unpredictably elsewhere
+
+DDD addresses these problems through two sets of design tools: **Strategic Design** (macro-level architecture) and **Tactical Design** (micro-level building blocks).
+
+## Ubiquitous Language — The Shared Vocabulary
+
+Ubiquitous Language is the most important foundation of DDD. It is the **shared language** that both developers and domain experts use — in meetings, in documentation, and in code.
+
+**Example in an e-commerce system:**
+
+| Business term | In code |
+|---|---|
+| Order | `Order` |
+| Product | `Product` |
+| Place an order | `placeOrder()` |
+| Cancel an order | `cancelOrder()` |
+| Shopping cart | `ShoppingCart` |
+| Payment | `Payment` |
+
+<Callout type="warning">Avoid generic names like `DataManager`, `ItemProcessor`, or `handleStuff()`. Names in code must accurately reflect business concepts. If a domain expert cannot understand your class or method names, you are violating the Ubiquitous Language principle.</Callout>
+
+## Strategic Design: The Big Picture
+
+Strategic Design helps you divide a large system into parts with well-defined boundaries.
+
+### Bounded Context — Defining Model Boundaries
+
+A Bounded Context is a boundary within which a specific business model is consistent and meaningful. The same concept can have different meanings in different Bounded Contexts.
+
+**Example:** In an e-commerce system, the concept of "Product":
+- **Catalog Context**: Product has a name, description, images, and categories
+- **Inventory Context**: Product has stock quantity and warehouse location
+- **Pricing Context**: Product has a base price, promotional price, and discounts
+- **Shipping Context**: Product has weight, dimensions, and shipping type
+
+<Diagram chart="graph TB\n    subgraph Catalog\n        P1[Product\nName, Description, Images]\n    end\n    subgraph Inventory\n        P2[Product\nStock, Warehouse Location]\n    end\n    subgraph Pricing\n        P3[Product\nBase Price, Promotions]\n    end\n    subgraph Shipping\n        P4[Product\nWeight, Dimensions]\n    end\n    Catalog <-->|Context Map| Inventory\n    Catalog <-->|Context Map| Pricing\n    Inventory <-->|Context Map| Shipping" />
+
+### Subdomains — Partitioning the Business
+
+DDD categorizes the domain into three types of subdomains:
+
+- **Core Domain**: The core business capability that provides competitive advantage — invest the most here
+- **Supporting Subdomain**: Supports the Core Domain with its own business logic but is not the competitive differentiator
+- **Generic Subdomain**: Common capabilities that can use off-the-shelf solutions (authentication, email, payment gateways)
+
+### Context Map — Mapping Relationships
+
+A Context Map describes the relationships between Bounded Contexts. Common relationship patterns include:
+- **Partnership**: Two contexts collaborate closely and evolve together
+- **Customer-Supplier**: One context provides data or services consumed by another
+- **Anti-Corruption Layer (ACL)**: A translation layer that protects a model from external influence
+
+## Tactical Design: The Building Blocks
+
+Tactical Design provides concrete building blocks for implementing the domain model in code.
+
+### Entity — Objects with Identity
+
+An Entity is an object with a **unique identity** that persists throughout its lifecycle. Two Entities with identical attributes but different IDs are considered different objects.
+
+### Value Object — Objects Defined by Attributes
+
+A Value Object has **no identity** and is defined entirely by its attributes. Two Value Objects with the same attributes are considered equal. Value Objects should be **immutable**.
+
+### Aggregate — Consistency Boundaries
+
+An Aggregate is a cluster of Entities and Value Objects treated as a single unit. Each Aggregate has an **Aggregate Root** — the primary Entity that serves as the sole entry point for accessing and modifying data within the cluster.
+
+<Diagram chart="graph TB\n    subgraph Order Aggregate\n        OR[Order\nAggregate Root] --> OI[OrderItem\nEntity]\n        OR --> SA[ShippingAddress\nValue Object]\n        OR --> M[Money\nValue Object]\n        OI --> M2[Money\nValue Object]\n    end\n    R[OrderRepository] --> OR" />
+
+<Callout type="tip">The golden rule of Aggregates: each transaction should modify only ONE Aggregate. If you need to update multiple Aggregates in a single operation, use Domain Events to achieve eventual consistency.</Callout>
+
+## Practical Example: E-Commerce with TypeScript
+
+Below is an example of building an Order Aggregate for an e-commerce system:
+
+### Value Objects
+
+```typescript
+// domain/value-objects/Money.ts
+export class Money {
+  constructor(
+    public readonly amount: number,
+    public readonly currency: string
+  ) {
+    if (amount < 0) throw new Error('Amount cannot be negative');
+    if (!currency) throw new Error('Currency is required');
+  }
+
+  add(other: Money): Money {
+    if (this.currency !== other.currency) {
+      throw new Error('Cannot add different currencies');
+    }
+    return new Money(this.amount + other.amount, this.currency);
+  }
+
+  multiply(factor: number): Money {
+    return new Money(this.amount * factor, this.currency);
+  }
+
+  equals(other: Money): boolean {
+    return this.amount === other.amount && this.currency === other.currency;
+  }
+}
+
+// domain/value-objects/Address.ts
+export class Address {
+  constructor(
+    public readonly street: string,
+    public readonly city: string,
+    public readonly state: string,
+    public readonly postalCode: string,
+    public readonly country: string
+  ) {
+    if (!street || !city) throw new Error('Invalid address');
+  }
+
+  equals(other: Address): boolean {
+    return (
+      this.street === other.street &&
+      this.city === other.city &&
+      this.state === other.state &&
+      this.postalCode === other.postalCode &&
+      this.country === other.country
+    );
+  }
+}
+```
+
+### Entity and Aggregate Root
+
+```typescript
+// domain/entities/OrderItem.ts
+export class OrderItem {
+  constructor(
+    public readonly id: string,
+    public readonly productId: string,
+    public readonly productName: string,
+    private _quantity: number,
+    public readonly unitPrice: Money
+  ) {
+    if (_quantity <= 0) throw new Error('Quantity must be greater than 0');
+  }
+
+  get quantity(): number { return this._quantity; }
+
+  get totalPrice(): Money {
+    return this.unitPrice.multiply(this._quantity);
+  }
+
+  updateQuantity(newQuantity: number): void {
+    if (newQuantity <= 0) throw new Error('Quantity must be greater than 0');
+    this._quantity = newQuantity;
+  }
+}
+
+// domain/aggregates/Order.ts — Aggregate Root
+export class Order {
+  private _items: OrderItem[] = [];
+  private _status: OrderStatus;
+
+  constructor(
+    public readonly id: string,
+    public readonly customerId: string,
+    private _shippingAddress: Address,
+    public readonly createdAt: Date = new Date()
+  ) {
+    this._status = OrderStatus.DRAFT;
+  }
+
+  get status(): OrderStatus { return this._status; }
+  get items(): ReadonlyArray<OrderItem> { return [...this._items]; }
+
+  addItem(item: OrderItem): void {
+    if (this._status !== OrderStatus.DRAFT) {
+      throw new Error('Can only add items when order is in DRAFT status');
+    }
+    const existing = this._items.find(i => i.productId === item.productId);
+    if (existing) {
+      existing.updateQuantity(existing.quantity + item.quantity);
+    } else {
+      this._items.push(item);
+    }
+  }
+
+  removeItem(productId: string): void {
+    if (this._status !== OrderStatus.DRAFT) {
+      throw new Error('Can only remove items when order is in DRAFT status');
+    }
+    this._items = this._items.filter(i => i.productId !== productId);
+  }
+
+  get totalAmount(): Money {
+    return this._items.reduce(
+      (sum, item) => sum.add(item.totalPrice),
+      new Money(0, 'USD')
+    );
+  }
+
+  place(): void {
+    if (this._items.length === 0) {
+      throw new Error('Order must contain at least one item');
+    }
+    this._status = OrderStatus.PLACED;
+    // Could emit a Domain Event: OrderPlacedEvent
+  }
+
+  cancel(): void {
+    if (this._status === OrderStatus.SHIPPED) {
+      throw new Error('Cannot cancel a shipped order');
+    }
+    this._status = OrderStatus.CANCELLED;
+  }
+}
+
+enum OrderStatus {
+  DRAFT = 'DRAFT',
+  PLACED = 'PLACED',
+  CONFIRMED = 'CONFIRMED',
+  SHIPPED = 'SHIPPED',
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED',
+}
+```
+
+### Repository and Domain Service
+
+```typescript
+// domain/repositories/OrderRepository.ts
+export interface OrderRepository {
+  findById(id: string): Promise<Order | null>;
+  save(order: Order): Promise<void>;
+  findByCustomerId(customerId: string): Promise<Order[]>;
+}
+
+// domain/services/OrderService.ts
+export class OrderService {
+  constructor(
+    private orderRepo: OrderRepository,
+    private inventoryService: InventoryService
+  ) {}
+
+  async placeOrder(orderId: string): Promise<void> {
+    const order = await this.orderRepo.findById(orderId);
+    if (!order) throw new Error('Order not found');
+
+    // Check inventory before placing the order
+    for (const item of order.items) {
+      const available = await this.inventoryService.checkStock(item.productId);
+      if (available < item.quantity) {
+        throw new Error(`Product ${item.productName} is out of stock`);
+      }
+    }
+
+    order.place();
+    await this.orderRepo.save(order);
+  }
+}
+```
+
+## Layered Architecture with DDD
+
+<Diagram chart="graph TB\n    A[Presentation Layer\nControllers, API] --> B[Application Layer\nUse Cases, DTOs]\n    B --> C[Domain Layer\nEntities, Value Objects\nAggregates, Domain Services]\n    B --> D[Infrastructure Layer\nRepositories, Database\nExternal APIs]\n    D --> C" />
+
+- **Domain Layer**: Contains all business logic with no dependencies on any other layer
+- **Application Layer**: Orchestrates use cases and calls the Domain Layer
+- **Infrastructure Layer**: Concrete implementations (database, APIs) that depend on the Domain Layer through interfaces
+- **Presentation Layer**: User interfaces and API endpoints
+
+<Callout type="info">The Domain Layer sits at the center and depends on nothing — this is the Dependency Inversion Principle in action. Repository interfaces are defined in the Domain Layer, but their implementations live in the Infrastructure Layer.</Callout>
+
+## DDD Concepts at a Glance
+
+<ComparisonTable
+  headers={["Concept", "Description", "Example"]}
+  rows={[
+    ["Entity", "Has a unique identity that persists through its lifecycle", "Order, Customer, Product"],
+    ["Value Object", "No identity, immutable, compared by attribute values", "Money, Address, Email"],
+    ["Aggregate", "Cluster of Entity/VO ensuring consistency", "Order + OrderItems"],
+    ["Aggregate Root", "Primary Entity, the sole access point", "Order in the Order Aggregate"],
+    ["Repository", "Interface for retrieving/storing Aggregates", "OrderRepository"],
+    ["Domain Service", "Business logic that doesn't belong to any Entity", "PricingService, OrderService"],
+    ["Domain Event", "A significant business occurrence", "OrderPlaced, PaymentReceived"],
+    ["Bounded Context", "Boundary of a business model", "Catalog, Inventory, Pricing"]
+  ]}
+/>
+
+## DDD and Microservices
+
+DDD and microservices have a natural relationship: **each Bounded Context can become a microservice**.
+
+- **Bounded Context = Service boundary**: Each context has its own database and API
+- **Context Map = Service communication**: Contexts communicate via APIs and message queues
+- **Anti-Corruption Layer = API Gateway/Adapter**: Translates data between services
+
+<Callout type="warning">Not every Bounded Context needs to be a separate microservice. Start with a modular monolith — organize modules by Bounded Context but deploy as a single unit. When scaling demands it, extract modules into microservices.</Callout>
+
+## When Should You Use DDD?
+
+**Well suited for:**
+- Complex business domains with many rules and constraints
+- Domains that change frequently and require flexibility
+- Long-term projects that need sustained maintainability
+- Teams with access to domain experts
+
+**Not ideal for:**
+- Simple CRUD applications — DDD would be over-engineering
+- Small teams with short-term projects — the learning and implementation cost of DDD is high
+- Projects without domain experts to consult
+- Simple business logic with few rules
+
+<Callout type="danger">DDD is not a silver bullet. Applying DDD to a simple CRUD application creates unnecessary complexity. Evaluate the business complexity first — if the business logic fits comfortably in a single Service class, you probably do not need DDD.</Callout>
+
+## Summary
+
+Domain-Driven Design is a powerful tool for tackling business complexity. By placing the domain at the center, using Ubiquitous Language, and dividing the system into clearly defined Bounded Contexts, DDD helps build software that accurately reflects the real world it serves. Combined with microservices, DDD becomes the architectural foundation for modern enterprise systems.

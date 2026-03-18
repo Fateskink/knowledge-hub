@@ -1,0 +1,250 @@
+---
+title: "RAG là gì? Retrieval-Augmented Generation giải thích đơn giản"
+description: "Tìm hiểu RAG (Retrieval-Augmented Generation): cách kết hợp LLM với nguồn dữ liệu bên ngoài qua embeddings, vector database và retrieval pipeline."
+category: "ai-basics"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 9
+tags: ["rag", "embeddings", "vector-database", "retrieval", "llm"]
+featured: false
+order: 5
+sources:
+  - title: "AWS - What is RAG?"
+    url: "https://aws.amazon.com/what-is/retrieval-augmented-generation/"
+  - title: "Pinecone - Retrieval Augmented Generation"
+    url: "https://www.pinecone.io/learn/retrieval-augmented-generation/"
+  - title: "LangChain - RAG Tutorial"
+    url: "https://python.langchain.com/docs/tutorials/rag/"
+  - title: "Google Cloud - RAG Overview"
+    url: "https://cloud.google.com/use-cases/retrieval-augmented-generation"
+---
+
+# RAG là gì? Retrieval-Augmented Generation giải thích đơn giản
+
+Bạn đã bao giờ hỏi ChatGPT về nội quy công ty bạn và nhận được câu trả lời... bịa? Đó là vì LLM chỉ biết những gì nó đã được huấn luyện. **RAG (Retrieval-Augmented Generation)** giải quyết vấn đề này bằng cách cho phép AI "tra cứu" tài liệu thực trước khi trả lời.
+
+## Vấn đề mà RAG giải quyết
+
+LLM có những hạn chế cốt lõi:
+
+1. **Knowledge cutoff:** Không biết thông tin sau thời điểm huấn luyện
+2. **Hallucination:** Bịa thông tin khi không biết câu trả lời
+3. **Không có dữ liệu riêng:** Không biết về tài liệu nội bộ công ty bạn
+4. **Không cập nhật:** Không biết tin tức, giá cả, hay chính sách mới nhất
+
+<Callout type="info" title="RAG = Tra cứu + Tạo sinh">
+Hãy tưởng tượng RAG như một sinh viên đi thi mở sách. Thay vì chỉ dựa vào trí nhớ (LLM thuần), sinh viên được mang theo tài liệu tham khảo (retrieved documents) để tra cứu trước khi trả lời.
+</Callout>
+
+## RAG Pipeline hoạt động thế nào?
+
+<Diagram chart="graph TD\n    subgraph Giai đoạn Chuẩn bị - Indexing\n    A[📄 Tài liệu gốc\nPDF, Word, Web, DB] --> B[✂️ Chunking\nChia thành đoạn nhỏ]\n    B --> C[🔢 Embedding Model\nChuyển text thành vector]\n    C --> D[💾 Vector Database\nLưu trữ vectors]\n    end\n    \n    subgraph Giai đoạn Truy vấn - Retrieval + Generation\n    E[❓ Câu hỏi người dùng] --> F[🔢 Embedding\nCâu hỏi thành vector]\n    F --> G[🔍 Semantic Search\nTìm đoạn liên quan nhất]\n    D --> G\n    G --> H[📝 Context + Prompt\nGhép đoạn tìm được với câu hỏi]\n    H --> I[🤖 LLM\nTạo câu trả lời]\n    I --> J[💬 Câu trả lời\ncó nguồn tham chiếu]\n    end\n    \n    style A fill:#e3f2fd\n    style D fill:#f3e5f5\n    style E fill:#e3f2fd\n    style I fill:#e8f5e9\n    style J fill:#fff8e1" />
+
+RAG hoạt động qua hai giai đoạn chính:
+
+### Giai đoạn 1: Indexing (Chuẩn bị dữ liệu)
+
+#### Bước 1: Thu thập tài liệu
+Tập hợp tất cả tài liệu bạn muốn AI có thể tham khảo: PDF, trang web, database, email, Confluence pages, v.v.
+
+#### Bước 2: Chunking (Chia nhỏ tài liệu)
+Tài liệu dài được chia thành các đoạn nhỏ (chunks), thường 200-1000 tokens mỗi chunk.
+
+```python
+# Ví dụ chunking đơn giản
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500,        # Kích thước mỗi chunk (ký tự)
+    chunk_overlap=50,      # Phần chồng lấn giữa các chunk
+    separators=["\n\n", "\n", ". ", " "]  # Ưu tiên tách ở đâu
+)
+
+documents = load_documents("company_handbook.pdf")
+chunks = splitter.split_documents(documents)
+
+print(f"Tổng: {len(chunks)} chunks từ tài liệu gốc")
+```
+
+<Callout type="tip" title="Chunking strategy quan trọng">
+Chunk quá nhỏ sẽ mất ngữ cảnh, chunk quá lớn sẽ chứa quá nhiều thông tin không liên quan. Chunk overlap giúp đảm bảo không mất thông tin ở ranh giới giữa các chunk. Thử nghiệm với các kích thước khác nhau để tìm ra mức tối ưu cho dữ liệu của bạn.
+</Callout>
+
+#### Bước 3: Embedding (Chuyển thành vector)
+Mỗi chunk được chuyển thành một vector số (embedding) - biểu diễn "ý nghĩa" của đoạn văn trong không gian toán học.
+
+```python
+# Tạo embeddings với OpenAI
+from openai import OpenAI
+
+client = OpenAI()
+
+def get_embedding(text: str) -> list[float]:
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=text
+    )
+    return response.data[0].embedding
+
+# Mỗi chunk -> một vector 1536 chiều
+chunk_text = "Nhân viên được nghỉ phép 12 ngày/năm theo quy định."
+vector = get_embedding(chunk_text)
+print(f"Vector có {len(vector)} chiều")  # 1536
+```
+
+#### Bước 4: Lưu vào Vector Database
+Các vectors được lưu vào vector database - cơ sở dữ liệu chuyên biệt cho việc tìm kiếm tương đồng.
+
+### Giai đoạn 2: Retrieval + Generation (Truy vấn)
+
+#### Bước 1: Embed câu hỏi
+Câu hỏi của người dùng cũng được chuyển thành vector bằng cùng embedding model.
+
+#### Bước 2: Semantic Search
+Tìm các chunks có vector "gần nhất" với vector câu hỏi. "Gần" ở đây thường đo bằng cosine similarity.
+
+#### Bước 3: Tạo prompt với context
+Ghép các chunks tìm được vào prompt cùng câu hỏi.
+
+#### Bước 4: LLM tạo câu trả lời
+LLM đọc context và tạo câu trả lời dựa trên thông tin thực tế.
+
+```python
+# RAG pipeline hoàn chỉnh (đơn giản hóa)
+def rag_answer(question: str) -> str:
+    # 1. Embed câu hỏi
+    question_vector = get_embedding(question)
+
+    # 2. Tìm chunks liên quan từ vector DB
+    relevant_chunks = vector_db.search(
+        vector=question_vector,
+        top_k=5  # Lấy 5 chunks gần nhất
+    )
+
+    # 3. Tạo prompt
+    context = "\n\n".join([chunk.text for chunk in relevant_chunks])
+    prompt = f"""Dựa trên thông tin sau đây, hãy trả lời câu hỏi.
+Nếu thông tin không đủ để trả lời, hãy nói rõ.
+
+Thông tin tham khảo:
+{context}
+
+Câu hỏi: {question}
+
+Trả lời:"""
+
+    # 4. Gửi cho LLM
+    response = llm.generate(prompt)
+    return response
+```
+
+## Embeddings và Vector Database chi tiết
+
+### Embeddings hoạt động thế nào?
+
+Embedding chuyển text thành vector sao cho các đoạn văn có ý nghĩa tương đồng sẽ có vector gần nhau.
+
+```text
+"Tôi thích ăn phở"     → [0.23, -0.45, 0.89, ...]
+"Phở là món ăn ngon"   → [0.25, -0.41, 0.85, ...]  ← Gần nhau!
+"Trời hôm nay đẹp"     → [-0.67, 0.33, -0.12, ...] ← Xa hai vector trên
+```
+
+### Các Embedding Models phổ biến:
+
+<ComparisonTable
+  headers={["Model", "Provider", "Kích thước", "Ghi chú"]}
+  rows={[
+    ["text-embedding-3-small", "OpenAI", "1536 chiều", "Phổ biến nhất, giá rẻ"],
+    ["text-embedding-3-large", "OpenAI", "3072 chiều", "Chính xác hơn, đắt hơn"],
+    ["Voyage AI", "Anthropic partner", "1024 chiều", "Tối ưu cho code và text"],
+    ["BGE-M3", "BAAI (open source)", "1024 chiều", "Đa ngôn ngữ, miễn phí"],
+    ["Cohere Embed v3", "Cohere", "1024 chiều", "Tốt cho đa ngôn ngữ"]
+  ]}
+/>
+
+### Vector Databases phổ biến:
+
+| Database | Loại | Đặc điểm |
+|----------|------|----------|
+| **Pinecone** | Cloud | Managed, dễ dùng, scalable |
+| **Weaviate** | Hybrid | Open source, nhiều tính năng |
+| **Chroma** | Embedded | Nhẹ, phù hợp prototype |
+| **Qdrant** | Self-hosted/Cloud | Hiệu suất cao, Rust-based |
+| **pgvector** | Extension | Thêm vào PostgreSQL có sẵn |
+
+<Callout type="tip" title="Bắt đầu đơn giản">
+Nếu bạn mới bắt đầu, hãy dùng **Chroma** (chạy local, không cần setup) hoặc **pgvector** (nếu đã dùng PostgreSQL). Khi cần scale, chuyển sang Pinecone hoặc Qdrant.
+</Callout>
+
+## Kỹ thuật RAG nâng cao
+
+### 1. Hybrid Search
+Kết hợp semantic search (vector) với keyword search (BM25) để có kết quả tốt hơn.
+
+### 2. Re-ranking
+Sau khi retrieval, sử dụng một model re-ranker để xếp hạng lại kết quả theo độ liên quan.
+
+### 3. Query Transformation
+Biến đổi câu hỏi ban đầu để tìm kiếm hiệu quả hơn: mở rộng query, tạo nhiều sub-queries, hoặc viết lại query bằng HyDE (Hypothetical Document Embedding).
+
+### 4. Contextual Chunking
+Thêm metadata và context vào mỗi chunk (thuộc tài liệu nào, chapter nào, ngày tạo) để cải thiện retrieval.
+
+<Diagram chart="graph LR\n    A[Basic RAG\nChunk + Embed + Retrieve] --> B[+ Hybrid Search\nVector + Keyword]\n    B --> C[+ Re-ranking\nSắp xếp lại kết quả]\n    C --> D[+ Query Transform\nCải thiện câu truy vấn]\n    D --> E[Advanced RAG\nHiệu suất tối ưu]\n    \n    style A fill:#ffcdd2\n    style B fill:#f8bbd0\n    style C fill:#e1bee7\n    style D fill:#d1c4e9\n    style E fill:#c5cae9" />
+
+## Ứng dụng thực tế của RAG
+
+### Chatbot nội bộ doanh nghiệp
+Trả lời câu hỏi về chính sách HR, quy trình, tài liệu kỹ thuật dựa trên tài liệu nội bộ.
+
+### Hỗ trợ khách hàng
+Tra cứu knowledge base, FAQ, và lịch sử ticket để trả lời chính xác.
+
+### Nghiên cứu pháp lý
+Tìm kiếm và tổng hợp thông tin từ hàng nghìn văn bản pháp luật.
+
+### Hỗ trợ developer
+Tra cứu documentation, codebase, và best practices để hỗ trợ coding.
+
+## RAG vs Fine-tuning
+
+<ComparisonTable
+  headers={["Tiêu chí", "RAG", "Fine-tuning"]}
+  rows={[
+    ["Cập nhật dữ liệu", "Dễ - chỉ cần thêm document mới", "Khó - cần train lại model"],
+    ["Chi phí ban đầu", "Thấp - chỉ cần vector DB", "Cao - cần GPU để train"],
+    ["Trích dẫn nguồn", "Có - biết document nào được dùng", "Không - kiến thức hòa vào model"],
+    ["Phù hợp khi", "Dữ liệu thay đổi thường xuyên", "Cần thay đổi hành vi/style của model"],
+    ["Độ chính xác", "Cao nếu retrieval tốt", "Phụ thuộc chất lượng training data"],
+    ["Latency", "Chậm hơn (thêm bước retrieval)", "Nhanh hơn (không cần retrieval)"]
+  ]}
+/>
+
+<Callout type="info" title="Khi nào dùng gì?">
+**Dùng RAG khi:** Bạn cần AI trả lời dựa trên dữ liệu cụ thể, dữ liệu thay đổi thường xuyên, cần trích dẫn nguồn.
+
+**Dùng Fine-tuning khi:** Bạn cần thay đổi phong cách, giọng điệu, hoặc hành vi của model. Hoặc khi cần model chuyên biệt cho một domain cụ thể.
+
+**Kết hợp cả hai:** Trong nhiều trường hợp, RAG + Fine-tuning cho kết quả tốt nhất.
+</Callout>
+
+## Lỗi thường gặp khi triển khai RAG
+
+<Callout type="danger" title="Những lỗi cần tránh">
+1. **Chunk size không phù hợp:** Quá nhỏ mất ngữ cảnh, quá lớn nhiều noise
+2. **Embedding model không phù hợp:** Dùng model tiếng Anh cho dữ liệu tiếng Việt
+3. **Không có re-ranking:** Retrieval top-k không phải lúc nào cũng chính xác
+4. **Thiếu evaluation:** Không đo lường chất lượng retrieval và generation
+5. **Prompt kém:** Không hướng dẫn LLM cách sử dụng context được cung cấp
+</Callout>
+
+## Tổng kết
+
+RAG là kỹ thuật thiết yếu để xây dựng ứng dụng AI thực tế, đặc biệt khi cần:
+- Trả lời dựa trên dữ liệu cụ thể của tổ chức
+- Giảm hallucination bằng grounding trên tài liệu thực
+- Cung cấp nguồn tham chiếu cho câu trả lời
+- Cập nhật kiến thức mà không cần train lại model
+
+Pipeline cơ bản: **Chunk → Embed → Store → Retrieve → Generate**. Từ đó, bạn có thể dần nâng cao với hybrid search, re-ranking, và query transformation.

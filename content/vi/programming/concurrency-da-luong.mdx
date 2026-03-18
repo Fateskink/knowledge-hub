@@ -1,0 +1,426 @@
+---
+title: "Concurrency và Đa Luồng: Thread, Goroutine và Async/Await"
+description: "Tổng quan về lập trình đồng thời: thread, goroutine, async/await, mutex, deadlock, và so sánh concurrency model giữa Go, Rust, Java, Python và JavaScript."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 16
+tags: ["concurrency", "multithreading", "goroutine", "async-await", "mutex", "deadlock", "parallelism"]
+featured: true
+order: 8
+sources:
+  - title: "Go Concurrency Patterns"
+    url: "https://go.dev/blog/pipelines"
+  - title: "The Rust Programming Language - Fearless Concurrency"
+    url: "https://doc.rust-lang.org/book/ch16-00-concurrency.html"
+  - title: "Java Concurrency in Practice"
+    url: "https://docs.oracle.com/javase/tutorial/essential/concurrency/"
+  - title: "Python asyncio Documentation"
+    url: "https://docs.python.org/3/library/asyncio.html"
+---
+
+# Concurrency và Đa Luồng: Thread, Goroutine và Async/Await
+
+Trong thế giới phần mềm hiện đại, việc xử lý nhiều tác vụ cùng lúc là yêu cầu không thể thiếu. Từ web server phục vụ hàng nghìn request đồng thời, đến ứng dụng mobile cần giữ giao diện mượt mà trong khi tải dữ liệu, **concurrency** (đồng thời) là kỹ năng mà mọi lập trình viên cần nắm vững.
+
+## Concurrency vs Parallelism
+
+Hai khái niệm này thường bị nhầm lẫn nhưng hoàn toàn khác nhau:
+
+- **Concurrency** (đồng thời): Quản lý nhiều tác vụ cùng lúc bằng cách luân phiên xử lý. Một CPU đơn nhân vẫn có thể đạt concurrency bằng cách chuyển đổi nhanh giữa các tác vụ.
+- **Parallelism** (song song): Thực sự chạy nhiều tác vụ cùng một thời điểm, yêu cầu nhiều nhân CPU (hoặc nhiều máy).
+
+<Diagram chart="graph LR
+    subgraph Concurrency - 1 CPU
+        A[Task A - chạy] --> B[Task B - chạy]
+        B --> C[Task A - chạy tiếp]
+        C --> D[Task B - chạy tiếp]
+    end
+    subgraph Parallelism - 2 CPU
+        E[CPU 1: Task A chạy liên tục] ~~~ F[CPU 2: Task B chạy liên tục]
+    end" />
+
+<Callout type="info">Rob Pike (đồng tác giả Go) nói: "Concurrency is about dealing with lots of things at once. Parallelism is about doing lots of things at once." Concurrency là về cấu trúc, parallelism là về thực thi.</Callout>
+
+## Thread Trong Hệ Điều Hành
+
+**Thread** (luồng) là đơn vị thực thi nhỏ nhất được hệ điều hành quản lý. Mỗi process có thể chứa nhiều thread, chia sẻ cùng không gian bộ nhớ.
+
+<Diagram chart="graph TD
+    A[Process] --> B[Thread 1\nStack riêng]
+    A --> C[Thread 2\nStack riêng]
+    A --> D[Thread 3\nStack riêng]
+    B --> E[Heap chung\nCode chung\nData chung]
+    C --> E
+    D --> E" />
+
+### Vòng Đời Của Thread
+
+<Diagram chart="graph LR
+    A[New] -->|start| B[Runnable]
+    B -->|scheduler| C[Running]
+    C -->|yield/preempt| B
+    C -->|wait/sleep| D[Blocked/Waiting]
+    D -->|notify/timeout| B
+    C -->|hoàn thành| E[Terminated]" />
+
+### Race Condition và Deadlock
+
+**Race condition** xảy ra khi nhiều thread cùng truy cập và sửa đổi dữ liệu chia sẻ mà không có cơ chế đồng bộ.
+
+```java
+// NGUY HIỂM: Race condition
+public class Counter {
+    private int count = 0;
+
+    public void increment() {
+        count++;  // Không atomic! Đọc -> Tăng -> Ghi
+    }
+    // Nếu 2 thread cùng gọi: count có thể tăng 1 thay vì 2
+}
+```
+
+**Deadlock** xảy ra khi hai hoặc nhiều thread chờ đợi lẫn nhau giải phóng tài nguyên, dẫn đến tất cả đều bị khóa vĩnh viễn.
+
+```java
+// Deadlock: Thread 1 giữ lockA, chờ lockB
+//           Thread 2 giữ lockB, chờ lockA
+Object lockA = new Object();
+Object lockB = new Object();
+
+// Thread 1
+synchronized (lockA) {
+    Thread.sleep(100);
+    synchronized (lockB) { /* ... */ }  // Chờ lockB mãi mãi
+}
+
+// Thread 2
+synchronized (lockB) {
+    Thread.sleep(100);
+    synchronized (lockA) { /* ... */ }  // Chờ lockA mãi mãi
+}
+```
+
+## Cơ Chế Đồng Bộ: Mutex, Semaphore, Lock
+
+### Mutex (Mutual Exclusion)
+
+Mutex đảm bảo chỉ một thread được truy cập vào vùng critical section tại một thời điểm.
+
+```cpp
+#include <mutex>
+#include <thread>
+#include <iostream>
+
+std::mutex mtx;
+int shared_counter = 0;
+
+void safe_increment(int times) {
+    for (int i = 0; i < times; i++) {
+        std::lock_guard<std::mutex> lock(mtx);  // Tự động unlock khi ra scope
+        shared_counter++;
+    }
+}
+
+int main() {
+    std::thread t1(safe_increment, 100000);
+    std::thread t2(safe_increment, 100000);
+    t1.join();
+    t2.join();
+    std::cout << "Kết quả: " << shared_counter << std::endl; // Luôn là 200000
+    return 0;
+}
+```
+
+<Callout type="warning">Luôn sử dụng `lock_guard` hoặc `unique_lock` trong C++ thay vì gọi `mutex.lock()`/`mutex.unlock()` trực tiếp. Nếu exception xảy ra giữa lock và unlock, mutex sẽ không bao giờ được giải phóng, gây deadlock.</Callout>
+
+## Go: Goroutines và Channels
+
+Go được thiết kế từ đầu cho concurrency. **Goroutine** là lightweight thread do Go runtime quản lý, chỉ tốn khoảng 2KB stack (so với 1-8MB của OS thread).
+
+<Diagram chart="graph TD
+    A[Go Runtime Scheduler] --> B[OS Thread 1]
+    A --> C[OS Thread 2]
+    A --> D[OS Thread 3]
+    B --> E[Goroutine 1]
+    B --> F[Goroutine 2]
+    B --> G[Goroutine 3]
+    C --> H[Goroutine 4]
+    C --> I[Goroutine 5]
+    D --> J[Goroutine 6]
+    D --> K[Goroutine 7]" />
+
+```go
+package main
+
+import (
+    "fmt"
+    "sync"
+    "time"
+)
+
+// Ví dụ 1: Goroutines cơ bản
+func fetchURL(url string, wg *sync.WaitGroup) {
+    defer wg.Done()
+    time.Sleep(100 * time.Millisecond) // Giả lập network request
+    fmt.Printf("Đã tải: %s\n", url)
+}
+
+// Ví dụ 2: Channels - giao tiếp giữa goroutines
+func producer(ch chan<- int) {
+    for i := 0; i < 5; i++ {
+        ch <- i * i  // Gửi giá trị vào channel
+        fmt.Printf("Đã gửi: %d\n", i*i)
+    }
+    close(ch)
+}
+
+func consumer(ch <-chan int) {
+    for val := range ch {  // Nhận giá trị cho đến khi channel đóng
+        fmt.Printf("Nhận được: %d\n", val)
+    }
+}
+
+func main() {
+    // Tải 5 URL đồng thời
+    var wg sync.WaitGroup
+    urls := []string{
+        "https://go.dev",
+        "https://rust-lang.org",
+        "https://python.org",
+        "https://java.com",
+        "https://nodejs.org",
+    }
+
+    for _, url := range urls {
+        wg.Add(1)
+        go fetchURL(url, &wg) // Mỗi URL chạy trong một goroutine riêng
+    }
+    wg.Wait() // Đợi tất cả hoàn thành
+
+    // Producer-Consumer pattern với channels
+    ch := make(chan int, 3) // Buffered channel, sức chứa 3
+    go producer(ch)
+    consumer(ch)
+}
+```
+
+<Callout type="tip">Triết lý của Go: "Don't communicate by sharing memory; share memory by communicating." Thay vì dùng mutex để bảo vệ dữ liệu chia sẻ, hãy dùng channels để truyền dữ liệu giữa các goroutine.</Callout>
+
+## Rust: Fearless Concurrency
+
+Rust sử dụng hệ thống ownership để **ngăn chặn data race tại thời điểm biên dịch**. Nếu code của bạn có data race, trình biên dịch Rust sẽ từ chối biên dịch.
+
+```rust
+use std::thread;
+use std::sync::{Arc, Mutex};
+
+fn main() {
+    // Arc (Atomic Reference Counting) + Mutex cho dữ liệu chia sẻ
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Kết quả: {}", *counter.lock().unwrap()); // Luôn là 10
+
+    // Message passing với channels (giống Go)
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    thread::spawn(move || {
+        let messages = vec![
+            String::from("Xin"),
+            String::from("chào"),
+            String::from("từ"),
+            String::from("thread"),
+        ];
+        for msg in messages {
+            tx.send(msg).unwrap();
+        }
+    });
+
+    for received in rx {
+        println!("Nhận: {}", received);
+    }
+}
+```
+
+## Python: GIL và asyncio
+
+Python có **Global Interpreter Lock** (GIL) - một mutex toàn cục chỉ cho phép một thread thực thi Python bytecode tại một thời điểm. Điều này khiến Python threading không tận dụng được đa nhân cho CPU-bound tasks.
+
+```python
+import asyncio
+import aiohttp
+import time
+
+# asyncio - lý tưởng cho I/O-bound tasks
+async def fetch_url(session, url):
+    async with session.get(url) as response:
+        data = await response.text()
+        print(f"Đã tải {url}: {len(data)} bytes")
+        return len(data)
+
+async def main():
+    urls = [
+        "https://httpbin.org/delay/1",
+        "https://httpbin.org/delay/1",
+        "https://httpbin.org/delay/1",
+    ]
+
+    start = time.time()
+    async with aiohttp.ClientSession() as session:
+        # Chạy tất cả request đồng thời
+        tasks = [fetch_url(session, url) for url in urls]
+        results = await asyncio.gather(*tasks)
+
+    elapsed = time.time() - start
+    print(f"Tổng thời gian: {elapsed:.2f}s")  # ~1s thay vì ~3s
+    print(f"Tổng bytes: {sum(results)}")
+
+asyncio.run(main())
+```
+
+<Callout type="info">Từ Python 3.13, CPython đang thử nghiệm chế độ "free-threaded" (PEP 703) - cho phép tắt GIL. Đây là bước tiến lớn giúp Python tận dụng đa nhân cho CPU-bound tasks mà không cần multiprocessing.</Callout>
+
+## JavaScript: Event Loop
+
+JavaScript là single-threaded nhưng đạt được concurrency nhờ **event loop** và non-blocking I/O.
+
+<Diagram chart="graph TD
+    A[Call Stack] --> B{Stack trống?}
+    B -->|Có| C[Lấy task từ\nMicrotask Queue]
+    C --> A
+    B -->|Microtask trống| D[Lấy task từ\nMacrotask Queue]
+    D --> A
+    E[setTimeout, I/O] --> F[Web APIs]
+    F --> D
+    G[Promise.then, async/await] --> C" />
+
+```javascript
+// async/await trong JavaScript
+async function fetchData(url) {
+    const response = await fetch(url);
+    return await response.json();
+}
+
+async function main() {
+    console.time("parallel");
+
+    // Chạy song song với Promise.all
+    const [users, posts, comments] = await Promise.all([
+        fetchData("/api/users"),
+        fetchData("/api/posts"),
+        fetchData("/api/comments"),
+    ]);
+
+    console.timeEnd("parallel"); // Thời gian = max(3 requests)
+    console.log(`Users: ${users.length}, Posts: ${posts.length}`);
+}
+```
+
+## Java: Thread, ExecutorService và CompletableFuture
+
+Java có hệ thống concurrency phong phú, từ thread cơ bản đến virtual threads (Java 21+).
+
+```java
+import java.util.concurrent.*;
+import java.util.List;
+
+public class ConcurrencyDemo {
+    public static void main(String[] args) throws Exception {
+        // ExecutorService - thread pool quản lý tự động
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+
+        // CompletableFuture - async/await style
+        CompletableFuture<String> usersFuture = CompletableFuture.supplyAsync(
+            () -> fetchFromDB("users"), executor
+        );
+        CompletableFuture<String> ordersFuture = CompletableFuture.supplyAsync(
+            () -> fetchFromDB("orders"), executor
+        );
+
+        // Kết hợp kết quả
+        CompletableFuture<String> combined = usersFuture.thenCombine(
+            ordersFuture,
+            (users, orders) -> "Users: " + users + ", Orders: " + orders
+        );
+
+        System.out.println(combined.get()); // Đợi kết quả
+
+        // Java 21+: Virtual Threads - lightweight như goroutine
+        // try (var executor2 = Executors.newVirtualThreadPerTaskExecutor()) {
+        //     executor2.submit(() -> fetchFromDB("products"));
+        // }
+
+        executor.shutdown();
+    }
+
+    static String fetchFromDB(String table) {
+        try { Thread.sleep(1000); } catch (InterruptedException e) {}
+        return table + "_data";
+    }
+}
+```
+
+## Actor Model: Erlang/Elixir
+
+Trong Actor model, mỗi **actor** là một đơn vị tính toán độc lập, chỉ giao tiếp qua **message passing**. Không có dữ liệu chia sẻ, không có lock, không có race condition.
+
+```elixir
+# Elixir - Actor model với processes
+defmodule Counter do
+  def start(initial_count \\ 0) do
+    spawn(fn -> loop(initial_count) end)
+  end
+
+  defp loop(count) do
+    receive do
+      {:increment, caller} ->
+        send(caller, {:count, count + 1})
+        loop(count + 1)
+      {:get, caller} ->
+        send(caller, {:count, count})
+        loop(count)
+    end
+  end
+end
+
+# Sử dụng
+counter = Counter.start(0)
+send(counter, {:increment, self()})
+receive do
+  {:count, value} -> IO.puts("Count: #{value}")  # Count: 1
+end
+```
+
+## So Sánh Concurrency Model
+
+<ComparisonTable
+  headers={["Tiêu chí", "Go", "Rust", "Java", "Python", "JavaScript"]}
+  rows={[
+    ["Mô hình chính", "Goroutines + Channels", "Threads + Ownership", "Threads + Virtual Threads", "asyncio + GIL", "Event Loop"],
+    ["Đơn vị concurrency", "Goroutine (~2KB)", "std::thread (OS thread)", "Thread / Virtual Thread", "Coroutine", "Promise/async function"],
+    ["Chi phí tạo", "Rất thấp", "Cao (OS thread)", "Thấp (virtual thread)", "Rất thấp", "Rất thấp"],
+    ["Số lượng tối đa", "Hàng triệu", "Hàng nghìn", "Hàng triệu (virtual)", "Hàng trăm nghìn", "Hàng triệu"],
+    ["Data race prevention", "Runtime (race detector)", "Compile time", "Runtime", "GIL (phần nào)", "Single-threaded"],
+    ["CPU-bound", "Tốt (GOMAXPROCS)", "Rất tốt", "Tốt", "Kém (cần multiprocessing)", "Kém (cần Worker)"],
+    ["I/O-bound", "Rất tốt", "Tốt (tokio)", "Tốt", "Tốt (asyncio)", "Rất tốt"],
+    ["Độ phức tạp", "Thấp", "Cao", "Trung bình", "Trung bình", "Thấp"]
+  ]}
+/>
+
+## Kết Luận
+
+Mỗi ngôn ngữ có cách tiếp cận riêng với concurrency, phù hợp với các trường hợp sử dụng khác nhau. Go nổi bật với goroutines đơn giản và hiệu quả. Rust đảm bảo an toàn tại compile time. Java cung cấp hệ sinh thái concurrency phong phú với virtual threads mới. Python phù hợp cho I/O-bound tasks với asyncio. JavaScript tận dụng event loop cho non-blocking operations. Hiểu rõ ưu nhược điểm của từng mô hình giúp bạn chọn đúng công cụ cho từng bài toán.

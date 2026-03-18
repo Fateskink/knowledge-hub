@@ -1,0 +1,224 @@
+---
+title: "SQL vs NoSQL"
+description: "Understand the differences between SQL and NoSQL databases, when to use each, and explore popular systems like PostgreSQL, MySQL, MongoDB, and Redis."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["sql", "nosql", "postgresql", "mysql", "mongodb", "redis", "database"]
+featured: true
+order: 1
+sources:
+  - title: "PostgreSQL Official Documentation"
+    url: "https://www.postgresql.org/docs/"
+  - title: "MongoDB Official Documentation"
+    url: "https://www.mongodb.com/docs/"
+  - title: "MySQL Reference Manual"
+    url: "https://dev.mysql.com/doc/refman/8.0/en/"
+  - title: "Redis Documentation"
+    url: "https://redis.io/docs/"
+---
+
+# SQL vs NoSQL
+
+Databases are the backbone of every software application. The two most common types are SQL (Relational) and NoSQL (Non-Relational). Each comes with its own strengths, weaknesses, and ideal use cases. This article helps you understand the key differences so you can make the right choice for your project.
+
+## What is SQL?
+
+SQL (Structured Query Language) is used to manage relational databases. Data is organized in tables with rows and columns, connected through primary keys and foreign keys to establish clear relationships.
+
+<Diagram chart="graph TD\n    subgraph Relational Database\n    A[Table: Users] -->|foreign key| B[Table: Orders]\n    B -->|foreign key| C[Table: Products]\n    A -->|foreign key| D[Table: Addresses]\n    end" />
+
+### Key Characteristics of SQL
+
+- **Fixed schema**: Table structure must be defined before inserting data
+- **ACID compliance**: Guarantees transaction consistency (Atomicity, Consistency, Isolation, Durability)
+- **Relationships between tables**: Uses JOIN to combine data from multiple tables
+- **Standardized language**: SQL syntax is largely consistent across systems
+
+### SQL Table and Query Example
+
+```sql
+-- Create users table
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create orders table with foreign key
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    total DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- JOIN query
+SELECT u.name, o.total, o.status
+FROM users u
+JOIN orders o ON u.id = o.user_id
+WHERE o.status = 'completed'
+ORDER BY o.created_at DESC;
+```
+
+## What is NoSQL?
+
+NoSQL (Not Only SQL) databases do not use the traditional relational model. Instead of tables and columns, NoSQL uses flexible data models such as documents, key-value pairs, column-families, or graphs.
+
+<Diagram chart="graph LR\n    subgraph NoSQL Types\n    A[NoSQL] --> B[Document Store\nMongoDB, CouchDB]\n    A --> C[Key-Value Store\nRedis, DynamoDB]\n    A --> D[Column-Family\nCassandra, HBase]\n    A --> E[Graph Database\nNeo4j, ArangoDB]\n    end" />
+
+### Key Characteristics of NoSQL
+
+- **Flexible schema**: Documents in the same collection can have different structures
+- **Easy horizontal scaling**: Designed to distribute data across multiple servers
+- **High performance**: Optimized for simple read/write operations
+- **Suitable for unstructured data**: JSON, XML, binary data
+
+### MongoDB Example
+
+```javascript
+// Connect and insert data into MongoDB
+const { MongoClient } = require('mongodb');
+
+const client = new MongoClient('mongodb://localhost:27017');
+await client.connect();
+
+const db = client.db('myapp');
+const users = db.collection('users');
+
+// Insert a document -- no schema definition needed
+await users.insertOne({
+  name: 'John Doe',
+  email: 'john@example.com',
+  profile: {
+    age: 28,
+    skills: ['JavaScript', 'Python', 'Docker'],
+    address: {
+      city: 'San Francisco',
+      country: 'USA'
+    }
+  },
+  createdAt: new Date()
+});
+
+// Query data
+const result = await users.find({
+  'profile.skills': 'JavaScript',
+  'profile.age': { $gte: 25 }
+}).toArray();
+```
+
+<Callout type="info">MongoDB stores data in BSON (Binary JSON) format, supporting richer data types than plain JSON, including Date, Binary, and Decimal128.</Callout>
+
+## SQL vs NoSQL Comparison
+
+<ComparisonTable
+  headers={["Criteria", "SQL", "NoSQL"]}
+  rows={[
+    ["Data Model", "Tables with rows and columns", "Document, Key-Value, Graph, Column"],
+    ["Schema", "Fixed, strict", "Flexible, dynamic"],
+    ["Scaling", "Vertical", "Horizontal"],
+    ["ACID", "Full support", "Depends on the system"],
+    ["Queries", "Standardized SQL", "API/Query specific to each system"],
+    ["Data Relationships", "Powerful JOINs", "Typically no JOIN support"],
+    ["Best For", "Structured data, transactions", "Flexible data, big data, realtime"],
+    ["Examples", "PostgreSQL, MySQL", "MongoDB, Redis, Cassandra"]
+  ]}
+/>
+
+## Popular Database Systems
+
+### PostgreSQL
+
+PostgreSQL is the most powerful open-source relational database, supporting both SQL and JSON, full-text search, and many advanced features.
+
+```sql
+-- PostgreSQL supports JSONB -- combining SQL and NoSQL
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    metadata JSONB
+);
+
+INSERT INTO products (name, metadata) VALUES
+('Laptop', '{"brand": "Dell", "specs": {"ram": "16GB", "cpu": "i7"}}');
+
+-- Query JSON data
+SELECT name, metadata->>'brand' AS brand,
+       metadata->'specs'->>'ram' AS ram
+FROM products
+WHERE metadata->'specs'->>'ram' = '16GB';
+```
+
+### MySQL
+
+MySQL is the most popular database in the world, known for its simplicity and high performance. Widely used in web applications like WordPress and Drupal.
+
+### MongoDB
+
+MongoDB is the most popular document-oriented database, storing data as JSON-like documents. Ideal for applications requiring flexible schemas and horizontal scaling.
+
+### Redis
+
+Redis is an in-memory database supporting multiple data structures: strings, hashes, lists, sets, and sorted sets. Commonly used as a cache, message broker, or session store.
+
+```javascript
+// Using Redis as cache
+const Redis = require('ioredis');
+const redis = new Redis();
+
+// Cache query results
+async function getUserWithCache(userId) {
+  const cacheKey = `user:${userId}`;
+
+  // Check cache first
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  // If not in cache, query database
+  const user = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
+
+  // Save to cache with 1 hour TTL
+  await redis.set(cacheKey, JSON.stringify(user), 'EX', 3600);
+
+  return user;
+}
+```
+
+## When to Choose SQL vs NoSQL
+
+<Diagram chart="graph TD\n    A[What do you need?] --> B{Is data\nclearly structured?}\n    B -->|Yes| C{Need complex\nACID transactions?}\n    B -->|No| F[Choose NoSQL]\n    C -->|Yes| D[Choose SQL\nPostgreSQL/MySQL]\n    C -->|No| E{Need large-scale\nhorizontal scaling?}\n    E -->|Yes| F\n    E -->|No| D" />
+
+### Choose SQL when:
+- Data has a clear and stable structure
+- Transaction consistency is critical (banking, e-commerce)
+- Complex queries with multiple JOINs are needed
+- Data has complex relationships
+
+### Choose NoSQL when:
+- Data structure is flexible or changes frequently
+- Horizontal scaling is needed for large data volumes
+- Read/write speed is prioritized over absolute consistency
+- Building realtime apps, IoT, or content management systems
+
+<Callout type="tip">Many modern applications use both SQL and NoSQL simultaneously (Polyglot Persistence). For example: PostgreSQL for transactional data, Redis for caching, and MongoDB for logging. Do not limit yourself to just one type.</Callout>
+
+## Modern Trends: NewSQL and Multi-Model
+
+Modern systems are blurring the line between SQL and NoSQL:
+
+- **PostgreSQL** supports JSONB, enabling semi-structured data handling
+- **MongoDB** has supported ACID transactions since version 4.0
+- **CockroachDB, TiDB** (NewSQL): Combine NoSQL scalability with SQL consistency
+- **Supabase** builds on PostgreSQL but provides realtime APIs similar to NoSQL
+
+<Callout type="warning">Do not choose a database just because it is trending. Consider your project's specific requirements: data volume, query patterns, consistency needs, and future scalability.</Callout>
+
+## Conclusion
+
+There is no one-size-fits-all solution. SQL excels when data is structured and consistency is critical. NoSQL is more flexible for unstructured data and large-scale systems. Understanding the characteristics of each will help you make better design decisions for your projects.

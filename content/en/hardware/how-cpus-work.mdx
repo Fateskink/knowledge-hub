@@ -1,0 +1,165 @@
+---
+title: "How CPUs Work: The Brain of Every Computer"
+description: "Dive deep into CPU internals — ALU, Control Unit, Registers, Cache, the Fetch-Decode-Execute cycle, pipelining, multi-core processing, and the CISC vs RISC debate that shapes modern processors."
+category: "hardware"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 9
+tags: ["cpu", "processor", "alu", "pipeline", "multi-core", "cisc", "risc", "cache", "hardware"]
+featured: true
+order: 2
+sources:
+  - title: "How a CPU Works — In One Lesson (YouTube/Techquickie)"
+    url: "https://www.youtube.com/watch?v=cNN_tTXABUA"
+  - title: "Computer Organization and Architecture — William Stallings"
+    url: "https://www.pearson.com/en-us/subject-catalog/p/computer-organization-and-architecture/P200000003235"
+  - title: "RISC vs. CISC — Stanford CS"
+    url: "https://cs.stanford.edu/people/eroberts/courses/soco/projects/risc/risccisc/"
+  - title: "CPU Cache Explained — Red Hat"
+    url: "https://www.redhat.com/en/topics/linux/what-is-cpu-cache"
+---
+
+# How CPUs Work: The Brain of Every Computer
+
+The Central Processing Unit is the single most important chip in any computing device. Whether you are browsing a website, rendering a 3D scene, or training a machine learning model, the CPU is orchestrating everything behind the scenes. Yet most people have no idea what actually happens inside this tiny piece of silicon. Let us change that.
+
+<Callout type="info">
+A modern CPU contains billions of transistors packed into an area smaller than your thumbnail. Intel's Core i9-14900K, for example, contains around 22.6 billion transistors on a die measuring approximately 257 square millimeters.
+</Callout>
+
+## Inside the CPU: The Core Components
+
+A CPU is not a single monolithic block — it is a carefully engineered system of specialized sub-units that work together.
+
+<Diagram chart="graph TD\n    subgraph CPU[CPU Die]\n        CU[Control Unit]\n        ALU[ALU - Arithmetic Logic Unit]\n        FPU[FPU - Floating Point Unit]\n        REG[Register File]\n        L1I[L1 Instruction Cache]\n        L1D[L1 Data Cache]\n        L2[L2 Cache]\n        BP[Branch Predictor]\n        DEC[Instruction Decoder]\n    end\n    L3[L3 Cache - Shared]\n    RAM[Main Memory - RAM]\n    L2 <--> L3\n    L3 <--> RAM" />
+
+### The Arithmetic Logic Unit (ALU)
+
+The ALU is the workhorse of the CPU. It performs two categories of operations:
+
+- **Arithmetic operations:** Addition, subtraction, multiplication, division, and increment/decrement.
+- **Logical operations:** AND, OR, NOT, XOR, and comparison operations (equal, greater than, less than).
+
+Every computation your computer performs — no matter how complex — ultimately breaks down into sequences of these basic operations. Multiplying two large matrices? That is millions of individual additions and multiplications handled by the ALU.
+
+Modern CPUs contain multiple ALUs so they can perform several operations simultaneously within a single clock cycle.
+
+### The Floating Point Unit (FPU)
+
+While the ALU handles integer math, the FPU specializes in floating-point arithmetic — operations on numbers with decimal points (like 3.14159 or 0.000042). Scientific computing, 3D graphics, and physics simulations rely heavily on the FPU.
+
+### The Control Unit (CU)
+
+The Control Unit is the conductor of the orchestra. It does not perform computations itself, but it tells every other part of the CPU what to do and when. The CU:
+
+- Fetches instructions from memory
+- Decodes instructions to determine the operation and operands
+- Generates control signals that activate the appropriate circuits
+- Manages the timing of operations using the clock signal
+
+### Registers
+
+Registers are the fastest storage in the entire computer — even faster than L1 cache. They are tiny memory cells built directly into the CPU that hold the data currently being processed. Key registers include:
+
+- **Program Counter (PC):** Holds the address of the next instruction to fetch.
+- **Instruction Register (IR):** Holds the instruction currently being executed.
+- **Accumulator (ACC):** Stores the result of ALU operations.
+- **General-Purpose Registers:** Hold data and addresses used during computation. A typical x86-64 CPU has 16 general-purpose registers.
+- **Flags/Status Register:** Contains bits that indicate the result of the last operation (zero, negative, overflow, carry).
+
+<Callout type="tip">
+Registers are so fast because they are made from the same circuits as the CPU itself and require no address lookup. Accessing a register takes roughly 1 clock cycle, compared to 4-5 cycles for L1 cache and 100+ cycles for main memory.
+</Callout>
+
+## The Fetch-Decode-Execute Cycle in Detail
+
+Every instruction the CPU processes follows the same fundamental sequence:
+
+<Diagram chart="graph LR\n    F[Fetch] --> D[Decode]\n    D --> E[Execute]\n    E --> M[Memory Access]\n    M --> W[Write Back]\n    W --> F" />
+
+1. **Fetch:** The CPU reads the instruction at the address stored in the Program Counter from memory (or more likely, from cache). The PC is then incremented to point to the next instruction.
+
+2. **Decode:** The instruction decoder breaks the binary instruction into its components — the opcode (what operation to perform) and the operands (what data to use). For example, `ADD R1, R2, R3` means "add the values in registers R2 and R3, and store the result in R1."
+
+3. **Execute:** The appropriate functional unit (ALU, FPU, etc.) performs the operation.
+
+4. **Memory Access:** If the instruction involves reading from or writing to memory, that transfer happens in this stage.
+
+5. **Write Back:** The result is written to the destination register or memory location.
+
+## Pipelining: The Assembly Line
+
+If every instruction had to complete all five stages before the next one could begin, the CPU would waste enormous amounts of time. Pipelining solves this by overlapping stages — while one instruction is being executed, the next is being decoded, and a third is being fetched.
+
+<Diagram chart="graph TD\n    subgraph Cycle_1[Clock Cycle 1]\n        I1F[Instr 1: Fetch]\n    end\n    subgraph Cycle_2[Clock Cycle 2]\n        I1D[Instr 1: Decode]\n        I2F[Instr 2: Fetch]\n    end\n    subgraph Cycle_3[Clock Cycle 3]\n        I1E[Instr 1: Execute]\n        I2D[Instr 2: Decode]\n        I3F[Instr 3: Fetch]\n    end\n    subgraph Cycle_4[Clock Cycle 4]\n        I1M[Instr 1: Memory]\n        I2E[Instr 2: Execute]\n        I3D[Instr 3: Decode]\n        I4F[Instr 4: Fetch]\n    end\n    Cycle_1 --> Cycle_2\n    Cycle_2 --> Cycle_3\n    Cycle_3 --> Cycle_4" />
+
+Without pipelining, completing 4 instructions would take 20 clock cycles (4 x 5 stages). With a 5-stage pipeline, those same 4 instructions complete in just 8 cycles. In theory, a fully utilized pipeline approaches one instruction per clock cycle.
+
+### Pipeline Hazards
+
+Pipelining is not without challenges:
+
+- **Data hazards:** An instruction needs the result of a previous instruction that has not finished yet. (Solution: forwarding/bypassing or stalling.)
+- **Control hazards:** A branch instruction changes the flow of execution, but the pipeline has already started fetching subsequent instructions. (Solution: branch prediction.)
+- **Structural hazards:** Two instructions need the same hardware resource at the same time. (Solution: duplicating resources.)
+
+<Callout type="warning">
+Branch mispredictions are costly. When the branch predictor guesses wrong, the CPU must flush the pipeline — discarding all the partially completed instructions and starting over. On a deeply pipelined processor with 15-20 stages, a single misprediction can waste 15-20 cycles.
+</Callout>
+
+## CPU Cache: Speed Where It Matters
+
+Main memory (RAM) is thousands of times slower than the CPU. If the processor had to wait for RAM every time it needed data, performance would plummet. Cache bridges this gap.
+
+<Diagram chart="graph LR\n    REG[Registers\n~1 cycle\n~1 KB] --> L1[L1 Cache\n~4 cycles\n~64-128 KB]\n    L1 --> L2[L2 Cache\n~12 cycles\n~256 KB-1 MB]\n    L2 --> L3[L3 Cache\n~40 cycles\n~8-64 MB]\n    L3 --> RAM[RAM\n~100+ cycles\n~8-64 GB]\n    RAM --> SSD[SSD Storage\n~25,000 cycles\n~256 GB-4 TB]" />
+
+- **L1 Cache:** The smallest and fastest. Split into L1 instruction cache and L1 data cache (Modified Harvard architecture). Typically 32-64 KB per core.
+- **L2 Cache:** Larger but slightly slower. Usually 256 KB to 1 MB per core.
+- **L3 Cache:** Shared among all cores. Ranges from 8 MB to 64 MB or more in high-end processors.
+
+The CPU always checks L1 first, then L2, then L3, and only accesses RAM if the data is not found in any cache. A cache hit (data found in cache) is fast; a cache miss (data not in cache) forces a slow trip to main memory.
+
+## Multi-Core Processing
+
+Clock speeds hit a practical ceiling around 2005 due to power consumption and heat constraints. The industry's answer was multi-core processors — putting multiple independent CPU cores on a single chip.
+
+<Diagram chart="graph TD\n    subgraph Chip[CPU Package]\n        subgraph Core1[Core 1]\n            C1ALU[ALU]\n            C1L1[L1 Cache]\n            C1L2[L2 Cache]\n        end\n        subgraph Core2[Core 2]\n            C2ALU[ALU]\n            C2L1[L1 Cache]\n            C2L2[L2 Cache]\n        end\n        subgraph Core3[Core 3]\n            C3ALU[ALU]\n            C3L1[L1 Cache]\n            C3L2[L2 Cache]\n        end\n        subgraph Core4[Core 4]\n            C4ALU[ALU]\n            C4L1[L1 Cache]\n            C4L2[L2 Cache]\n        end\n        L3[Shared L3 Cache]\n        MC[Memory Controller]\n    end\n    MC <--> RAM[System RAM]" />
+
+Each core can execute its own stream of instructions independently. A quad-core CPU can genuinely run four tasks simultaneously. However, not all software benefits equally from multiple cores:
+
+- **Single-threaded tasks** (like many older applications) can only use one core, no matter how many are available.
+- **Multi-threaded tasks** (like video rendering, compilation, and server workloads) can distribute work across all available cores.
+
+Modern desktop CPUs feature 8-24 cores, while server CPUs from AMD (EPYC) and Intel (Xeon) can have 96-128 cores or more.
+
+<Callout type="info">
+Intel's hybrid architecture (since 12th Gen Alder Lake) combines high-performance "P-cores" with energy-efficient "E-cores." P-cores handle demanding foreground tasks while E-cores manage background work, balancing performance and power efficiency.
+</Callout>
+
+## CISC vs. RISC: Two Philosophies
+
+The debate between Complex Instruction Set Computing (CISC) and Reduced Instruction Set Computing (RISC) has shaped CPU design for decades.
+
+<ComparisonTable headers={["Feature", "CISC", "RISC"]} rows={[["Instruction Set", "Large, complex instructions that can perform multi-step operations", "Small, simple instructions that each complete in one cycle"], ["Instruction Length", "Variable length (1-15 bytes in x86)", "Fixed length (typically 4 bytes)"], ["Execution", "One instruction may take multiple cycles", "One instruction per cycle (ideally)"], ["Hardware Complexity", "Complex decoder, microcode engine", "Simpler hardware, easier to pipeline"], ["Memory Access", "Instructions can operate directly on memory", "Load/Store architecture — only load and store instructions access memory"], ["Code Size", "Smaller programs (fewer, more powerful instructions)", "Larger programs (more instructions needed)"], ["Power Efficiency", "Generally higher power consumption", "Generally more power-efficient"], ["Examples", "Intel x86, AMD x86-64", "ARM, Apple Silicon, RISC-V, MIPS"]]} />
+
+### The Modern Reality
+
+The CISC vs. RISC distinction has blurred significantly. Modern x86 processors (CISC on the outside) internally translate complex instructions into simpler micro-operations (essentially RISC-like) before executing them. Meanwhile, ARM processors (RISC) have added more complex instructions for common operations.
+
+Apple's transition from Intel (x86/CISC) to its own ARM-based Apple Silicon (RISC) demonstrated that RISC designs can deliver exceptional performance while consuming far less power. The M-series chips achieve desktop-class performance in ultra-thin laptops with no active cooling.
+
+<Callout type="tip">
+RISC-V is an open-source instruction set architecture gaining significant momentum. Unlike ARM (which requires licensing), anyone can design a RISC-V processor without paying royalties. This is driving innovation in embedded systems, IoT devices, and even server processors.
+</Callout>
+
+## The Clock: Heartbeat of the CPU
+
+Everything in a CPU is synchronized to a clock signal — a regular electrical pulse that oscillates billions of times per second. When we say a CPU runs at 5 GHz, it means the clock ticks 5 billion times per second. Each tick is a clock cycle, and operations are measured in how many cycles they take.
+
+However, clock speed alone does not determine performance. A CPU that completes more work per clock cycle (higher IPC — Instructions Per Clock) can outperform a faster-clocked but less efficient processor. This is why Apple's M-series chips, running at around 3.5 GHz, can match or beat Intel chips running at 5+ GHz.
+
+## Looking Ahead
+
+CPU design continues to evolve rapidly. Chiplet architectures (used by AMD's Ryzen and EPYC processors) assemble CPUs from multiple smaller dies rather than one monolithic chip, improving yields and enabling modular designs. 3D stacking places cache directly on top of the processing cores, dramatically reducing latency. And new instruction set extensions for AI workloads are being added to every new generation.
+
+Understanding how CPUs work gives you a foundation for understanding virtually every other topic in computing — from why your code runs slowly to why certain architectures dominate specific markets. The CPU may be small, but it is the most consequential piece of engineering in the modern world.

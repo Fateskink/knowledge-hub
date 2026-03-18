@@ -1,0 +1,476 @@
+---
+title: "Design Patterns"
+description: "Tìm hiểu các design pattern phổ biến trong lập trình - Singleton, Factory, Observer và Strategy với ví dụ code Python và TypeScript."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["design-patterns", "oop", "python", "typescript", "kien-truc"]
+featured: false
+order: 5
+sources:
+  - title: "Refactoring Guru - Design Patterns"
+    url: "https://refactoring.guru/design-patterns"
+  - title: "Python Design Patterns"
+    url: "https://python-patterns.guide/"
+  - title: "TypeScript Design Patterns"
+    url: "https://www.typescriptlang.org/docs/"
+---
+
+# Design Patterns
+
+Design patterns (mẫu thiết kế) là những giải pháp đã được chứng minh cho các vấn đề thường gặp trong lập trình. Chúng không phải là code có sẵn mà bạn copy-paste, mà là những bản thiết kế (blueprint) giúp bạn giải quyết vấn đề một cách có cấu trúc và hiệu quả. Bài viết này giới thiệu 4 design pattern phổ biến nhất với ví dụ cụ thể bằng Python và TypeScript.
+
+## Tại sao cần học Design Patterns?
+
+- **Code dễ bảo trì**: Code có cấu trúc rõ ràng, dễ sửa đổi và mở rộng.
+- **Giao tiếp hiệu quả**: Đồng đội hiểu nhau nhanh hơn khi dùng chung thuật ngữ.
+- **Tránh lặp lại sai lầm**: Học từ kinh nghiệm của những người đi trước.
+- **Phỏng vấn**: Nhiều công ty hỏi về design patterns trong phỏng vấn kỹ thuật.
+
+<Callout type="info">Design patterns được phổ biến bởi cuốn sách "Design Patterns: Elements of Reusable Object-Oriented Software" (1994) của Gang of Four (GoF). Cuốn sách mô tả 23 patterns được chia thành 3 nhóm: Creational, Structural và Behavioral.</Callout>
+
+## Phân loại Design Patterns
+
+<Diagram chart="graph TD\n    A[Design Patterns] --> B[Creational]\n    A --> C[Structural]\n    A --> D[Behavioral]\n    B --> B1[Singleton]\n    B --> B2[Factory]\n    B --> B3[Builder]\n    C --> C1[Adapter]\n    C --> C2[Decorator]\n    C --> C3[Facade]\n    D --> D1[Observer]\n    D --> D2[Strategy]\n    D --> D3[Command]" />
+
+## 1. Singleton Pattern
+
+Singleton đảm bảo rằng một class chỉ có duy nhất một instance (đối tượng) trong toàn bộ ứng dụng.
+
+### Khi nào sử dụng?
+
+- Quản lý kết nối database
+- Cấu hình ứng dụng (config)
+- Logger (ghi log)
+- Cache
+
+<Diagram chart="graph LR\n    A[Client A] --> S[Singleton Instance]\n    B[Client B] --> S\n    C[Client C] --> S\n    S --> D[(Database)]" />
+
+### Ví dụ Python
+
+```python
+class DatabaseConnection:
+    """Singleton pattern - chỉ tạo một kết nối database duy nhất."""
+
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+        self._initialized = True
+        self.connection = "Connected to PostgreSQL"
+        print("Tạo kết nối database mới")
+
+    def query(self, sql):
+        return f"Thực thi: {sql}"
+
+
+# Sử dụng
+db1 = DatabaseConnection()  # In: "Tạo kết nối database mới"
+db2 = DatabaseConnection()  # Không in gì - dùng instance cũ
+
+print(db1 is db2)           # True - cùng một đối tượng
+print(db1.query("SELECT * FROM users"))
+```
+
+### Ví dụ TypeScript
+
+```typescript
+class AppConfig {
+  private static instance: AppConfig;
+  private settings: Map<string, string>;
+
+  private constructor() {
+    this.settings = new Map();
+    console.log("Khởi tạo cấu hình ứng dụng");
+  }
+
+  static getInstance(): AppConfig {
+    if (!AppConfig.instance) {
+      AppConfig.instance = new AppConfig();
+    }
+    return AppConfig.instance;
+  }
+
+  set(key: string, value: string): void {
+    this.settings.set(key, value);
+  }
+
+  get(key: string): string | undefined {
+    return this.settings.get(key);
+  }
+}
+
+// Sử dụng
+const config1 = AppConfig.getInstance();
+const config2 = AppConfig.getInstance();
+console.log(config1 === config2); // true
+```
+
+<Callout type="warning">Singleton có thể làm code khó test vì tạo sự phụ thuộc toàn cục (global state). Hãy cân nhắc sử dụng dependency injection thay thế khi có thể.</Callout>
+
+## 2. Factory Pattern
+
+Factory Pattern tạo đối tượng mà không cần chỉ định class cụ thể. Thay vì gọi `new` trực tiếp, bạn dùng một "nhà máy" (factory) để quyết định tạo đối tượng nào.
+
+### Khi nào sử dụng?
+
+- Tạo các đối tượng cùng kiểu nhưng khác cài đặt
+- Khi logic tạo đối tượng phức tạp
+- Khi muốn tách logic tạo đối tượng khỏi logic sử dụng
+
+<Diagram chart="graph TD\n    A[Client] --> F[Factory]\n    F -->|type=email| B[EmailNotification]\n    F -->|type=sms| C[SMSNotification]\n    F -->|type=push| D[PushNotification]" />
+
+### Ví dụ Python
+
+```python
+from abc import ABC, abstractmethod
+
+
+class Notification(ABC):
+    """Interface chung cho các loại thông báo."""
+
+    @abstractmethod
+    def send(self, message: str) -> str:
+        pass
+
+
+class EmailNotification(Notification):
+    def send(self, message: str) -> str:
+        return f"[EMAIL] Gửi email: {message}"
+
+
+class SMSNotification(Notification):
+    def send(self, message: str) -> str:
+        return f"[SMS] Gửi tin nhắn: {message}"
+
+
+class PushNotification(Notification):
+    def send(self, message: str) -> str:
+        return f"[PUSH] Gửi thông báo đẩy: {message}"
+
+
+class NotificationFactory:
+    """Factory tạo các đối tượng Notification."""
+
+    @staticmethod
+    def create(notification_type: str) -> Notification:
+        factories = {
+            "email": EmailNotification,
+            "sms": SMSNotification,
+            "push": PushNotification,
+        }
+        factory = factories.get(notification_type)
+        if factory is None:
+            raise ValueError(f"Loại thông báo '{notification_type}' không hợp lệ")
+        return factory()
+
+
+# Sử dụng
+for ntype in ["email", "sms", "push"]:
+    notification = NotificationFactory.create(ntype)
+    print(notification.send("Đơn hàng của bạn đã được xác nhận!"))
+```
+
+### Ví dụ TypeScript
+
+```typescript
+interface Payment {
+  process(amount: number): string;
+}
+
+class CreditCardPayment implements Payment {
+  process(amount: number): string {
+    return `Thanh toán ${amount} VND bằng thẻ tín dụng`;
+  }
+}
+
+class MoMoPayment implements Payment {
+  process(amount: number): string {
+    return `Thanh toán ${amount} VND bằng MoMo`;
+  }
+}
+
+class BankTransferPayment implements Payment {
+  process(amount: number): string {
+    return `Chuyển khoản ${amount} VND qua ngân hàng`;
+  }
+}
+
+class PaymentFactory {
+  static create(method: string): Payment {
+    switch (method) {
+      case "credit_card": return new CreditCardPayment();
+      case "momo": return new MoMoPayment();
+      case "bank": return new BankTransferPayment();
+      default: throw new Error(`Phương thức '${method}' không hợp lệ`);
+    }
+  }
+}
+
+// Sử dụng
+const payment = PaymentFactory.create("momo");
+console.log(payment.process(500000));
+```
+
+## 3. Observer Pattern
+
+Observer Pattern thiết lập mối quan hệ một-nhiều: khi một đối tượng thay đổi trạng thái, tất cả các đối tượng phụ thuộc (observers) sẽ được thông báo và tự động cập nhật.
+
+### Khi nào sử dụng?
+
+- Hệ thống thông báo (notifications)
+- Event handling trong UI
+- Pub/Sub messaging
+- Reactive programming
+
+<Diagram chart="graph TD\n    S[Subject - Nguồn sự kiện] -->|thông báo| O1[Observer 1 - Email]\n    S -->|thông báo| O2[Observer 2 - SMS]\n    S -->|thông báo| O3[Observer 3 - Dashboard]\n    U[User Action] -->|thay đổi| S" />
+
+### Ví dụ Python
+
+```python
+from abc import ABC, abstractmethod
+from typing import List
+
+
+class Observer(ABC):
+    """Interface cho các observer."""
+
+    @abstractmethod
+    def update(self, event: str, data: dict) -> None:
+        pass
+
+
+class EventSystem:
+    """Subject - quản lý và thông báo cho các observer."""
+
+    def __init__(self):
+        self._observers: dict[str, List[Observer]] = {}
+
+    def subscribe(self, event: str, observer: Observer) -> None:
+        if event not in self._observers:
+            self._observers[event] = []
+        self._observers[event].append(observer)
+
+    def unsubscribe(self, event: str, observer: Observer) -> None:
+        if event in self._observers:
+            self._observers[event].remove(observer)
+
+    def notify(self, event: str, data: dict) -> None:
+        for observer in self._observers.get(event, []):
+            observer.update(event, data)
+
+
+class EmailAlert(Observer):
+    def update(self, event: str, data: dict) -> None:
+        print(f"[Email] Sự kiện '{event}': {data.get('message', '')}")
+
+
+class LogSystem(Observer):
+    def update(self, event: str, data: dict) -> None:
+        print(f"[Log] Ghi nhận sự kiện '{event}' lúc {data.get('time', 'N/A')}")
+
+
+# Sử dụng
+system = EventSystem()
+email = EmailAlert()
+logger = LogSystem()
+
+system.subscribe("don_hang_moi", email)
+system.subscribe("don_hang_moi", logger)
+system.subscribe("loi_he_thong", logger)
+
+system.notify("don_hang_moi", {
+    "message": "Đơn hàng #1234 vừa được tạo",
+    "time": "2026-03-18 10:30"
+})
+# [Email] Sự kiện 'don_hang_moi': Đơn hàng #1234 vừa được tạo
+# [Log] Ghi nhận sự kiện 'don_hang_moi' lúc 2026-03-18 10:30
+```
+
+## 4. Strategy Pattern
+
+Strategy Pattern cho phép bạn định nghĩa một nhóm thuật toán, đóng gói từng thuật toán thành class riêng, và cho phép thay đổi thuật toán tại thời điểm chạy chương trình (runtime).
+
+### Khi nào sử dụng?
+
+- Nhiều cách tính giá (giảm giá, VIP, ...)
+- Nhiều thuật toán sắp xếp
+- Nhiều cách xác thực người dùng
+- Khi muốn tránh cấu trúc if/elif/else dài
+
+<Diagram chart="graph LR\n    C[Context] --> S{Strategy Interface}\n    S --> S1[Strategy A - Giảm giá %]\n    S --> S2[Strategy B - Giảm giá cố định]\n    S --> S3[Strategy C - Mua 1 tặng 1]" />
+
+### Ví dụ Python
+
+```python
+from abc import ABC, abstractmethod
+
+
+class DiscountStrategy(ABC):
+    """Interface cho các chiến lược giảm giá."""
+
+    @abstractmethod
+    def calculate(self, price: float) -> float:
+        pass
+
+    @abstractmethod
+    def description(self) -> str:
+        pass
+
+
+class NoDiscount(DiscountStrategy):
+    def calculate(self, price: float) -> float:
+        return price
+
+    def description(self) -> str:
+        return "Không giảm giá"
+
+
+class PercentageDiscount(DiscountStrategy):
+    def __init__(self, percent: float):
+        self.percent = percent
+
+    def calculate(self, price: float) -> float:
+        return price * (1 - self.percent / 100)
+
+    def description(self) -> str:
+        return f"Giảm {self.percent}%"
+
+
+class FixedDiscount(DiscountStrategy):
+    def __init__(self, amount: float):
+        self.amount = amount
+
+    def calculate(self, price: float) -> float:
+        return max(0, price - self.amount)
+
+    def description(self) -> str:
+        return f"Giảm {self.amount:,.0f} VND"
+
+
+class ShoppingCart:
+    """Context - sử dụng strategy để tính giá."""
+
+    def __init__(self):
+        self.items: list[tuple[str, float]] = []
+        self._discount: DiscountStrategy = NoDiscount()
+
+    def add_item(self, name: str, price: float) -> None:
+        self.items.append((name, price))
+
+    def set_discount(self, strategy: DiscountStrategy) -> None:
+        self._discount = strategy
+
+    def total(self) -> float:
+        subtotal = sum(price for _, price in self.items)
+        return self._discount.calculate(subtotal)
+
+    def checkout(self) -> None:
+        subtotal = sum(price for _, price in self.items)
+        final = self.total()
+        print(f"Tạm tính: {subtotal:,.0f} VND")
+        print(f"Ưu đãi: {self._discount.description()}")
+        print(f"Thanh toán: {final:,.0f} VND")
+
+
+# Sử dụng
+cart = ShoppingCart()
+cart.add_item("Áo thun", 250_000)
+cart.add_item("Quần jean", 450_000)
+
+# Không giảm giá
+cart.checkout()
+
+# Áp dụng giảm 20%
+cart.set_discount(PercentageDiscount(20))
+cart.checkout()
+
+# Áp dụng giảm 100.000 VND
+cart.set_discount(FixedDiscount(100_000))
+cart.checkout()
+```
+
+### Ví dụ TypeScript
+
+```typescript
+interface SortStrategy<T> {
+  sort(data: T[]): T[];
+  name: string;
+}
+
+class BubbleSort<T> implements SortStrategy<T> {
+  name = "Bubble Sort";
+  sort(data: T[]): T[] {
+    const arr = [...data];
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = 0; j < arr.length - i - 1; j++) {
+        if (arr[j] > arr[j + 1]) {
+          [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+        }
+      }
+    }
+    return arr;
+  }
+}
+
+class QuickSort<T> implements SortStrategy<T> {
+  name = "Quick Sort";
+  sort(data: T[]): T[] {
+    if (data.length <= 1) return data;
+    const pivot = data[0];
+    const left = data.slice(1).filter(x => x <= pivot);
+    const right = data.slice(1).filter(x => x > pivot);
+    return [...this.sort(left), pivot, ...this.sort(right)];
+  }
+}
+
+class Sorter<T> {
+  private strategy: SortStrategy<T>;
+
+  constructor(strategy: SortStrategy<T>) {
+    this.strategy = strategy;
+  }
+
+  setStrategy(strategy: SortStrategy<T>): void {
+    this.strategy = strategy;
+  }
+
+  sort(data: T[]): T[] {
+    console.log(`Dùng ${this.strategy.name}`);
+    return this.strategy.sort(data);
+  }
+}
+
+// Sử dụng
+const sorter = new Sorter(new BubbleSort<number>());
+console.log(sorter.sort([5, 2, 8, 1, 9]));
+
+sorter.setStrategy(new QuickSort<number>());
+console.log(sorter.sort([5, 2, 8, 1, 9]));
+```
+
+<Callout type="tip">Strategy pattern giúp bạn tuân thủ nguyên tắc Open/Closed (mở cho mở rộng, đóng cho sửa đổi). Bạn có thể thêm chiến lược mới mà không cần sửa code hiện tại.</Callout>
+
+## Tổng kết so sánh
+
+<ComparisonTable
+  headers={["Pattern", "Mục đích", "Nhóm", "Ứng dụng thực tế"]}
+  rows={[
+    ["Singleton", "Đảm bảo chỉ có 1 instance", "Creational", "Database connection, Config"],
+    ["Factory", "Tạo đối tượng linh hoạt", "Creational", "Notification, Payment"],
+    ["Observer", "Thông báo khi có thay đổi", "Behavioral", "Event system, UI updates"],
+    ["Strategy", "Đổi thuật toán tại runtime", "Behavioral", "Giảm giá, Sắp xếp, Auth"]
+  ]}
+/>
+
+## Kết luận
+
+Design patterns là những công cụ mạnh mẽ giúp bạn viết code có cấu trúc, dễ bảo trì và mở rộng. Hãy bắt đầu bằng việc hiểu rõ 4 pattern cơ bản trong bài viết này, rồi áp dụng chúng vào các dự án thực tế. Đừng cố nhớ hết 23 patterns của GoF ngay lập tức, hãy học dần dần khi gặp các vấn đề cụ thể trong quá trình phát triển phần mềm.

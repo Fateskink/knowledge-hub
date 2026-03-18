@@ -1,0 +1,272 @@
+---
+title: "Apache Airflow - Điều phối Data Pipeline"
+description: "Tìm hiểu Apache Airflow, công cụ điều phối workflow cho data pipeline. Khái niệm DAGs, tasks, operators và cách xây dựng ETL pipeline."
+category: "automation"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["apache-airflow", "data-pipeline", "etl", "dag", "workflow", "orchestration", "python", "data-engineering"]
+featured: true
+order: 2
+sources:
+  - title: "Apache Airflow Official Documentation"
+    url: "https://airflow.apache.org/docs/"
+  - title: "Apache Airflow GitHub"
+    url: "https://github.com/apache/airflow"
+  - title: "Airflow Tutorial - Astronomer"
+    url: "https://www.astronomer.io/docs/learn/"
+  - title: "Apache Airflow - Wikipedia"
+    url: "https://en.wikipedia.org/wiki/Apache_Airflow"
+---
+
+# Apache Airflow - Điều phối Data Pipeline
+
+Apache Airflow là một nền tảng mã nguồn mở để lập trình, lập lịch và giám sát các workflow (quy trình làm việc) dưới dạng code. Được phát triển ban đầu tại Airbnb vào năm 2014 và trở thành dự án Apache cấp cao vào năm 2019, Airflow đã trở thành công cụ điều phối data pipeline phổ biến nhất trong lĩnh vực data engineering.
+
+## Apache Airflow là gì?
+
+Airflow cho phép bạn định nghĩa các workflow phức tạp dưới dạng **DAGs (Directed Acyclic Graphs)** bằng Python. Thay vì sử dụng giao diện kéo thả, bạn viết code để mô tả các bước trong pipeline, thứ tự thực hiện và các phụ thuộc giữa chúng.
+
+<Callout type="info">Airflow không phải là công cụ xử lý dữ liệu (data processing tool). Nó là công cụ điều phối (orchestrator) - nó quản lý khi nào và ở đâu các tác vụ được thực hiện, nhưng bản thân nó không xử lý dữ liệu.</Callout>
+
+### Tại sao dùng Airflow?
+
+- **Workflow as code**: Định nghĩa pipeline bằng Python, dễ version control
+- **Lập lịch linh hoạt**: Cron expressions, data-aware scheduling
+- **Giao diện web**: UI trực quan để giám sát và debug
+- **Khả năng mở rộng**: Chạy trên một máy hoặc cluster hàng nghìn worker
+- **Hệ sinh thái phong phú**: Hàng trăm operators và providers
+- **Community lớn**: Được hỗ trợ bởi Apache Foundation và cộng đồng rộng lớn
+
+## Các khái niệm cốt lõi
+
+<Diagram chart="graph TD\n    A[DAG - Directed Acyclic Graph] --> B[Task 1: Extract]\n    A --> C[Task 2: Transform]\n    A --> D[Task 3: Load]\n    B --> C\n    C --> D\n    subgraph Executor\n    E[Scheduler] --> F[Worker Pool]\n    F --> G[Worker 1]\n    F --> H[Worker 2]\n    F --> I[Worker 3]\n    end\n    E -->|Trigger| A" />
+
+### DAG (Directed Acyclic Graph)
+
+DAG là đơn vị cơ bản của Airflow. Một DAG là một tập hợp các task được tổ chức theo các phụ thuộc và quan hệ thứ tự. "Directed" có nghĩa là có hướng (task A chạy trước task B), "Acyclic" có nghĩa là không có chu trình (không có vòng lặp vô hạn).
+
+### Task
+
+Task là một đơn vị công việc trong DAG. Mỗi task thực hiện một hành động cụ thể như: truy vấn database, gọi API, chuyển đổi dữ liệu, gửi email...
+
+### Operator
+
+Operator là khuôn mẫu (template) để tạo task. Airflow cung cấp nhiều operator có sẵn:
+
+- **BashOperator**: Chạy lệnh bash
+- **PythonOperator**: Chạy hàm Python
+- **EmailOperator**: Gửi email
+- **HttpOperator**: Gọi HTTP request
+- **SqlOperator**: Thực thi câu lệnh SQL
+- **S3/GCS Operators**: Tương tác với cloud storage
+
+### Sensor
+
+Sensor là loại operator đặc biệt, chờ đợi một điều kiện nào đó được thỏa mãn trước khi tiếp tục:
+
+- **FileSensor**: Chờ đợi file xuất hiện
+- **HttpSensor**: Chờ đợi API trả về kết quả mong muốn
+- **SqlSensor**: Chờ đợi dữ liệu trong database
+
+## Kiến trúc Apache Airflow
+
+<Diagram chart="graph LR\n    subgraph Airflow Architecture\n    A[Web Server - Flask UI] --> B[Metadata DB - PostgreSQL]\n    C[Scheduler] --> B\n    C --> D[Executor]\n    D --> E[Worker 1]\n    D --> F[Worker 2]\n    D --> G[Worker 3]\n    H[DAG Files - Python] --> C\n    H --> A\n    end" />
+
+| Thành phần | Chức năng |
+|-----------|-----------|
+| Web Server | Giao diện web để giám sát và quản lý DAGs |
+| Scheduler | Lập lịch và kích hoạt các task theo thứ tự |
+| Executor | Thực thi các task (Local, Celery, Kubernetes) |
+| Metadata DB | Lưu trữ trạng thái của DAGs, tasks, connections |
+| Worker | Máy thực hiện các task (với Celery/K8s Executor) |
+
+## Ví dụ: Xây dựng ETL Pipeline
+
+Đây là ví dụ về một DAG xử lý dữ liệu ETL (Extract - Transform - Load) hoàn chỉnh:
+
+```python
+from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
+from airflow.providers.postgres.operators.postgres import PostgresOperator
+from airflow.sensors.filesystem import FileSensor
+
+# Định nghĩa các tham số mặc định cho DAG
+default_args = {
+    'owner': 'data-team',
+    'depends_on_past': False,
+    'email': ['data-team@company.com'],
+    'email_on_failure': True,
+    'email_on_retry': False,
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+}
+
+# Tạo DAG
+dag = DAG(
+    dag_id='etl_sales_pipeline',
+    default_args=default_args,
+    description='ETL pipeline xử lý dữ liệu bán hàng hàng ngày',
+    schedule_interval='0 6 * * *',  # Chạy lúc 6h sáng mỗi ngày
+    start_date=datetime(2026, 1, 1),
+    catchup=False,
+    tags=['etl', 'sales', 'production'],
+)
+
+# Task 1: Kiểm tra file dữ liệu có tồn tại
+check_file = FileSensor(
+    task_id='check_source_file',
+    filepath='/data/raw/sales_{{ ds }}.csv',
+    poke_interval=300,  # Kiểm tra mỗi 5 phút
+    timeout=3600,       # Timeout sau 1 giờ
+    dag=dag,
+)
+
+# Task 2: Extract - Đọc dữ liệu từ source
+def extract_data(**context):
+    import pandas as pd
+    execution_date = context['ds']
+    filepath = f'/data/raw/sales_{execution_date}.csv'
+
+    df = pd.read_csv(filepath)
+    print(f'Extracted {len(df)} records from {filepath}')
+
+    # Lưu dữ liệu vào XCom để chia sẻ giữa các task
+    context['ti'].xcom_push(key='record_count', value=len(df))
+    df.to_parquet(f'/data/staging/sales_{execution_date}.parquet')
+
+extract = PythonOperator(
+    task_id='extract_data',
+    python_callable=extract_data,
+    dag=dag,
+)
+
+# Task 3: Transform - Làm sạch và chuyển đổi dữ liệu
+def transform_data(**context):
+    import pandas as pd
+    execution_date = context['ds']
+
+    df = pd.read_parquet(f'/data/staging/sales_{execution_date}.parquet')
+
+    # Làm sạch dữ liệu
+    df = df.dropna(subset=['product_id', 'amount'])
+    df['amount'] = df['amount'].astype(float)
+    df['sale_date'] = pd.to_datetime(df['sale_date'])
+
+    # Tính toán các metric
+    df['revenue'] = df['amount'] * df['quantity']
+    df['category_upper'] = df['category'].str.upper()
+
+    df.to_parquet(f'/data/processed/sales_{execution_date}.parquet')
+    print(f'Transformed {len(df)} records')
+
+transform = PythonOperator(
+    task_id='transform_data',
+    python_callable=transform_data,
+    dag=dag,
+)
+
+# Task 4: Load - Tải dữ liệu vào Data Warehouse
+load_to_warehouse = PostgresOperator(
+    task_id='load_to_warehouse',
+    postgres_conn_id='warehouse_db',
+    sql="""
+        COPY sales_fact
+        FROM '/data/processed/sales_{{ ds }}.parquet'
+        WITH (FORMAT 'parquet');
+    """,
+    dag=dag,
+)
+
+# Task 5: Thông báo hoàn thành
+notify = BashOperator(
+    task_id='send_notification',
+    bash_command="""
+        curl -X POST https://hooks.slack.com/services/xxx \
+        -H 'Content-Type: application/json' \
+        -d '{"text": "ETL Pipeline hoàn thành cho ngày {{ ds }}"}'
+    """,
+    dag=dag,
+)
+
+# Định nghĩa thứ tự thực hiện
+check_file >> extract >> transform >> load_to_warehouse >> notify
+```
+
+<Diagram chart="graph LR\n    A[FileSensor: Chờ file] --> B[Extract: Đọc CSV]\n    B --> C[Transform: Làm sạch]\n    C --> D[Load: Ghi vào DB]\n    D --> E[Notify: Gửi Slack]" />
+
+<Callout type="tip">Sử dụng TaskFlow API (decorator @task) từ Airflow 2.0 để viết DAG gọn gàng hơn. TaskFlow tự động xử lý XCom và các phụ thuộc giữa task.</Callout>
+
+## TaskFlow API (Airflow 2.0+)
+
+Phiên bản hiện đại hơn của ví dụ trên sử dụng TaskFlow:
+
+```python
+from airflow.decorators import dag, task
+from datetime import datetime
+
+@dag(
+    schedule_interval='0 6 * * *',
+    start_date=datetime(2026, 1, 1),
+    catchup=False,
+    tags=['etl', 'sales'],
+)
+def etl_sales_pipeline_v2():
+
+    @task()
+    def extract(ds=None):
+        import pandas as pd
+        df = pd.read_csv(f'/data/raw/sales_{ds}.csv')
+        return df.to_dict()
+
+    @task()
+    def transform(raw_data: dict):
+        import pandas as pd
+        df = pd.DataFrame(raw_data)
+        df = df.dropna(subset=['product_id', 'amount'])
+        df['revenue'] = df['amount'] * df['quantity']
+        return df.to_dict()
+
+    @task()
+    def load(processed_data: dict):
+        import pandas as pd
+        df = pd.DataFrame(processed_data)
+        # Ghi vào database
+        print(f'Loaded {len(df)} records to warehouse')
+
+    # Pipeline flow
+    raw = extract()
+    processed = transform(raw)
+    load(processed)
+
+# Khởi tạo DAG
+etl_sales_pipeline_v2()
+```
+
+## Các Executor trong Airflow
+
+| Executor | Mô tả | Phù hợp |
+|----------|-------|---------|
+| SequentialExecutor | Chạy từng task một | Development, testing |
+| LocalExecutor | Chạy song song trên một máy | Quy mô nhỏ |
+| CeleryExecutor | Phân phối task qua Celery workers | Quy mô lớn |
+| KubernetesExecutor | Mỗi task chạy trong một pod riêng | Cloud-native, quy mô lớn |
+
+<Callout type="warning">SequentialExecutor chỉ nên dùng cho môi trường phát triển. Trong production, sử dụng CeleryExecutor hoặc KubernetesExecutor để đảm bảo hiệu suất và độ tin cậy.</Callout>
+
+## Best practices
+
+1. **Giữ DAG đơn giản**: Mỗi DAG nên thực hiện một nhiệm vụ cụ thể
+2. **Idempotent tasks**: Task có thể chạy lại mà không gây lỗi hay dữ liệu trùng lặp
+3. **Sử dụng connections**: Quản lý thông tin kết nối qua Airflow UI, không hardcode
+4. **Testing**: Viết unit test cho các hàm Python trước khi đưa vào DAG
+5. **Monitoring**: Thiết lập alerting cho các DAG quan trọng
+6. **Version control**: Lưu trữ DAG files trong Git repository
+
+<Callout type="info">Apache Airflow là nền tảng điều phối workflow phổ biến nhất cho data engineering. Các công ty như Airbnb, Spotify, Twitter, Square và hàng nghìn tổ chức khác sử dụng Airflow trong production hàng ngày.</Callout>
+
+## Kết luận
+
+Apache Airflow là công cụ không thể thiếu cho bất kỳ data engineer nào. Với khả năng định nghĩa workflow bằng Python, hệ thống lập lịch mạnh mẽ và giao diện giám sát trực quan, Airflow giúp bạn xây dựng và vận hành các data pipeline phức tạp một cách dễ dàng và tin cậy.

@@ -1,0 +1,145 @@
+---
+title: "Magnetic Cards and NFC: The Physics of Contactless Payments"
+description: "Explore how magnetic stripe cards encode data, understand electromagnetic induction and Faraday's law, and learn how NFC and RFID technology power bank cards, mobile payments, and access systems."
+category: "hardware"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 8
+tags: ["nfc", "rfid", "magnetic-stripe", "contactless-payment", "electromagnetic-induction", "faradays-law", "smart-cards"]
+featured: false
+order: 7
+sources:
+  - title: "How Do Magnetic Stripe Cards Work? — How Stuff Works"
+    url: "https://electronics.howstuffworks.com/everyday-tech/magnetic-stripe-card.htm"
+  - title: "Near Field Communication (NFC) — NFC Forum"
+    url: "https://nfc-forum.org/what-is-nfc/"
+  - title: "RFID Technology — IEEE Xplore"
+    url: "https://ieeexplore.ieee.org/document/5765649"
+  - title: "Faraday's Law of Electromagnetic Induction — Khan Academy"
+    url: "https://www.khanacademy.org/science/physics/magnetic-forces-and-magnetic-fields/magnetic-flux-faradays-law/a/what-is-faradays-law"
+---
+
+# Magnetic Cards and NFC: The Physics of Contactless Payments
+
+You tap your phone at a coffee shop and your latte is paid for. You wave a key card at your office door and it unlocks. You insert a credit card into a terminal and your purchase is authorized. These everyday interactions depend on fundamental principles of electromagnetism that were discovered nearly 200 years ago. Understanding how magnetic stripe cards, NFC, and RFID work reveals a beautiful connection between physics and the technologies we take for granted.
+
+<Callout type="info">
+In 2025, contactless payments accounted for over 60% of all in-person card transactions globally. The technology behind that casual tap at the register is rooted in Michael Faraday's experiments with magnets and coils of wire in the 1830s.
+</Callout>
+
+## Magnetic Stripe Cards: Data Written in Magnets
+
+The magnetic stripe (or magstripe) on the back of credit cards, hotel key cards, and ID badges is one of the oldest data storage technologies still in widespread use, dating back to the 1960s.
+
+### How Data Is Stored
+
+The dark stripe on the back of a card is a thin layer of iron-oxide particles — essentially tiny magnets — embedded in a plastic film. Data is encoded by magnetizing these particles in specific patterns. Each particle is magnetized in one of two directions, representing binary 0 or 1.
+
+<Diagram chart="graph LR\n    subgraph Stripe[Magnetic Stripe Cross-Section]\n        T1[Track 1 - 79 characters\nAlphanumeric - Name]\n        T2[Track 2 - 40 characters\nNumeric - Card Number]\n        T3[Track 3 - 107 characters\nNumeric - Rarely used]\n    end\n    WRITE[Write Head\nMagnetizes particles] --> Stripe\n    Stripe --> READ[Read Head\nDetects magnetic changes]" />
+
+A standard magnetic stripe has three tracks:
+- **Track 1:** Up to 79 alphanumeric characters. Contains the cardholder's name, account number, and other data. Uses 210 bits per inch (BPI).
+- **Track 2:** Up to 40 numeric characters. Contains the primary account number and expiration date. Uses 75 BPI. This is the track most commonly read by payment terminals.
+- **Track 3:** Up to 107 numeric characters at 210 BPI. Rarely used in modern applications.
+
+### Reading the Stripe
+
+When you swipe a card, the read head detects changes in the magnetic field as the stripe moves past. Each transition (north-to-south or south-to-north) generates a tiny electrical pulse in the read head coil. The pattern of these pulses is decoded into binary data.
+
+<Callout type="warning">
+Magnetic stripe cards are inherently insecure. The data on the stripe is static and unencrypted — it is the same every time you swipe. This makes magstripe data easy to copy (skim) with inexpensive equipment. This is the primary reason the industry has moved toward chip cards (EMV) and contactless payments, which use dynamic, encrypted data for each transaction.
+</Callout>
+
+## Electromagnetic Induction: The Physics Behind It All
+
+To understand NFC, RFID, and even how the magstripe read head works, you need to understand electromagnetic induction — one of the most important discoveries in physics.
+
+### Faraday's Law
+
+In 1831, Michael Faraday discovered that a changing magnetic field through a coil of wire induces an electrical voltage (and therefore current) in that coil. This is Faraday's Law of Electromagnetic Induction:
+
+**EMF = -d(Phi)/dt**
+
+In plain language: the voltage induced in a coil is proportional to the rate of change of the magnetic flux through it. The faster the magnetic field changes, the stronger the induced voltage.
+
+<Diagram chart="graph TD\n    subgraph Faraday[Faradays Law in Action]\n        MAG[Changing Magnetic Field] --> COIL[Conductor Coil]\n        COIL --> EMF[Induced Voltage - EMF]\n        EMF --> CURRENT[Electric Current Flows]\n    end\n    subgraph Applications[Applications]\n        GEN[Electric Generators]\n        TRANS[Transformers]\n        WIRE[Wireless Charging]\n        NFC_APP[NFC / RFID]\n        INDUCT[Induction Cooktops]\n    end\n    Faraday --> Applications" />
+
+This same principle powers:
+- **Electric generators:** A spinning magnet creates a changing magnetic field through wire coils, generating electricity.
+- **Transformers:** A changing current in one coil induces a voltage in a nearby coil, allowing voltage conversion.
+- **Wireless charging:** A coil in the charging pad creates a changing magnetic field that induces current in a coil inside your phone.
+- **NFC and RFID:** The reader's coil induces power and data signals in the tag's coil.
+
+## RFID: Radio-Frequency Identification
+
+RFID uses electromagnetic fields to automatically identify and track tags attached to objects. It is the broader technology category that includes NFC.
+
+### How RFID Works
+
+An RFID system has two components:
+1. **Reader (interrogator):** Contains an antenna that emits radio waves.
+2. **Tag (transponder):** Contains a small chip and an antenna coil.
+
+<Diagram chart="graph LR\n    subgraph Reader[RFID Reader]\n        R_ANT[Antenna Coil]\n        R_TX[Transmitter]\n        R_RX[Receiver]\n        R_PROC[Processor]\n    end\n    subgraph Tag[RFID Tag]\n        T_ANT[Antenna Coil]\n        T_CHIP[Microchip\nStores data]\n        T_CAP[Capacitor\nStores harvested energy]\n    end\n    R_ANT -->|Electromagnetic Field\nPowers tag + sends commands| T_ANT\n    T_ANT -->|Modulated backscatter\nReturns data| R_ANT" />
+
+**Passive RFID tags** (the most common type) have no battery. They harvest energy from the reader's electromagnetic field through electromagnetic induction. The reader's radio waves induce a current in the tag's antenna coil, which powers the chip. The chip then modulates the signal and reflects it back — a technique called backscatter. This is why passive tags can be incredibly small and inexpensive (a few cents each).
+
+**Active RFID tags** have their own battery and can transmit signals over longer distances (up to 100 meters), used in vehicle tracking and toll collection.
+
+<ComparisonTable headers={["Feature", "Passive RFID", "Active RFID", "NFC"]} rows={[["Power Source", "Harvested from reader's field", "Internal battery", "Harvested or device-powered"], ["Range", "1-10 meters", "Up to 100 meters", "Up to 4 cm"], ["Frequency", "LF: 125-134 kHz, HF: 13.56 MHz, UHF: 860-960 MHz", "433 MHz or 915 MHz", "13.56 MHz"], ["Cost per Tag", "Very low ($0.05-$0.50)", "Higher ($5-$50+)", "Low to moderate"], ["Data Transfer", "Read-only or read/write", "Read/write", "Read/write, peer-to-peer"], ["Common Uses", "Inventory tracking, access cards, pet chips", "Vehicle tolling, container tracking", "Mobile payments, transit cards, pairing"]]} />
+
+## NFC: Near Field Communication
+
+NFC is a specialized form of HF RFID operating at 13.56 MHz, designed specifically for short-range communication (under 4 centimeters). This extremely short range is a deliberate security feature — an attacker would need to be physically adjacent to intercept the communication.
+
+### NFC Operating Modes
+
+NFC devices can operate in three modes:
+
+<Diagram chart="graph TD\n    NFC[NFC Technology] --> RW[Reader/Writer Mode\nPhone reads NFC tags\nSmart posters, product info]\n    NFC --> P2P[Peer-to-Peer Mode\nTwo NFC devices exchange data\nFile sharing, device pairing]\n    NFC --> CE[Card Emulation Mode\nPhone acts as contactless card\nMobile payments, transit passes]" />
+
+1. **Reader/Writer Mode:** Your phone reads data from or writes data to a passive NFC tag. Used for smart posters, product authentication, and quick device pairing.
+
+2. **Peer-to-Peer Mode:** Two NFC-enabled devices exchange data. Used for Android Beam (now deprecated) and device pairing protocols.
+
+3. **Card Emulation Mode:** Your phone emulates a contactless smart card. This is how Apple Pay, Google Pay, and Samsung Pay work — your phone acts as if it were a contactless bank card.
+
+### How Mobile Payments Work
+
+When you tap your phone to pay, the following happens in about 500 milliseconds:
+
+<Diagram chart="graph LR\n    TAP[Phone taps terminal] --> FIELD[Terminal generates\n13.56 MHz field]\n    FIELD --> POWER[Phone's NFC chip\nactivated]\n    POWER --> AUTH[Secure Element generates\none-time token]\n    AUTH --> SEND[Token sent to terminal\nvia NFC]\n    SEND --> BANK[Terminal sends token\nto payment network]\n    BANK --> APPROVE[Bank verifies and\napproves transaction]" />
+
+1. The payment terminal generates an electromagnetic field at 13.56 MHz.
+2. Your phone's NFC antenna detects the field and activates.
+3. The Secure Element (a tamper-resistant chip in your phone) generates a one-time cryptographic token — a unique code valid for this single transaction.
+4. The token, along with a device-specific account number (not your real card number), is transmitted to the terminal.
+5. The terminal forwards this data to the payment network, which verifies it with your bank.
+6. The transaction is approved or declined.
+
+<Callout type="tip">
+Mobile payments via NFC are significantly more secure than magnetic stripe cards. Your real card number is never transmitted — the Secure Element generates a unique token for each transaction. Even if an attacker intercepted the NFC communication, the captured token would be useless for any other transaction.
+</Callout>
+
+## EMV Chip Cards: The Middle Ground
+
+The gold or silver chip on modern credit cards (EMV — Europay, Mastercard, Visa) is a small computer that performs cryptographic operations. Unlike the magnetic stripe's static data, the chip generates a unique cryptogram for each transaction.
+
+When you insert a chip card (contact EMV), the terminal's contacts connect directly to the chip's pads. When you tap a chip card (contactless EMV), it uses the same NFC protocol as mobile payments — the card has a built-in antenna coil and is powered by the terminal's electromagnetic field.
+
+<Callout type="info">
+Contactless cards that you tap contain both an NFC antenna and an EMV chip. The chip is powered wirelessly through electromagnetic induction from the terminal — exactly the same principle Faraday discovered in 1831, just miniaturized into a credit card.
+</Callout>
+
+## Real-World Applications Beyond Payments
+
+NFC and RFID technology extends far beyond paying for coffee:
+
+- **Public transit:** Transit cards (Oyster, Suica, Clipper) use NFC for fast fare collection. Some cities allow phone-based transit passes.
+- **Access control:** Office badges, hotel key cards, and building security systems use RFID/NFC for identification and authentication.
+- **Healthcare:** Hospitals use RFID to track equipment, medications, and patient identification wristbands.
+- **Supply chain:** RFID tags on products enable automated inventory management. Retail stores use RFID for theft prevention (those security tags that set off alarms).
+- **Pet identification:** Implanted RFID microchips (125 kHz or 134 kHz) store a unique ID number linked to the owner's contact information.
+- **Automotive:** Keyless entry and push-button start systems use RFID at 125 kHz (LF) for proximity detection and NFC or UHF for communication.
+
+The physics of electromagnetic induction, discovered in a 19th-century laboratory, now underpins a global payments infrastructure processing trillions of dollars annually. From Faraday's coils to your phone's NFC chip, the principle is the same — a changing magnetic field induces a current, and with clever engineering, that current carries data, identity, and trust.

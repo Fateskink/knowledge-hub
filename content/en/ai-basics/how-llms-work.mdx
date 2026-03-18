@@ -1,0 +1,159 @@
+---
+title: "How Large Language Models Work: From Tokens to Transformers"
+description: "Understand the inner workings of Large Language Models — how text becomes tokens, how the Transformer architecture processes them, and how models like GPT and Claude generate human-like text."
+category: "ai-basics"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 9
+tags: ["llm", "transformers", "tokenization", "deep-learning", "natural-language-processing"]
+featured: false
+order: 2
+sources:
+  - title: "Attention Is All You Need — Vaswani et al., 2017"
+    url: "https://arxiv.org/abs/1706.03762"
+  - title: "What Are Large Language Models? — NVIDIA"
+    url: "https://www.nvidia.com/en-us/glossary/large-language-models/"
+  - title: "The Illustrated Transformer — Jay Alammar"
+    url: "https://jalammar.github.io/illustrated-transformer/"
+---
+
+# How Large Language Models Work
+
+Large Language Models (LLMs) like GPT-4, Claude, Gemini, and Llama have transformed how we interact with computers. They can write essays, answer questions, translate languages, write code, and carry on conversations that feel remarkably human. But how do they actually work?
+
+This article breaks down the key concepts behind LLMs in plain language, so you can understand what happens between typing a question and receiving an answer.
+
+<Callout type="info">
+An LLM does not "understand" text the way you do. It is a statistical model that has learned patterns from enormous amounts of text data and uses those patterns to predict what words should come next.
+</Callout>
+
+## The Big Picture
+
+At the highest level, an LLM does one thing: given a sequence of text, it predicts the most likely next token. It does this over and over, one token at a time, until it produces a complete response.
+
+<Diagram chart="graph LR\n    A[User Prompt] --> B[Tokenization]\n    B --> C[Embedding Layer]\n    C --> D[Transformer Blocks]\n    D --> E[Output Probabilities]\n    E --> F[Token Selection]\n    F --> G[Detokenization]\n    G --> H[Generated Text]" />
+
+Let us walk through each stage.
+
+## Step 1: Tokenization — Breaking Text Into Pieces
+
+Computers do not read words the way humans do. Before an LLM can process your text, it must convert it into **tokens** — small chunks that the model can work with.
+
+A token is not always a complete word. Common words like "the" or "hello" are usually a single token, but less common words get split into smaller pieces. For example:
+
+- "understanding" might become ["under", "standing"]
+- "tokenization" might become ["token", "ization"]
+- "ChatGPT" might become ["Chat", "G", "PT"]
+
+<Callout type="tip">
+A rough rule of thumb: in English, one token is approximately 3/4 of a word. So 1,000 words is roughly 1,300 tokens. This matters because LLMs have a maximum context window measured in tokens.
+</Callout>
+
+Most modern LLMs use a tokenization method called **Byte Pair Encoding (BPE)**, which builds a vocabulary of the most frequently occurring character combinations in the training data. GPT-4 uses a vocabulary of roughly 100,000 tokens.
+
+## Step 2: Embeddings — Turning Tokens Into Numbers
+
+Once text is tokenized, each token is converted into a numerical vector (a list of numbers) called an **embedding**. These vectors capture semantic meaning — tokens with similar meanings end up as vectors that are close together in a high-dimensional space.
+
+<Diagram chart="graph TD\n    A[Token: king] --> B[Vector: 0.2, 0.8, -0.1, ...]\n    C[Token: queen] --> D[Vector: 0.3, 0.7, -0.1, ...]\n    E[Token: apple] --> F[Vector: -0.5, 0.1, 0.9, ...]\n    B --> G{Similar vectors = similar meaning}\n    D --> G\n    F --> H{Different vector = different meaning}" />
+
+A famous example: in a well-trained embedding space, the vector for "king" minus "man" plus "woman" produces a vector close to "queen." The model learns these relationships entirely from data, without being told what these words mean.
+
+Modern LLMs use embedding dimensions of 4,096 to 12,288 numbers per token, allowing them to capture nuanced relationships between concepts.
+
+## Step 3: The Transformer Architecture
+
+The Transformer is the engine that powers every major LLM today. Introduced in the 2017 paper "Attention Is All You Need" by researchers at Google, it replaced older architectures like RNNs and LSTMs and became the foundation of modern AI.
+
+### Self-Attention: The Key Innovation
+
+The core idea of the Transformer is the **self-attention mechanism**. It allows the model to look at all the tokens in a sequence and determine which ones are most relevant to each other.
+
+Consider the sentence: "The cat sat on the mat because it was tired."
+
+What does "it" refer to? A human instantly knows "it" refers to "the cat." Self-attention lets the model learn the same thing by assigning high attention weights between "it" and "cat."
+
+<Diagram chart="graph TD\n    A[Input Tokens] --> B[Query Q]\n    A --> C[Key K]\n    A --> D[Value V]\n    B --> E[Attention Scores = Q x K]\n    E --> F[Softmax Normalization]\n    F --> G[Weighted Values = Scores x V]\n    G --> H[Context-Aware Output]" />
+
+For each token, the model computes three vectors:
+- **Query (Q):** "What am I looking for?"
+- **Key (K):** "What do I contain?"
+- **Value (V):** "What information do I provide?"
+
+The attention score between two tokens is computed by comparing the Query of one token with the Key of another. High scores mean the model pays more attention to that relationship.
+
+### Multi-Head Attention
+
+Instead of computing attention once, Transformers compute it multiple times in parallel using different "heads." Each head can focus on different types of relationships — one might focus on syntax, another on semantics, and another on positional relationships.
+
+<Callout type="info">
+GPT-4 is estimated to have 96 or more attention heads per layer. Each head learns to attend to different patterns in the data, giving the model a rich, multi-faceted understanding of each token's context.
+</Callout>
+
+### Transformer Blocks
+
+A complete Transformer layer (or "block") includes:
+
+1. Multi-head self-attention
+2. A feed-forward neural network
+3. Layer normalization and residual connections
+
+Modern LLMs stack many of these blocks on top of each other. GPT-3 has 96 layers; larger models may have even more. Each layer refines the model's understanding of the input, building increasingly abstract representations.
+
+<Diagram chart="graph TD\n    A[Input Embeddings] --> B[Transformer Block 1]\n    B --> C[Transformer Block 2]\n    C --> D[...]\n    D --> E[Transformer Block N]\n    E --> F[Final Output]\n    subgraph Block\n    G[Multi-Head Attention] --> H[Add & Normalize]\n    H --> I[Feed-Forward Network]\n    I --> J[Add & Normalize]\n    end" />
+
+## Step 4: Training — Learning From the Internet
+
+Training an LLM involves two major phases.
+
+### Pre-training
+
+The model reads enormous amounts of text — books, websites, code repositories, scientific papers — and learns to predict the next token. This is called **self-supervised learning** because the training signal comes from the text itself (no human labels needed).
+
+The training process adjusts billions of parameters (the model's internal weights) to minimize prediction errors. GPT-3 has 175 billion parameters; GPT-4 is estimated to have over a trillion.
+
+<Callout type="warning">
+Pre-training a large model requires thousands of high-end GPUs running for weeks or months, costing millions of dollars in compute. This is why only a handful of organizations can train frontier models from scratch.
+</Callout>
+
+### Fine-tuning and RLHF
+
+After pre-training, the model is further trained to be helpful and safe:
+
+1. **Supervised Fine-Tuning (SFT):** Human trainers write example conversations showing how the model should respond.
+2. **Reinforcement Learning from Human Feedback (RLHF):** Human evaluators rank multiple model responses from best to worst. A reward model is trained on these rankings, and then the LLM is optimized to produce responses the reward model scores highly.
+
+<Diagram chart="graph LR\n    A[Pre-trained Model] --> B[Supervised Fine-Tuning]\n    B --> C[Reward Model Training]\n    C --> D[RLHF Optimization]\n    D --> E[Deployed Model]" />
+
+This process is what makes the difference between a raw language model (which might produce toxic or unhelpful text) and a useful assistant like ChatGPT or Claude.
+
+## Step 5: Inference — Generating a Response
+
+When you send a prompt to an LLM, the model processes all your input tokens through its Transformer layers and produces a probability distribution over its entire vocabulary for the next token.
+
+The model does not simply pick the highest-probability token every time. Instead, it uses **sampling strategies** to balance quality and creativity:
+
+- **Temperature:** Controls randomness. Low temperature (e.g., 0.1) makes the model more deterministic; high temperature (e.g., 1.0) makes it more creative.
+- **Top-p (nucleus sampling):** Only considers tokens whose cumulative probability exceeds a threshold.
+- **Top-k:** Only considers the k most likely tokens.
+
+The model generates one token, appends it to the input, and repeats the process. This is why LLM responses appear to stream in word by word — each token genuinely is generated one at a time.
+
+## Key Concepts Summary
+
+<ComparisonTable headers={["Concept", "What It Does", "Why It Matters"]} rows={[["Tokenization", "Splits text into small pieces", "Enables the model to process any text"], ["Embeddings", "Converts tokens to number vectors", "Captures meaning and relationships"], ["Self-Attention", "Finds relationships between tokens", "Core innovation of Transformers"], ["Pre-training", "Learns language patterns from data", "Gives the model general knowledge"], ["RLHF", "Aligns model with human preferences", "Makes the model helpful and safe"], ["Inference", "Generates text token by token", "Produces the response you see"]]} />
+
+## Limitations to Keep in Mind
+
+LLMs are powerful, but they have fundamental limitations:
+
+- **No true understanding:** They manipulate patterns in text without genuine comprehension.
+- **Hallucinations:** They can confidently produce false information because they optimize for plausible-sounding text, not factual accuracy.
+- **Context window limits:** They can only consider a finite number of tokens at once (though this is growing — some models now support over 1 million tokens).
+- **Knowledge cutoff:** Their knowledge is frozen at the time of training, unless augmented with tools or retrieval systems.
+
+<Callout type="info">
+Understanding how LLMs work helps you use them more effectively. When you know the model is predicting tokens based on patterns, you can craft better prompts and interpret its outputs more critically.
+</Callout>
+
+In the next article, we will explore **prompt engineering** — the art and science of communicating effectively with LLMs to get the best possible results.

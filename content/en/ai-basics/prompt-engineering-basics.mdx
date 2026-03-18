@@ -1,0 +1,260 @@
+---
+title: "Prompt Engineering Basics: How to Talk to AI Effectively"
+description: "Master the fundamentals of prompt engineering — from zero-shot and few-shot prompting to chain-of-thought reasoning and system prompts. Learn practical techniques to get better results from any LLM."
+category: "ai-basics"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 9
+tags: ["prompt-engineering", "llm", "zero-shot", "few-shot", "chain-of-thought"]
+featured: true
+order: 3
+sources:
+  - title: "Prompt Engineering Guide — DAIR.AI"
+    url: "https://www.promptingguide.ai/"
+  - title: "Chain-of-Thought Prompting — Wei et al., 2022"
+    url: "https://arxiv.org/abs/2201.11903"
+  - title: "OpenAI Prompt Engineering Best Practices"
+    url: "https://platform.openai.com/docs/guides/prompt-engineering"
+---
+
+# Prompt Engineering Basics
+
+A prompt is the text you send to an AI model to get a response. **Prompt engineering** is the skill of crafting that text to get the best possible output. It is not magic — it is a structured approach to communication that anyone can learn.
+
+The difference between a mediocre AI response and an excellent one often comes down to how you write your prompt. This article covers the most important techniques, with practical examples you can use immediately.
+
+<Callout type="info">
+Prompt engineering is not about tricking the AI. It is about communicating clearly — providing the right context, structure, and instructions so the model understands exactly what you need.
+</Callout>
+
+## Why Prompt Engineering Matters
+
+LLMs are general-purpose tools. The same model that writes poetry can also debug code, summarize legal documents, or plan a marketing campaign. But it needs guidance to know which "mode" to operate in.
+
+Think of it like giving instructions to a very capable but very literal assistant. The clearer and more specific your instructions, the better the result.
+
+<Diagram chart="graph LR\n    A[Vague Prompt] --> B[Generic Response]\n    C[Well-Crafted Prompt] --> D[Specific, Useful Response]\n    E[Prompt with Examples] --> F[Response Matching Your Format]\n    G[Prompt with Reasoning Steps] --> H[Thoughtful, Accurate Response]" />
+
+## The Anatomy of a Good Prompt
+
+Every effective prompt contains some combination of these elements:
+
+1. **Role/Context:** Who should the AI act as? What is the situation?
+2. **Task:** What exactly should it do?
+3. **Format:** How should the output be structured?
+4. **Constraints:** What should it avoid? What are the boundaries?
+5. **Examples:** What does a good response look like?
+
+<Callout type="tip">
+You do not need all five elements in every prompt. Simple tasks may only need a clear task description. Complex tasks benefit from all five.
+</Callout>
+
+## Core Prompting Techniques
+
+### 1. Zero-Shot Prompting
+
+Zero-shot prompting means giving the model a task with no examples. You rely entirely on the model's pre-trained knowledge.
+
+**Example:**
+```
+Classify the following movie review as positive, negative, or neutral:
+"The cinematography was stunning but the plot felt predictable and rushed."
+```
+
+This works well for straightforward tasks where the model already understands the concept. Most everyday interactions with AI use zero-shot prompting.
+
+**When to use it:** Simple, well-defined tasks like classification, summarization, translation, or answering factual questions.
+
+### 2. Few-Shot Prompting
+
+Few-shot prompting provides the model with a few examples of the desired input-output pattern before presenting the actual task. This dramatically improves performance on tasks where the format or style matters.
+
+**Example:**
+```
+Convert the following product descriptions to concise bullet points:
+
+Description: "Our premium leather wallet features RFID blocking technology,
+eight card slots, and a slim profile that fits comfortably in any pocket."
+Bullets:
+- RFID blocking technology
+- 8 card slots
+- Slim profile design
+- Premium leather
+
+Description: "This stainless steel water bottle keeps drinks cold for 24 hours
+and hot for 12 hours, with a leak-proof lid and a capacity of 750ml."
+Bullets:
+- 24hr cold / 12hr hot insulation
+- Leak-proof lid
+- 750ml capacity
+- Stainless steel construction
+
+Description: "The wireless noise-canceling headphones offer 30-hour battery life,
+Bluetooth 5.3, and a foldable design with memory foam ear cushions."
+Bullets:
+```
+
+The model sees the pattern and produces consistent output that matches the format and level of detail from the examples.
+
+<Callout type="info">
+Research shows that few-shot prompting can improve accuracy by 10-30% on many tasks compared to zero-shot. The quality of your examples matters more than the quantity — 2-3 well-chosen examples often outperform 10 mediocre ones.
+</Callout>
+
+### 3. Chain-of-Thought (CoT) Prompting
+
+Chain-of-thought prompting asks the model to show its reasoning step by step before giving a final answer. This significantly improves performance on tasks that require logic, math, or multi-step reasoning.
+
+**Without CoT:**
+```
+Q: A store has 45 apples. They sell 60% on Monday and half of the remainder
+on Tuesday. How many are left?
+A: 9
+```
+
+**With CoT:**
+```
+Q: A store has 45 apples. They sell 60% on Monday and half of the remainder
+on Tuesday. How many are left?
+A: Let me work through this step by step.
+1. Start with 45 apples
+2. Monday: sell 60% of 45 = 27 apples sold, leaving 45 - 27 = 18 apples
+3. Tuesday: sell half of 18 = 9 apples sold, leaving 18 - 9 = 9 apples
+The answer is 9 apples.
+```
+
+You can trigger chain-of-thought reasoning simply by adding "Let's think step by step" or "Explain your reasoning" to your prompt.
+
+<Diagram chart="graph TD\n    A[Problem Statement] --> B[Step 1: Identify Given Information]\n    B --> C[Step 2: Apply First Operation]\n    C --> D[Step 3: Apply Second Operation]\n    D --> E[Step 4: State Final Answer]\n    E --> F[Verify Result]" />
+
+<Callout type="warning">
+Chain-of-thought prompting uses more tokens (and therefore more cost and time) because the model generates the reasoning steps. Use it when accuracy matters more than speed — for math, logic, complex analysis, and coding problems.
+</Callout>
+
+### 4. System Prompts
+
+A system prompt sets the overall behavior, personality, and constraints for the AI before the user conversation begins. It acts as a persistent instruction set that shapes every response.
+
+**Example system prompt:**
+```
+You are a senior Python developer and code reviewer. When reviewing code:
+- Focus on readability, performance, and security
+- Suggest specific improvements with code examples
+- Rate the code quality on a scale of 1-10
+- Use a professional but friendly tone
+- If you spot a security vulnerability, highlight it with [SECURITY] prefix
+```
+
+System prompts are powerful because they establish consistent behavior across an entire conversation without repeating instructions in every message.
+
+### 5. Role Prompting
+
+Assigning the AI a specific role can dramatically change the quality and style of its responses. The model adjusts its vocabulary, depth, and perspective based on the role.
+
+**Example:**
+```
+You are an experienced data scientist explaining concepts to a marketing team
+that has no technical background. Use analogies from everyday life and avoid
+jargon. If you must use a technical term, define it immediately.
+```
+
+## Comparing Prompting Techniques
+
+<ComparisonTable headers={["Technique", "Best For", "Complexity", "Token Cost"]} rows={[["Zero-Shot", "Simple, well-defined tasks", "Low", "Low"], ["Few-Shot", "Format-specific outputs, classification", "Medium", "Medium"], ["Chain-of-Thought", "Math, logic, complex reasoning", "Medium", "High"], ["System Prompts", "Setting consistent behavior", "Low", "Low"], ["Role Prompting", "Domain-specific expertise", "Low", "Low"]]} />
+
+## Advanced Tips and Patterns
+
+### Be Specific About Format
+
+Instead of "Summarize this article," try:
+```
+Summarize this article in exactly 3 bullet points. Each bullet should be
+one sentence, start with a verb, and capture a key finding.
+```
+
+### Use Delimiters for Clarity
+
+When your prompt includes data or text to process, use clear delimiters:
+```
+Translate the text between the triple backticks to French.
+Maintain the original formatting.
+
+\```
+Welcome to our platform. Please review the terms of service
+before creating your account.
+\```
+```
+
+### Iterative Refinement
+
+Prompt engineering is rarely a one-shot process. Start simple, evaluate the output, and refine.
+
+<Diagram chart="graph LR\n    A[Write Initial Prompt] --> B[Review Output]\n    B --> C{Satisfactory?}\n    C -->|No| D[Identify Issues]\n    D --> E[Refine Prompt]\n    E --> B\n    C -->|Yes| F[Use or Save Prompt]" />
+
+### Constrain the Output
+
+Tell the model what NOT to do:
+```
+Answer the customer's question about our return policy.
+- Do NOT make up information not in the policy document below
+- Do NOT promise exceptions to the policy
+- If unsure, say "I'd recommend contacting our support team"
+```
+
+### Ask the Model to Verify
+
+For important tasks, add a verification step:
+```
+After generating your response, review it for:
+1. Factual accuracy
+2. Completeness (did you address all parts of the question?)
+3. Clarity (would a non-expert understand this?)
+
+If you find issues, revise before presenting the final answer.
+```
+
+## Common Mistakes to Avoid
+
+<Callout type="warning">
+These are the most frequent prompt engineering mistakes beginners make.
+</Callout>
+
+1. **Being too vague.** "Tell me about marketing" will get a generic essay. "Give me 5 low-budget marketing strategies for a new SaaS product targeting small businesses" gets actionable advice.
+
+2. **Overloading a single prompt.** If you need the model to do 10 different things, break them into separate prompts. Complex, multi-part prompts increase the chance of the model missing or conflating requirements.
+
+3. **Not providing context.** The model cannot read your mind. If your question depends on specific context (your industry, audience, constraints), include it.
+
+4. **Ignoring the output format.** If you need JSON, a table, or bullet points, say so explicitly. Otherwise, the model will choose its own format.
+
+5. **Not iterating.** Your first prompt is a draft. The best prompt engineers treat their prompts as code — they test, evaluate, and refine them.
+
+## Putting It All Together
+
+Here is an example that combines multiple techniques:
+
+```
+System: You are a senior financial analyst. Be precise with numbers
+and cite your reasoning.
+
+User: I'm evaluating whether to invest in Company X. Based on the
+financial data below, analyze the company's health.
+
+Use chain-of-thought reasoning. Structure your analysis as:
+1. Revenue trends
+2. Profitability analysis
+3. Key risks
+4. Overall recommendation (Buy/Hold/Sell)
+
+[Financial data here]
+
+Format your response with clear headings and include a summary
+table at the end.
+```
+
+This prompt uses role assignment, explicit structure, chain-of-thought instruction, and format specification — giving the model everything it needs to produce a high-quality analysis.
+
+<Callout type="tip">
+The best way to improve at prompt engineering is practice. Try different techniques with the same task and compare the results. Keep a collection of prompts that work well for your common tasks.
+</Callout>
+
+Prompt engineering is a skill that improves with practice. Start with the techniques in this article, experiment with your own variations, and you will quickly find that AI becomes a far more powerful tool in your hands.

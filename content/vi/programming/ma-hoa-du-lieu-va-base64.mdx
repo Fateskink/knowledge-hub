@@ -1,0 +1,221 @@
+---
+title: "Mã Hóa Dữ Liệu: Base64, UTF-8 và Cách Máy Tính Biểu Diễn Thông Tin"
+description: "Tìm hiểu cách máy tính biểu diễn văn bản và dữ liệu: từ ASCII đến Unicode/UTF-8, cơ chế Base64 encoding từng bước, và sự khác biệt giữa encoding, encryption và hashing."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 14
+tags: ["encoding", "base64", "utf-8", "unicode", "ascii", "encryption", "data-representation"]
+featured: true
+order: 12
+sources:
+  - title: "RFC 4648 - The Base16, Base32, and Base64 Data Encodings"
+    url: "https://datatracker.ietf.org/doc/html/rfc4648"
+  - title: "The Unicode Standard"
+    url: "https://www.unicode.org/standard/standard.html"
+  - title: "W3C - Character encodings for beginners"
+    url: "https://www.w3.org/International/questions/qa-what-is-encoding"
+  - title: "MDN Web Docs - Base64"
+    url: "https://developer.mozilla.org/en-US/docs/Glossary/Base64"
+---
+
+# Mã Hóa Dữ Liệu: Base64, UTF-8 và Cách Máy Tính Biểu Diễn Thông Tin
+
+Bạn đã bao giờ tự hỏi tại sao khi mở một file ảnh bằng trình soạn thảo văn bản, bạn thấy toàn ký tự lạ? Hay tại sao một chuỗi Base64 luôn dài hơn chuỗi gốc khoảng 33%? Câu trả lời nằm ở cách máy tính **mã hóa** (encoding) thông tin — chuyển đổi dữ liệu từ dạng này sang dạng khác để lưu trữ và truyền tải.
+
+## Encoding vs Encryption — Phân Biệt Rõ Ràng
+
+Trước khi đi sâu, hãy phân biệt ba khái niệm thường bị nhầm lẫn:
+
+<ComparisonTable headers={["Đặc điểm", "Encoding (Mã hóa)", "Encryption (Mã hóa mật)", "Hashing (Băm)"]} rows={[
+    ["Mục đích", "Biểu diễn dữ liệu ở dạng khác", "Bảo vệ tính bí mật", "Xác minh tính toàn vẹn"],
+    ["Có khóa bí mật?", "Không", "Có", "Không"],
+    ["Đảo ngược được?", "Có, ai cũng làm được", "Có, nhưng cần khóa", "Không (một chiều)"],
+    ["Ví dụ", "Base64, UTF-8, URL encoding", "AES, RSA, ChaCha20", "SHA-256, bcrypt, MD5"],
+    ["An toàn?", "KHÔNG bảo mật", "Bảo mật nếu dùng đúng", "Không thể giải mã ngược"]
+]} />
+
+<Callout type="warning">Base64 KHÔNG phải là mã hóa mật (encryption). Bất kỳ ai cũng có thể decode Base64 mà không cần khóa. Tuyệt đối không sử dụng Base64 để "bảo vệ" mật khẩu, token, hay dữ liệu nhạy cảm.</Callout>
+
+## ASCII — Bảng Mã Khởi Nguyên
+
+**ASCII** (American Standard Code for Information Interchange) ra đời năm 1963, sử dụng **7 bit** để biểu diễn 128 ký tự: chữ cái A-Z, a-z, số 0-9, dấu câu và các ký tự điều khiển.
+
+```
+Ký tự → Giá trị ASCII (thập phân) → Nhị phân (7-bit)
+  'A'  →  65                       → 1000001
+  'a'  →  97                       → 1100001
+  '0'  →  48                       → 0110000
+  ' '  →  32                       → 0100000
+```
+
+Vấn đề: 128 ký tự chỉ đủ cho tiếng Anh. Không có chỗ cho tiếng Việt (ă, ơ, ư), tiếng Nhật, tiếng Trung hay hàng nghìn ngôn ngữ khác. Đây là lý do **Unicode** ra đời.
+
+## Unicode và UTF-8 — Mọi Ngôn Ngữ, Một Tiêu Chuẩn
+
+**Unicode** là một tiêu chuẩn gán cho mỗi ký tự trong mọi ngôn ngữ một mã số duy nhất gọi là **code point**. Ví dụ: `U+0041` = A, `U+00E0` = à, `U+1F600` = 😀.
+
+Nhưng Unicode chỉ là bảng ánh xạ. Còn cách lưu các code point thành bytes trong bộ nhớ thì sao? Đó là vai trò của **UTF-8**.
+
+### UTF-8: Mã Hóa Độ Dài Thay Đổi
+
+UTF-8 là cách encoding phổ biến nhất trên internet (chiếm hơn 98% trang web). Nó sử dụng từ **1 đến 4 bytes** cho mỗi ký tự.
+
+<Diagram chart="graph TD
+    A[Ký tự Unicode] --> B{Code point range?}
+    B -->|U+0000 đến U+007F| C[1 byte: 0xxxxxxx]
+    B -->|U+0080 đến U+07FF| D[2 bytes: 110xxxxx 10xxxxxx]
+    B -->|U+0800 đến U+FFFF| E[3 bytes: 1110xxxx 10xxxxxx 10xxxxxx]
+    B -->|U+10000 đến U+10FFFF| F[4 bytes: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx]" />
+
+Điểm thiên tài của UTF-8: các ký tự ASCII (tiếng Anh, số, dấu câu) vẫn chỉ dùng 1 byte, hoàn toàn tương thích ngược với ASCII. Ký tự tiếng Việt có dấu dùng 2-3 bytes, emoji dùng 4 bytes.
+
+```python
+# Ký tự tiếng Việt trong UTF-8
+text = "Việt Nam"
+encoded = text.encode('utf-8')
+print(encoded)        # b'Vi\xc3\xaat Nam'
+print(len(text))      # 8 ký tự
+print(len(encoded))   # 10 bytes (chữ "ệ" chiếm 3 bytes)
+```
+
+<ComparisonTable headers={["Encoding", "Bytes/ký tự", "Tương thích ASCII", "Sử dụng chính"]} rows={[
+    ["ASCII", "1 byte", "Chính nó", "Hệ thống cũ, giao thức cơ bản"],
+    ["UTF-8", "1-4 bytes", "Có", "Web, Linux, JSON, hầu hết mọi nơi"],
+    ["UTF-16", "2 hoặc 4 bytes", "Không", "Windows nội bộ, Java, JavaScript"],
+    ["UTF-32", "4 bytes cố định", "Không", "Hiếm dùng, xử lý nội bộ"]
+]} />
+
+## Base64 — Biến Nhị Phân Thành Văn Bản
+
+### Tại Sao Cần Base64?
+
+Nhiều giao thức (email SMTP, JSON, XML, URL) chỉ hỗ trợ văn bản ASCII. Khi bạn cần truyền dữ liệu nhị phân (ảnh, file, byte tùy ý) qua các kênh này, bạn cần chuyển đổi nó thành chuỗi ký tự an toàn. Đó chính là việc Base64 làm.
+
+### Cơ Chế Hoạt Động Từng Bước
+
+Base64 sử dụng bảng 64 ký tự: `A-Z` (0-25), `a-z` (26-51), `0-9` (52-61), `+` (62), `/` (63). Ký tự `=` dùng để padding.
+
+Hãy encode chuỗi **"Hello"** step-by-step:
+
+**Bước 1**: Chuyển mỗi ký tự thành giá trị ASCII (8-bit):
+
+```
+H = 01001000
+e = 01100101
+l = 01101100
+l = 01101100
+o = 01101111
+```
+
+**Bước 2**: Ghép tất cả thành chuỗi bit liên tục:
+
+```
+01001000 01100101 01101100 01101100 01101111
+```
+
+**Bước 3**: Chia thành nhóm **6 bit** (thay vì 8 bit):
+
+```
+010010 | 000110 | 010101 | 101100 | 011011 | 000110 | 1111
+```
+
+Nhóm cuối chỉ có 4 bit → thêm 2 bit `0` phía sau: `111100`
+
+**Bước 4**: Chuyển mỗi nhóm 6 bit thành ký tự Base64:
+
+```
+010010 = 18 → S
+000110 = 6  → G
+010101 = 21 → V
+101100 = 44 → s
+011011 = 27 → b
+000110 = 6  → G
+111100 = 60 → 8
+```
+
+**Bước 5**: Thêm `=` padding (vì 5 bytes gốc = 40 bit, chia 6 = 6 nhóm dư 4 bit → cần 1 padding `=`):
+
+Kết quả: **`SGVsbG8=`**
+
+<Diagram chart="graph LR
+    A[Hello] -->|ASCII bytes| B[72 101 108 108 111]
+    B -->|Ghép bit liên tục| C[0100100001100101...]
+    C -->|Chia nhóm 6 bit| D[010010 000110 ...]
+    D -->|Tra bảng Base64| E[SGVsbG8=]" />
+
+### Xác Minh Bằng Code
+
+```javascript
+// JavaScript
+const encoded = btoa('Hello');
+console.log(encoded);           // "SGVsbG8="
+console.log(atob('SGVsbG8=')); // "Hello"
+
+// Node.js - hỗ trợ UTF-8
+const buf = Buffer.from('Xin chào', 'utf-8');
+const base64 = buf.toString('base64');
+console.log(base64); // "WGluIGNow6Bv"
+console.log(Buffer.from(base64, 'base64').toString('utf-8')); // "Xin chào"
+```
+
+```python
+import base64
+
+# Python encode/decode
+encoded = base64.b64encode(b'Hello')
+print(encoded)  # b'SGVsbG8='
+
+decoded = base64.b64decode(b'SGVsbG8=')
+print(decoded)  # b'Hello'
+
+# Encode file ảnh thành Base64
+with open('photo.jpg', 'rb') as f:
+    img_base64 = base64.b64encode(f.read()).decode('ascii')
+    # Dùng trong HTML: <img src="data:image/jpeg;base64,{img_base64}">
+```
+
+<Callout type="info">Base64 tăng kích thước dữ liệu khoảng 33% vì mỗi 3 bytes gốc (24 bit) được biểu diễn bằng 4 ký tự Base64 (mỗi ký tự mang 6 bit thông tin). Tỷ lệ: 4/3 ≈ 1.33.</Callout>
+
+## Base64 Trong Thực Tế
+
+### Data URIs
+
+Nhúng ảnh trực tiếp vào HTML/CSS mà không cần file riêng:
+
+```html
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUg..." />
+```
+
+### Email (MIME)
+
+Email gốc chỉ hỗ trợ ASCII 7-bit. Base64 cho phép gửi file đính kèm (ảnh, PDF) qua email bằng cách encode chúng thành text.
+
+### JWT (JSON Web Token)
+
+JWT gồm 3 phần, mỗi phần được encode bằng **Base64URL** (biến thể dùng `-` và `_` thay cho `+` và `/` để an toàn trong URL):
+
+```
+header.payload.signature
+eyJhbGciOi...  ← Base64URL encoded JSON
+```
+
+## Hex Encoding và URL Encoding
+
+**Hex encoding** biểu diễn mỗi byte bằng 2 ký tự hex (0-9, A-F). Tăng kích thước gấp đôi nhưng dễ đọc cho con người.
+
+```python
+data = b'Hello'
+print(data.hex())  # '48656c6c6f'
+print(bytes.fromhex('48656c6c6f'))  # b'Hello'
+```
+
+**URL encoding** (Percent encoding) thay thế các ký tự đặc biệt bằng `%XX` (XX là mã hex):
+
+```
+"Xin chào thế giới" → "Xin%20ch%C3%A0o%20th%E1%BA%BF%20gi%E1%BB%9Bi"
+```
+
+## Kết Luận
+
+Encoding là nền tảng giúp máy tính lưu trữ và truyền tải mọi loại thông tin. ASCII mở đường cho kỷ nguyên số, Unicode thống nhất mọi ngôn ngữ, UTF-8 mang lại sự cân bằng hoàn hảo giữa hiệu quả và tương thích, còn Base64 là cây cầu nối giữa thế giới nhị phân và văn bản. Hiểu rõ các cơ chế này không chỉ giúp bạn debug hiệu quả hơn mà còn là nền tảng để hiểu sâu về bảo mật, mạng, và cách internet thực sự hoạt động.

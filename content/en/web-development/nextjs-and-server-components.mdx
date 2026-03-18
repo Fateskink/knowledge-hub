@@ -1,0 +1,313 @@
+---
+title: "Next.js and Server Components"
+description: "Learn about Next.js App Router, Server vs Client Components, and rendering strategies SSR/SSG/ISR in modern web development."
+category: "web-development"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 13
+tags: ["nextjs", "react", "server-components", "ssr", "ssg", "app-router", "web-development"]
+featured: false
+order: 4
+sources:
+  - title: "Next.js Official Documentation"
+    url: "https://nextjs.org/docs"
+  - title: "React Server Components RFC"
+    url: "https://react.dev/blog/2023/03/22/react-labs-what-we-have-been-working-on-march-2023"
+  - title: "Vercel - Next.js Learn"
+    url: "https://nextjs.org/learn"
+  - title: "Next.js App Router Documentation"
+    url: "https://nextjs.org/docs/app"
+---
+
+# Next.js and Server Components
+
+Next.js is the most popular React framework for building modern web applications. With the introduction of the App Router and React Server Components, the way we build web applications has fundamentally changed. This article will help you understand these important concepts.
+
+## What is Next.js?
+
+Next.js is a React framework that provides many features that plain React does not offer:
+
+- **Server-Side Rendering (SSR)**: Render pages on the server
+- **Static Site Generation (SSG)**: Generate static pages at build time
+- **File-based Routing**: Routing based on directory structure
+- **API Routes**: Create backend APIs within your project
+- **Image Optimization**: Automatic image optimization
+- **Built-in CSS Support**: Support for CSS Modules, Tailwind CSS
+
+<Callout type="info">Next.js solves many complex problems you would face when using plain React, such as routing, code splitting, SEO, and performance optimization. It is the top choice for production React applications.</Callout>
+
+## App Router vs Pages Router
+
+Next.js 13+ introduced the App Router, an entirely new approach compared to the traditional Pages Router.
+
+<ComparisonTable headers={["Feature", "Pages Router (legacy)", "App Router (new)"]} rows={[["Directory", "pages/", "app/"], ["Routing", "File-based in pages/", "Folder-based in app/"], ["Layouts", "Custom, manual", "Nested layouts automatic"], ["Data Fetching", "getServerSideProps, getStaticProps", "async Server Components, fetch()"], ["Loading UI", "Manual implementation", "loading.js automatic"], ["Error Handling", "Custom error pages", "error.js automatic"], ["Server Components", "Not supported", "Default"], ["Streaming", "Limited", "Full support"]]} />
+
+### App Router Directory Structure
+
+```
+app/
+├── layout.js          # Root layout (required)
+├── page.js            # Home page (/)
+├── loading.js         # Loading UI for home page
+├── error.js           # Error UI for home page
+├── globals.css
+├── about/
+│   └── page.js        # /about
+├── blog/
+│   ├── layout.js      # Blog-specific layout
+│   ├── page.js        # /blog
+│   └── [slug]/
+│       ├── page.js    # /blog/my-first-post (dynamic route)
+│       └── loading.js
+├── api/
+│   └── users/
+│       └── route.js   # API endpoint: /api/users
+└── (auth)/             # Route group (does not affect URL)
+    ├── login/
+    │   └── page.js    # /login
+    └── register/
+        └── page.js    # /register
+```
+
+## Server Components vs Client Components
+
+This is the most important distinction in the Next.js App Router.
+
+<Diagram chart="graph TD\n    A[Next.js App] --> B{Component Type}\n    B --> C[Server Component]\n    B --> D[Client Component]\n    C --> C1[Renders on Server]\n    C1 --> C2[No JS sent to client]\n    C2 --> C3[Direct DB/API access]\n    D --> D1[Renders on Client]\n    D1 --> D2[JS sent to browser]\n    D2 --> D3[Handles user interaction]\n    C3 --> E[HTML sent to browser]\n    D3 --> E" />
+
+### Server Components (Default)
+
+All components in the App Router are Server Components by default. They run on the server and send no JavaScript to the client.
+
+```jsx
+// app/blog/page.js - This is a Server Component (default)
+// Can access the database directly, no API needed
+
+import { getPosts } from "@/lib/database";
+
+export default async function BlogPage() {
+  // Query database directly - runs only on the server
+  const posts = await getPosts();
+
+  return (
+    <div>
+      <h1>My Blog</h1>
+      <div className="grid">
+        {posts.map(post => (
+          <article key={post.id} className="card">
+            <h2>{post.title}</h2>
+            <p>{post.excerpt}</p>
+            <time>{post.createdAt}</time>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// You can use async/await directly
+// No JavaScript for this part is sent to the client
+// Safe to use secrets and API keys
+```
+
+### Client Components
+
+When you need user interaction (events, state, effects), you must use Client Components by adding `"use client"` at the top of the file.
+
+```jsx
+"use client";
+// app/components/SearchBar.js - Client Component
+
+import { useState, useEffect } from "react";
+
+export default function SearchBar({ onSearch }) {
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+
+  useEffect(() => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/search?q=${query}`);
+      const data = await res.json();
+      setSuggestions(data.results);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  return (
+    <div className="search-bar">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search posts..."
+      />
+      {suggestions.length > 0 && (
+        <ul className="suggestions">
+          {suggestions.map(item => (
+            <li key={item.id} onClick={() => onSearch(item)}>
+              {item.title}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+```
+
+<Callout type="tip">Rule of thumb for choosing Server vs Client Components: Use Server Components by default. Only switch to Client Components when you need: useState, useEffect, onClick, onChange, or any browser API (localStorage, window, document).</Callout>
+
+### Combining Server and Client Components
+
+```jsx
+// app/blog/page.js - Server Component
+import SearchBar from "@/components/SearchBar"; // Client
+import BlogList from "@/components/BlogList";     // Server
+
+export default async function BlogPage() {
+  const posts = await fetchPosts(); // Runs on server
+
+  return (
+    <div>
+      <h1>Blog</h1>
+      {/* Client component for interactivity */}
+      <SearchBar />
+      {/* Server component for static content */}
+      <BlogList posts={posts} />
+    </div>
+  );
+}
+```
+
+## Rendering Strategies
+
+Next.js provides several rendering strategies, each suited for different use cases.
+
+<Diagram chart="graph LR\n    A[Request] --> B{Strategy}\n    B --> C[SSG - Static]\n    B --> D[SSR - Server]\n    B --> E[ISR - Hybrid]\n    C --> C1[Build time]\n    C1 --> C2[Static HTML]\n    C2 --> C3[CDN cached]\n    D --> D1[Every request]\n    D1 --> D2[Fresh HTML]\n    D2 --> D3[Always current]\n    E --> E1[Build time + Revalidate]\n    E1 --> E2[Static HTML]\n    E2 --> E3[Auto-updates]" />
+
+### Static Site Generation (SSG)
+
+Pages are generated at build time. Best for content that rarely changes.
+
+```jsx
+// Default in App Router - automatically SSG if no dynamic data
+export default function AboutPage() {
+  return (
+    <div>
+      <h1>About Us</h1>
+      <p>This page is statically generated at build time.</p>
+    </div>
+  );
+}
+```
+
+### Server-Side Rendering (SSR)
+
+Pages are rendered fresh for every request. Best for personalized content or frequently changing data.
+
+```jsx
+// Force SSR by using dynamic data
+export default async function DashboardPage() {
+  // cookies() or headers() makes the page dynamic (SSR)
+  const res = await fetch("https://api.example.com/dashboard", {
+    cache: "no-store", // No caching - always fetch fresh
+  });
+  const data = await res.json();
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Last updated: {data.lastUpdated}</p>
+    </div>
+  );
+}
+```
+
+### Incremental Static Regeneration (ISR)
+
+Combines the best of SSG and SSR: static pages that automatically update on a schedule.
+
+```jsx
+// ISR - revalidate every 60 seconds
+export default async function ProductsPage() {
+  const res = await fetch("https://api.example.com/products", {
+    next: { revalidate: 60 }, // Update every 60 seconds
+  });
+  const products = await res.json();
+
+  return (
+    <div>
+      <h1>Products</h1>
+      {products.map(product => (
+        <div key={product.id}>
+          <h3>{product.name}</h3>
+          <p>${product.price.toFixed(2)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+<Callout type="warning">Choosing the right rendering strategy is critical for performance. SSG is the fastest but not suitable for frequently changing data. SSR is the most flexible but slower. ISR is a good balanced solution for many use cases.</Callout>
+
+## Layouts and Loading States
+
+The App Router lets you create nested layouts and automatic loading UI.
+
+```jsx
+// app/layout.js - Root Layout
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <header>
+          <nav>Logo | Menu</nav>
+        </header>
+        <main>{children}</main>
+        <footer>Copyright 2026</footer>
+      </body>
+    </html>
+  );
+}
+
+// app/blog/layout.js - Blog Layout (nested)
+export default function BlogLayout({ children }) {
+  return (
+    <div className="blog-layout">
+      <aside className="sidebar">
+        <h3>Categories</h3>
+        <ul>
+          <li>React</li>
+          <li>Next.js</li>
+          <li>CSS</li>
+        </ul>
+      </aside>
+      <div className="content">{children}</div>
+    </div>
+  );
+}
+
+// app/blog/loading.js - Shown while loading
+export default function Loading() {
+  return (
+    <div className="skeleton">
+      <div className="skeleton-title" />
+      <div className="skeleton-text" />
+      <div className="skeleton-text" />
+    </div>
+  );
+}
+```
+
+## Conclusion
+
+Next.js with the App Router and Server Components represents the future of web development with React. Understanding the difference between Server and Client Components, along with the various rendering strategies, will help you build fast, secure, and SEO-friendly web applications.
+
+Your next step is to create a Next.js project and practice with the App Router. Start with a simple blog or portfolio, then gradually apply advanced features like ISR, middleware, and API routes.

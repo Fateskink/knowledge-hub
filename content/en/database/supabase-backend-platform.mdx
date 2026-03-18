@@ -1,0 +1,330 @@
+---
+title: "Supabase - Backend Platform"
+description: "Learn about Supabase, the open-source backend platform built on PostgreSQL, providing Authentication, Storage, Realtime subscriptions, and more."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["supabase", "postgresql", "backend", "baas", "firebase", "realtime", "authentication"]
+featured: true
+order: 2
+sources:
+  - title: "Supabase Official Documentation"
+    url: "https://supabase.com/docs"
+  - title: "Supabase GitHub Repository"
+    url: "https://github.com/supabase/supabase"
+  - title: "Firebase Official Documentation"
+    url: "https://firebase.google.com/docs"
+  - title: "PostgreSQL Documentation"
+    url: "https://www.postgresql.org/docs/"
+---
+
+# Supabase - Backend Platform
+
+Supabase is an open-source Backend-as-a-Service (BaaS) platform, widely considered the open-source alternative to Firebase, built on top of PostgreSQL. Instead of building a backend from scratch, Supabase provides a ready-made database, authentication, storage, realtime subscriptions, and edge functions.
+
+## What is Supabase?
+
+Supabase combines multiple open-source tools into a unified platform:
+
+<Diagram chart="graph TD\n    A[Supabase Platform] --> B[PostgreSQL Database]\n    A --> C[GoTrue - Authentication]\n    A --> D[Storage - File Management]\n    A --> E[Realtime - WebSocket]\n    A --> F[Edge Functions - Deno]\n    A --> G[PostgREST - Auto API]\n    B --> H[Row Level Security]\n    G --> I[Auto-generated REST API]\n    E --> J[Database Changes]\n    E --> K[Broadcast]\n    E --> L[Presence]" />
+
+### Core Components
+
+- **PostgreSQL**: A powerful, full-featured relational database
+- **PostgREST**: Automatically generates a REST API from your database schema
+- **GoTrue**: Authentication system supporting email, OAuth, and magic links
+- **Realtime**: Listen to database changes via WebSocket
+- **Storage**: Store and manage files (images, videos, documents)
+- **Edge Functions**: Serverless functions running on Deno
+
+<Callout type="info">Supabase is 100% open source. You can self-host it on your own server or use Supabase's cloud service. This is a major differentiator from Firebase -- you are not locked into a single vendor.</Callout>
+
+## Getting Started with Supabase
+
+### Installation and Connection
+
+```bash
+# Install Supabase client for JavaScript/TypeScript
+npm install @supabase/supabase-js
+```
+
+```typescript
+// Initialize Supabase client
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = 'https://your-project.supabase.co';
+const supabaseAnonKey = 'your-anon-key';
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+```
+
+### CRUD Operations
+
+```typescript
+// Insert new data
+const { data, error } = await supabase
+  .from('posts')
+  .insert({
+    title: 'My First Post',
+    content: 'Post content goes here...',
+    author_id: user.id,
+    published: true
+  })
+  .select();
+
+// Read data with filters and sorting
+const { data: posts } = await supabase
+  .from('posts')
+  .select(`
+    id,
+    title,
+    content,
+    created_at,
+    author:users(name, avatar_url)
+  `)
+  .eq('published', true)
+  .order('created_at', { ascending: false })
+  .limit(10);
+
+// Update data
+const { data: updated } = await supabase
+  .from('posts')
+  .update({ title: 'Updated Title' })
+  .eq('id', postId)
+  .select();
+
+// Delete data
+const { error: deleteError } = await supabase
+  .from('posts')
+  .delete()
+  .eq('id', postId);
+```
+
+<Callout type="tip">Supabase automatically generates a REST API from your database structure. Any table you create in PostgreSQL is instantly accessible via the API without writing any backend code.</Callout>
+
+## Authentication
+
+Supabase provides a complete authentication system with multiple methods:
+
+```typescript
+// Sign up with email
+const { data, error } = await supabase.auth.signUp({
+  email: 'user@example.com',
+  password: 'secure-password-123'
+});
+
+// Sign in with email
+const { data, error } = await supabase.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'secure-password-123'
+});
+
+// Sign in with Google OAuth
+const { data, error } = await supabase.auth.signInWithOAuth({
+  provider: 'google',
+  options: {
+    redirectTo: 'https://myapp.com/callback'
+  }
+});
+
+// Sign in with Magic Link (passwordless)
+const { data, error } = await supabase.auth.signInWithOtp({
+  email: 'user@example.com'
+});
+
+// Listen to auth state changes
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Auth event:', event);
+  console.log('Session:', session);
+});
+
+// Sign out
+await supabase.auth.signOut();
+```
+
+## Realtime Subscriptions
+
+One of Supabase's most powerful features is the ability to listen to data changes in real time:
+
+```typescript
+// Listen to changes on the messages table
+const channel = supabase
+  .channel('messages-channel')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',        // INSERT, UPDATE, DELETE
+      schema: 'public',
+      table: 'messages',
+      filter: 'room_id=eq.123'
+    },
+    (payload) => {
+      console.log('Change:', payload.eventType);
+      console.log('New data:', payload.new);
+      console.log('Old data:', payload.old);
+    }
+  )
+  .subscribe();
+
+// Presence -- track online users
+const presenceChannel = supabase.channel('room-1');
+
+presenceChannel
+  .on('presence', { event: 'sync' }, () => {
+    const state = presenceChannel.presenceState();
+    console.log('Online users:', state);
+  })
+  .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+    console.log('New user joined:', newPresences);
+  })
+  .subscribe(async (status) => {
+    if (status === 'SUBSCRIBED') {
+      await presenceChannel.track({
+        user_id: user.id,
+        username: user.name,
+        online_at: new Date().toISOString()
+      });
+    }
+  });
+```
+
+<Diagram chart="graph LR\n    A[Client A] -->|Subscribe| B[Supabase Realtime]\n    C[Client B] -->|Insert data| D[PostgreSQL]\n    D -->|Change event| B\n    B -->|Broadcast| A\n    B -->|Broadcast| E[Client C]" />
+
+## Row Level Security (RLS)
+
+Supabase uses PostgreSQL's Row Level Security to secure data at the row level:
+
+```sql
+-- Enable RLS on the posts table
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+
+-- Allow anyone to read published posts
+CREATE POLICY "Anyone can read published posts"
+  ON posts FOR SELECT
+  USING (published = true);
+
+-- Allow authors to update their own posts
+CREATE POLICY "Authors can update own posts"
+  ON posts FOR UPDATE
+  USING (auth.uid() = author_id)
+  WITH CHECK (auth.uid() = author_id);
+
+-- Allow authenticated users to create posts
+CREATE POLICY "Authenticated users can create posts"
+  ON posts FOR INSERT
+  WITH CHECK (auth.uid() = author_id);
+
+-- Allow authors to delete their own posts
+CREATE POLICY "Authors can delete own posts"
+  ON posts FOR DELETE
+  USING (auth.uid() = author_id);
+```
+
+<Callout type="warning">Always enable Row Level Security for every table containing sensitive data. Without RLS, anyone with the anon key can read and write data through the API.</Callout>
+
+## Storage
+
+```typescript
+// Upload a file
+const { data, error } = await supabase.storage
+  .from('avatars')
+  .upload(`public/${userId}/avatar.png`, file, {
+    cacheControl: '3600',
+    upsert: true
+  });
+
+// Get public URL
+const { data: urlData } = supabase.storage
+  .from('avatars')
+  .getPublicUrl(`public/${userId}/avatar.png`);
+
+// Create a signed URL with expiration
+const { data: signedUrl } = await supabase.storage
+  .from('private-docs')
+  .createSignedUrl('report.pdf', 3600); // 1 hour
+```
+
+## Supabase vs Firebase
+
+<ComparisonTable
+  headers={["Criteria", "Supabase", "Firebase"]}
+  rows={[
+    ["Database", "PostgreSQL (Relational)", "Firestore (NoSQL Document)"],
+    ["Open Source", "Yes, 100% open source", "No, Google proprietary"],
+    ["Self-hosting", "Supported", "Not supported"],
+    ["Queries", "Full SQL + REST API", "Document queries, limited"],
+    ["Realtime", "PostgreSQL changes + Broadcast", "Firestore listeners"],
+    ["Auth", "GoTrue (email, OAuth, SSO)", "Firebase Auth (similar)"],
+    ["Storage", "S3-compatible", "Google Cloud Storage"],
+    ["Pricing", "Generous free tier, predictable", "Free tier, can spike unexpectedly"],
+    ["Vendor lock-in", "Low (can self-host)", "High (depends on Google)"]
+  ]}
+/>
+
+<Callout type="tip">If you are comfortable with SQL and want better control over your data, Supabase is an excellent choice. If you need a rich ecosystem with ML Kit, Analytics, and Crashlytics built in, Firebase still has the edge.</Callout>
+
+## Example: Simple Realtime Chat
+
+```typescript
+// React component for realtime chat with Supabase
+import { useEffect, useState } from 'react';
+import { supabase } from './supabaseClient';
+
+function ChatRoom({ roomId }: { roomId: string }) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+
+  useEffect(() => {
+    // Load existing messages
+    const loadMessages = async () => {
+      const { data } = await supabase
+        .from('messages')
+        .select('*, user:users(name)')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true });
+      setMessages(data || []);
+    };
+    loadMessages();
+
+    // Listen for new messages
+    const channel = supabase
+      .channel(`room-${roomId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `room_id=eq.${roomId}`
+      }, (payload) => {
+        setMessages(prev => [...prev, payload.new]);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [roomId]);
+
+  const sendMessage = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('messages').insert({
+      room_id: roomId,
+      user_id: user?.id,
+      content: newMessage
+    });
+    setNewMessage('');
+  };
+
+  return (
+    <div>
+      {messages.map(msg => (
+        <div key={msg.id}>{msg.content}</div>
+      ))}
+      <input value={newMessage} onChange={e => setNewMessage(e.target.value)} />
+      <button onClick={sendMessage}>Send</button>
+    </div>
+  );
+}
+```
+
+## Conclusion
+
+Supabase offers the perfect combination of PostgreSQL's power and the convenience of a BaaS platform. With self-hosting support, open-source codebase, and a growing community, Supabase is becoming a top choice for projects ranging from startups to enterprise applications.

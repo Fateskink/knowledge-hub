@@ -1,0 +1,121 @@
+---
+title: "RAM and Memory: The Hierarchy That Makes Computers Fast"
+description: "Understand how RAM works at the cell level, the differences between DRAM and SRAM, the memory hierarchy from registers to hard drives, DDR4 vs DDR5, and how virtual memory extends physical RAM."
+category: "hardware"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 8
+tags: ["ram", "memory", "dram", "sram", "ddr5", "virtual-memory", "cache", "memory-hierarchy"]
+featured: false
+order: 4
+sources:
+  - title: "How Does Computer Memory Work? — TED-Ed"
+    url: "https://www.youtube.com/watch?v=p3q5zWCw8J4"
+  - title: "DRAM vs SRAM — Difference and Comparison"
+    url: "https://www.digikey.com/en/articles/understanding-the-differences-between-sram-and-dram"
+  - title: "DDR5 vs DDR4 — Crucial"
+    url: "https://www.crucial.com/articles/about-memory/ddr4-vs-ddr5"
+  - title: "Virtual Memory — MIT OpenCourseWare"
+    url: "https://ocw.mit.edu/courses/6-004-computation-structures-spring-2017/"
+---
+
+# RAM and Memory: The Hierarchy That Makes Computers Fast
+
+When people talk about a computer's memory, they usually mean RAM — that number on the spec sheet that says 8 GB, 16 GB, or 32 GB. But memory in a computer is far more nuanced than a single number. It is a carefully designed hierarchy of storage layers, each trading off speed, size, and cost to keep the CPU fed with data as efficiently as possible.
+
+<Callout type="info">
+If the CPU is the brain of the computer, memory is its short-term and long-term recall. Registers are what you are actively thinking about right now. Cache is what you can recall instantly. RAM is your desk with papers spread out. Storage is the filing cabinet across the room.
+</Callout>
+
+## How RAM Works: DRAM at the Cell Level
+
+RAM stands for Random Access Memory, meaning any byte of memory can be accessed in roughly the same amount of time regardless of its physical location. The most common type of RAM in computers is DRAM (Dynamic Random Access Memory).
+
+A single DRAM cell stores one bit of data using just two components:
+
+1. **A capacitor** that stores electrical charge (charged = 1, discharged = 0).
+2. **A transistor** that acts as a gate, controlling access to the capacitor.
+
+<Diagram chart="graph TD\n    WL[Word Line - Row Select] --> T[Transistor - Access Gate]\n    T --> C[Capacitor - Stores Charge]\n    T --> BL[Bit Line - Data In/Out]\n    C --> GND[Ground]" />
+
+When the CPU wants to read a bit, the word line activates the transistor, allowing the charge from the capacitor to flow onto the bit line. A sense amplifier detects whether the charge is above or below a threshold — determining if the bit is 1 or 0.
+
+### Why DRAM Is "Dynamic"
+
+The "dynamic" in DRAM refers to a critical limitation: capacitors leak charge over time. A DRAM cell loses its data within milliseconds if not refreshed. The memory controller must periodically re-read and rewrite every cell thousands of times per second — a process called refreshing. This constant refreshing consumes power and briefly blocks access to memory.
+
+<Callout type="warning">
+DRAM refresh is not just a technical detail — it has real performance implications. During a refresh cycle, the affected rows of memory are unavailable. Modern DDR5 modules mitigate this with "same bank refresh," which refreshes one bank while other banks remain accessible.
+</Callout>
+
+## DRAM vs. SRAM
+
+SRAM (Static Random Access Memory) takes a completely different approach. Instead of a capacitor, each SRAM cell uses a circuit of six transistors arranged as a pair of cross-coupled inverters. This design holds its state as long as power is applied — no refreshing needed.
+
+<ComparisonTable headers={["Feature", "DRAM", "SRAM"]} rows={[["Cell Structure", "1 transistor + 1 capacitor per bit", "6 transistors per bit"], ["Speed", "Slower (60-100 ns access)", "Faster (1-10 ns access)"], ["Density", "Very high — small cells pack tightly", "Lower — 6 transistors per cell take more space"], ["Power (Active)", "Lower per bit", "Higher per bit"], ["Refresh Needed", "Yes — capacitors leak charge", "No — maintains state while powered"], ["Cost", "Low — cheap to manufacture at scale", "High — more transistors per bit"], ["Primary Use", "Main memory (RAM sticks)", "CPU cache (L1, L2, L3)"], ["Volatility", "Volatile — loses data without power", "Volatile — loses data without power"]]} />
+
+<Callout type="tip">
+Your computer uses both DRAM and SRAM simultaneously. The RAM sticks you see plugged into the motherboard are DRAM. The cache memory inside the CPU is SRAM. Each type is used where its strengths matter most.
+</Callout>
+
+## The Memory Hierarchy
+
+Computers use a tiered system of memory, balancing speed, size, and cost at each level. The fundamental principle: smaller and faster memory sits closer to the CPU, while larger and slower storage sits further away.
+
+<Diagram chart="graph TD\n    R[Registers\nSpeed: ~0.3 ns | Size: ~1 KB\nCost: Highest] --> L1[L1 Cache\nSpeed: ~1 ns | Size: 64-128 KB\nSRAM]\n    L1 --> L2[L2 Cache\nSpeed: ~3-5 ns | Size: 256 KB-1 MB\nSRAM]\n    L2 --> L3[L3 Cache\nSpeed: ~10-20 ns | Size: 8-64 MB\nSRAM]\n    L3 --> RAM[Main Memory - RAM\nSpeed: ~50-100 ns | Size: 8-128 GB\nDRAM]\n    RAM --> SSD[SSD Storage\nSpeed: ~25-100 us | Size: 256 GB-8 TB\nNAND Flash]\n    SSD --> HDD[HDD Storage\nSpeed: ~5-10 ms | Size: 1-20 TB\nMagnetic Disks]" />
+
+Each level of the hierarchy is typically 10-1000 times slower than the level above it, but also 10-1000 times larger. The system works because of **locality of reference** — programs tend to access the same data and nearby data repeatedly:
+
+- **Temporal locality:** If you accessed a piece of data recently, you are likely to access it again soon.
+- **Spatial locality:** If you accessed a memory address, you are likely to access nearby addresses next.
+
+Cache algorithms exploit these patterns by automatically copying frequently and recently accessed data to faster storage levels.
+
+## DDR4 vs. DDR5: The Latest Generation
+
+DDR (Double Data Rate) SDRAM is the standard for main memory in modern computers. DDR5, which began shipping in 2021, represents a significant improvement over DDR4.
+
+<ComparisonTable headers={["Specification", "DDR4", "DDR5"]} rows={[["Data Rate", "2133-3200 MT/s (base)", "4800-6400 MT/s (base)"], ["Maximum Speed (OC)", "~5000 MT/s", "~8400+ MT/s"], ["Voltage", "1.2V", "1.1V"], ["Module Capacity", "Up to 64 GB per DIMM", "Up to 256 GB per DIMM"], ["Channels per DIMM", "1 x 64-bit", "2 x 32-bit (dual sub-channels)"], ["Bank Groups", "4", "8"], ["Burst Length", "8", "16"], ["On-Die ECC", "No", "Yes"], ["Power Management", "On motherboard", "On-DIMM PMIC"]]} />
+
+DDR5's dual sub-channel architecture is particularly noteworthy. Instead of a single 64-bit channel, each DDR5 DIMM has two independent 32-bit channels. This doubles the number of simultaneous memory operations, improving efficiency even if the raw bandwidth per channel is the same.
+
+<Callout type="info">
+DDR5's on-die ECC (Error Correcting Code) corrects single-bit errors within the memory chip before data reaches the memory controller. This is separate from system-level ECC (which requires ECC DIMMs and a compatible platform) but improves baseline reliability for all users.
+</Callout>
+
+## Virtual Memory: When RAM Is Not Enough
+
+What happens when your applications need more memory than your physical RAM can provide? The operating system uses virtual memory — a technique that treats part of your storage drive as an extension of RAM.
+
+<Diagram chart="graph LR\n    APP[Application sees\nVirtual Address Space\ne.g. 0x0000 to 0xFFFF] --> MMU[MMU\nMemory Management Unit]\n    MMU --> PT[Page Table\nMaps virtual addresses\nto physical locations]\n    PT --> RAM[Physical RAM\nFrequently used pages]\n    PT --> SWAP[Swap Space on SSD/HDD\nInfrequently used pages]" />
+
+### How Virtual Memory Works
+
+1. **Address Space:** Each process gets its own virtual address space — a continuous range of addresses that appears to be a large, private block of memory.
+
+2. **Paging:** Virtual memory is divided into fixed-size blocks called pages (typically 4 KB). Physical RAM is divided into page frames of the same size.
+
+3. **Page Table:** The operating system maintains a page table that maps virtual page addresses to physical frame addresses. The MMU (Memory Management Unit), a hardware component in the CPU, performs this translation for every memory access.
+
+4. **Page Faults:** When a program accesses a page that is not currently in physical RAM, a page fault occurs. The OS pauses the program, loads the needed page from the swap file on disk into RAM (possibly evicting another page to make room), updates the page table, and resumes the program.
+
+<Callout type="warning">
+When physical RAM is nearly full and the system constantly swaps pages between RAM and disk, performance degrades severely — a condition called **thrashing**. This is why adding more RAM is often the single most effective hardware upgrade. If your system is thrashing, it can feel 100 times slower than normal because disk access is orders of magnitude slower than RAM access.
+</Callout>
+
+### Benefits of Virtual Memory
+
+- **Isolation:** Each process has its own address space and cannot access another process's memory — a critical security and stability feature.
+- **Overcommitment:** The system can run programs whose combined memory requirements exceed physical RAM.
+- **Simplified programming:** Developers write code as if they have a large, continuous block of memory, without worrying about physical memory layout.
+- **Memory-mapped files:** Files can be mapped directly into virtual address space, allowing them to be accessed as if they were in memory.
+
+## Memory Technologies on the Horizon
+
+Several emerging technologies aim to bridge the gap between DRAM and storage:
+
+- **HBM (High Bandwidth Memory):** Stacks DRAM dies vertically and connects them with through-silicon vias (TSVs), achieving much higher bandwidth. Widely used in GPUs and AI accelerators (NVIDIA H100 uses HBM3).
+- **CXL (Compute Express Link):** An interconnect standard that allows memory to be shared and pooled across CPUs and accelerators, breaking the traditional per-socket memory model.
+- **Processing-In-Memory (PIM):** Places compute units directly in the memory chip, reducing data movement. Samsung's HBM-PIM adds processing logic to HBM stacks.
+
+Understanding memory is understanding performance. In most real-world applications, the bottleneck is not the CPU's ability to compute — it is the memory system's ability to feed data to the CPU fast enough. Every layer of the memory hierarchy, every cache optimization, and every virtual memory technique exists to solve this fundamental challenge.

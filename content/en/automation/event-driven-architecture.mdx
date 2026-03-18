@@ -1,0 +1,284 @@
+---
+title: "Event-Driven Architecture"
+description: "Learn about event-driven architecture, event sourcing, CQRS, and how they compare with monolithic and microservices architectures. Why EDA matters in modern systems."
+category: "automation"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["event-driven", "architecture", "event-sourcing", "cqrs", "kafka", "microservices", "message-queue", "distributed-systems"]
+featured: false
+order: 5
+sources:
+  - title: "Martin Fowler - Event-Driven Architecture"
+    url: "https://martinfowler.com/articles/201701-event-driven.html"
+  - title: "Confluent - Event-Driven Architecture"
+    url: "https://www.confluent.io/learn/event-driven-architecture/"
+  - title: "Microsoft - Event-driven architecture style"
+    url: "https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven"
+  - title: "Apache Kafka Documentation"
+    url: "https://kafka.apache.org/documentation/"
+---
+
+# Event-Driven Architecture
+
+Event-Driven Architecture (EDA) is a software architecture pattern in which the flow of the system is driven by events. Instead of components calling each other directly (request-response), they communicate by producing and reacting to events. This architectural pattern is increasingly popular in modern distributed systems.
+
+## Why Does Event-Driven Architecture Matter?
+
+In traditional request-response architectures, services call each other directly, creating **tight coupling**. When one service is slow or fails, the entire processing chain is affected. EDA solves this problem by decoupling event producers from event consumers.
+
+<Diagram chart="graph LR\n    subgraph Traditional Request-Response\n    A[Service A] -->|HTTP Call| B[Service B]\n    B -->|HTTP Call| C[Service C]\n    C -->|Response| B\n    B -->|Response| A\n    end" />
+
+<Diagram chart="graph LR\n    subgraph Event-Driven\n    D[Service A] -->|Publish Event| E[Event Bus / Broker]\n    E -->|Subscribe| F[Service B]\n    E -->|Subscribe| G[Service C]\n    E -->|Subscribe| H[Service D]\n    end" />
+
+### Benefits of EDA
+
+- **Loose coupling**: Services don't know about each other, only about events
+- **Scalability**: Easily add new consumers without affecting existing services
+- **Resilience**: One service failure doesn't bring down the entire system
+- **Real-time**: Process events as they happen
+- **Audit trail**: Every change is recorded as an event
+
+<Callout type="info">Major companies like Netflix, Uber, LinkedIn, and Airbnb all use event-driven architecture as the foundation of their systems. LinkedIn developed Apache Kafka, one of the most popular event streaming platforms, to serve this need.</Callout>
+
+## Core Concepts
+
+### What is an Event?
+
+An event is a record of something that happened in the system. An event consists of:
+
+```json
+{
+  "eventId": "evt-20260318-001",
+  "eventType": "OrderPlaced",
+  "timestamp": "2026-03-18T10:30:00Z",
+  "source": "order-service",
+  "data": {
+    "orderId": "ORD-12345",
+    "customerId": "CUST-789",
+    "items": [
+      {"productId": "PROD-001", "quantity": 2, "price": 29.99}
+    ],
+    "totalAmount": 59.98
+  },
+  "metadata": {
+    "correlationId": "corr-abc-123",
+    "version": "1.0"
+  }
+}
+```
+
+### Components of EDA
+
+| Component | Function |
+|-----------|----------|
+| Event Producer | Emits events when changes occur |
+| Event Consumer | Listens to and processes events |
+| Event Broker/Bus | Intermediary for event transport (Kafka, RabbitMQ, NATS) |
+| Event Store | Stores events (for Event Sourcing) |
+| Event Schema | Defines the structure of events |
+
+## Event Sourcing
+
+Event Sourcing is a pattern where the state of the system is stored as a sequence of events (event log) rather than just the current state. To determine the current state, you "replay" all events from the beginning.
+
+<Diagram chart="graph LR\n    A[OrderCreated] --> B[ItemAdded x2]\n    B --> C[PaymentReceived]\n    C --> D[OrderShipped]\n    D --> E[OrderDelivered]\n    subgraph Event Store\n    A\n    B\n    C\n    D\n    E\n    end\n    E --> F[Current State: Delivered]" />
+
+### Event Sourcing Example for an Order System
+
+```python
+from datetime import datetime
+from dataclasses import dataclass
+from typing import List
+import json
+
+# Define Events
+@dataclass
+class Event:
+    event_id: str
+    event_type: str
+    timestamp: str
+    data: dict
+
+@dataclass
+class OrderCreated(Event):
+    pass
+
+@dataclass
+class ItemAdded(Event):
+    pass
+
+@dataclass
+class PaymentReceived(Event):
+    pass
+
+# Event Store
+class EventStore:
+    def __init__(self):
+        self.events: List[Event] = []
+
+    def append(self, event: Event):
+        self.events.append(event)
+        print(f"Event stored: {event.event_type}")
+
+    def get_events(self, aggregate_id: str) -> List[Event]:
+        return [e for e in self.events
+                if e.data.get("order_id") == aggregate_id]
+
+# Order Aggregate - Rebuild state from events
+class Order:
+    def __init__(self):
+        self.order_id = None
+        self.status = None
+        self.items = []
+        self.total = 0.0
+        self.paid = False
+
+    def apply(self, event: Event):
+        """Apply event to update state"""
+        if event.event_type == "OrderCreated":
+            self.order_id = event.data["order_id"]
+            self.status = "created"
+
+        elif event.event_type == "ItemAdded":
+            self.items.append(event.data["item"])
+            self.total += event.data["item"]["price"] * event.data["item"]["quantity"]
+
+        elif event.event_type == "PaymentReceived":
+            self.paid = True
+            self.status = "paid"
+
+        elif event.event_type == "OrderShipped":
+            self.status = "shipped"
+
+    @staticmethod
+    def rebuild_from_events(events: List[Event]) -> 'Order':
+        """Rebuild Order from event sequence"""
+        order = Order()
+        for event in events:
+            order.apply(event)
+        return order
+
+# Usage
+store = EventStore()
+
+# Create order
+store.append(Event(
+    event_id="evt-001",
+    event_type="OrderCreated",
+    timestamp=datetime.now().isoformat(),
+    data={"order_id": "ORD-100", "customer_id": "CUST-50"}
+))
+
+# Add products
+store.append(Event(
+    event_id="evt-002",
+    event_type="ItemAdded",
+    timestamp=datetime.now().isoformat(),
+    data={"order_id": "ORD-100", "item": {"product": "Laptop", "price": 999, "quantity": 1}}
+))
+
+# Payment received
+store.append(Event(
+    event_id="evt-003",
+    event_type="PaymentReceived",
+    timestamp=datetime.now().isoformat(),
+    data={"order_id": "ORD-100", "amount": 999}
+))
+
+# Rebuild current state
+events = store.get_events("ORD-100")
+order = Order.rebuild_from_events(events)
+print(f"Order: {order.order_id}, Status: {order.status}, Total: ${order.total}")
+```
+
+<Callout type="tip">Event Sourcing allows you to "travel back in time" to see the system state at any point. This is extremely useful for debugging, auditing, and analytics.</Callout>
+
+## CQRS (Command Query Responsibility Segregation)
+
+CQRS is a pattern that separates read (Query) and write (Command) operations into two distinct models. CQRS is often combined with Event Sourcing.
+
+<Diagram chart="graph TD\n    A[Client] -->|Command: Place Order| B[Command Handler]\n    A -->|Query: View Order| C[Query Handler]\n    B --> D[Write Model - Event Store]\n    D -->|Publish Events| E[Event Bus]\n    E -->|Update| F[Read Model - Database]\n    C --> F" />
+
+### Why CQRS?
+
+| Problem | CQRS Solution |
+|---------|---------------|
+| Read and write have different requirements | Optimize each side independently |
+| Reads far outnumber writes | Scale read model independently |
+| Complex domain model | Simplify by splitting into two models |
+| Performance bottlenecks | Read model optimized for queries |
+
+## Comparing Architecture Styles
+
+<ComparisonTable headers={["Criteria", "Monolithic", "Microservices (Request-Response)", "Event-Driven"]} rows={[["Coupling", "Very tight", "Medium (HTTP calls)", "Loose (via events)"], ["Scalability", "Scale entire app", "Scale per service", "Scale per consumer"], ["Data consistency", "ACID transactions", "Eventual consistency + saga", "Eventual consistency"], ["Complexity", "Low initially", "High (networking, discovery)", "Very high (ordering, idempotency)"], ["Debugging", "Easy (single process)", "Hard (distributed tracing)", "Very hard (async, event replay)"], ["Latency", "Low", "Medium", "Low (async) or high (eventual)"], ["Best for", "MVP, small teams", "Medium systems", "Large systems, real-time"]]} />
+
+<Callout type="warning">Event-Driven Architecture is not a "silver bullet." It adds significant complexity and is only truly necessary when a system requires loose coupling, real-time processing, or high scalability. Do not use EDA for simple applications.</Callout>
+
+## Popular EDA Tools and Platforms
+
+### Apache Kafka
+
+Kafka is the most popular event streaming platform, supporting event storage and replay with high throughput:
+
+```python
+# Kafka Producer
+from kafka import KafkaProducer
+import json
+
+producer = KafkaProducer(
+    bootstrap_servers=['localhost:9092'],
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+
+# Send event
+producer.send('order-events', {
+    'eventType': 'OrderPlaced',
+    'orderId': 'ORD-12345',
+    'timestamp': '2026-03-18T10:30:00Z'
+})
+producer.flush()
+```
+
+```python
+# Kafka Consumer
+from kafka import KafkaConsumer
+import json
+
+consumer = KafkaConsumer(
+    'order-events',
+    bootstrap_servers=['localhost:9092'],
+    group_id='notification-service',
+    value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+)
+
+for message in consumer:
+    event = message.value
+    if event['eventType'] == 'OrderPlaced':
+        print(f"Sending notification for order: {event['orderId']}")
+```
+
+### Other Tools
+
+| Tool | Characteristics |
+|------|----------------|
+| RabbitMQ | Traditional message broker, supports multiple protocols |
+| Apache Pulsar | Kafka alternative with built-in multi-tenancy |
+| NATS | Lightweight, fast, suited for cloud-native |
+| AWS EventBridge | Serverless event bus on AWS |
+| Redis Streams | Simple event streaming on Redis |
+
+## Best Practices
+
+1. **Schema Registry**: Use a schema registry (like Confluent Schema Registry) to manage event schemas
+2. **Idempotent consumers**: Consumers must handle duplicate events gracefully
+3. **Event versioning**: Design event schemas to evolve without breaking consumers
+4. **Dead letter queue**: Handle events that cannot be consumed
+5. **Correlation ID**: Add IDs to trace related event chains
+6. **Monitoring**: Monitor lag, throughput, and error rates
+
+<Callout type="info">If you are new to EDA, experiment with RabbitMQ (simpler) before moving to Kafka. Understand the fundamental concepts like publish/subscribe, message durability, and consumer groups before applying them in production.</Callout>
+
+## Conclusion
+
+Event-driven architecture is one of the most important trends in modern software design. With the ability to decouple components, enable real-time processing, and scale flexibly, EDA helps build large, complex systems while maintaining agility and reliability. Combined with Event Sourcing and CQRS, EDA becomes a powerful foundation for large-scale enterprise systems.

@@ -1,0 +1,248 @@
+---
+title: "Vector Database: Semantic Search at Scale"
+description: "Learn about vector databases, HNSW and IVF algorithms, compare Pinecone, Weaviate, Qdrant, ChromaDB, and build semantic search and RAG pipelines with vector DB."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["vector-database", "chromadb", "pinecone", "qdrant", "hnsw", "semantic-search", "rag", "embeddings"]
+featured: true
+order: 8
+sources:
+  - title: "Pinecone Documentation - Vector Database"
+    url: "https://docs.pinecone.io/"
+  - title: "ChromaDB Documentation"
+    url: "https://docs.trychroma.com/"
+  - title: "Qdrant Documentation"
+    url: "https://qdrant.tech/documentation/"
+  - title: "HNSW Algorithm Paper"
+    url: "https://arxiv.org/abs/1603.09320"
+---
+
+# Vector Database: Semantic Search at Scale
+
+In the previous article, we learned how to turn text into vectors and compute cosine similarity. But when you have 10 million documents, comparing the query vector against every single vector (brute-force) takes seconds — far too slow for real-time applications. **Vector databases** were built to solve exactly this problem: finding the most similar vectors in massive datasets in just milliseconds.
+
+## What Is a Vector Database?
+
+A vector database is a database system purpose-built to store, index, and query high-dimensional vector data. Unlike SQL databases that search by exact values, or document databases that match keywords, vector databases search by **semantic similarity**.
+
+<Diagram chart="graph TD\n    subgraph SQL Database\n    A[SELECT * WHERE id = 5]\n    end\n    subgraph Document DB\n    B[Keyword Search]\n    end\n    subgraph Vector Database\n    C[Find K Nearest Vectors]\n    end\n    A --> D[Exact Match Result]\n    B --> E[Keyword Match Result]\n    C --> F[Semantically Similar Result]" />
+
+<Callout type="info">
+Vector databases do not replace SQL or NoSQL — they complement each other. In practice, you often use a vector DB alongside a traditional database: vector DB for semantic search, SQL/NoSQL for structured data and business logic.
+</Callout>
+
+## Why Do We Need Vector Databases?
+
+### The Problem with Brute-Force Search
+
+With N vectors of D dimensions, brute-force search has O(N x D) complexity. With 10 million vectors at 1536 dimensions, each query requires roughly 15 billion floating-point operations. This is not viable for real-time applications.
+
+### The Solution: Approximate Nearest Neighbor (ANN)
+
+Vector databases use **ANN** (Approximate Nearest Neighbor) algorithms — accepting "approximately correct" results that are blazingly fast, with recall above 95%.
+
+## Vector Search Algorithms
+
+### HNSW (Hierarchical Navigable Small World)
+
+HNSW is the most popular algorithm today. The idea: build a multi-layer graph where each node is a vector and edges connect to "nearest neighbors."
+
+<Diagram chart="graph TD\n    subgraph Layer 2 - Sparse\n    A2[Node A] --> B2[Node B]\n    end\n    subgraph Layer 1 - Medium\n    A1[Node A] --> B1[Node B]\n    A1 --> C1[Node C]\n    B1 --> D1[Node D]\n    end\n    subgraph Layer 0 - Dense\n    A0[A] --> B0[B]\n    A0 --> C0[C]\n    B0 --> D0[D]\n    C0 --> E0[E]\n    D0 --> F0[F]\n    E0 --> F0\n    end\n    A2 -.-> A1\n    B2 -.-> B1\n    A1 -.-> A0\n    B1 -.-> B0\n    C1 -.-> C0\n    D1 -.-> D0" />
+
+Search starts at the top layer (sparse, few nodes), quickly jumps to the approximate neighborhood, then "dives" to lower layers (denser) to refine results. It is similar to finding an address: first look at the country map, then zoom into the city, district, and street.
+
+### IVF (Inverted File Index)
+
+IVF partitions the vector space into clusters using K-means. During search, only vectors in the nearest few clusters are compared, rather than the entire dataset.
+
+### Product Quantization (PQ)
+
+PQ compresses vectors by splitting the original vector into sub-vectors and quantizing them. This reduces memory by 10-100x at the cost of some accuracy.
+
+<ComparisonTable headers={["Algorithm", "Speed", "Memory", "Recall", "Best For"]} rows={[["Brute-force", "Slow", "Low", "100%", "< 100K vectors"], ["IVF", "Fast", "Medium", "~95%", "Millions of vectors"], ["HNSW", "Very fast", "High", "~98%", "Millions to billions"], ["IVF + PQ", "Fast", "Very low", "~90%", "Billions of vectors, limited RAM"]]} />
+
+## Popular Vector Databases
+
+<ComparisonTable headers={["Database", "Type", "Language", "Key Strength", "Best For"]} rows={[["Pinecone", "Managed cloud", "API", "Serverless, easiest to use", "Production without infra management"], ["Weaviate", "Self-hosted / Cloud", "Go", "Hybrid search, GraphQL API", "Projects needing high customization"], ["Qdrant", "Self-hosted / Cloud", "Rust", "High performance, great filtering", "Large data with complex filters"], ["Milvus", "Self-hosted", "Go/C++", "Largest scale, distributed", "Enterprise, billions of vectors"], ["ChromaDB", "Embedded / Server", "Python", "Simplest, developer-friendly", "Prototyping, small-medium projects"], ["pgvector", "PostgreSQL extension", "C", "Built into PostgreSQL", "Already using PostgreSQL"]]} />
+
+<Callout type="tip">
+If you are just getting started, use **ChromaDB** for rapid prototyping — installation is a single pip install. When you are ready for production, switch to **Qdrant** or **Pinecone** depending on whether you want to manage infrastructure yourself.
+</Callout>
+
+## Hands-On: Semantic Search with ChromaDB
+
+### Installation
+
+```bash
+pip install chromadb sentence-transformers
+```
+
+### Full CRUD with ChromaDB
+
+```python
+import chromadb
+from chromadb.utils import embedding_functions
+
+# Initialize client (persistent - saves data to disk)
+client = chromadb.PersistentClient(path="./chroma_data")
+
+# Use Sentence-Transformers as the embedding function
+sentence_tf = embedding_functions.SentenceTransformerEmbeddingFunction(
+    model_name="all-MiniLM-L6-v2"
+)
+
+# Create or get a collection
+collection = client.get_or_create_collection(
+    name="articles",
+    embedding_function=sentence_tf,
+    metadata={"hnsw:space": "cosine"}  # Use cosine similarity
+)
+
+# === CREATE: Add documents ===
+collection.add(
+    documents=[
+        "PostgreSQL supports JSON, full-text search, and many advanced features",
+        "Redis is an in-memory data store commonly used for caching and sessions",
+        "Docker packages applications into containers for easy deployment",
+        "Kubernetes manages and orchestrates multiple containers at scale",
+        "MongoDB stores data as flexible JSON-like documents",
+        "GraphQL allows clients to request exactly the data they need",
+    ],
+    metadatas=[
+        {"category": "database", "language": "en"},
+        {"category": "database", "language": "en"},
+        {"category": "devops", "language": "en"},
+        {"category": "devops", "language": "en"},
+        {"category": "database", "language": "en"},
+        {"category": "api", "language": "en"},
+    ],
+    ids=["doc1", "doc2", "doc3", "doc4", "doc5", "doc6"]
+)
+
+# === READ: Semantic search ===
+results = collection.query(
+    query_texts=["fastest way to store data"],
+    n_results=3
+)
+
+print("=== Search Results ===")
+for doc, score in zip(results['documents'][0], results['distances'][0]):
+    print(f"[{1 - score:.3f}] {doc}")
+
+# === READ: Search with metadata filter ===
+results_filtered = collection.query(
+    query_texts=["manage applications"],
+    n_results=3,
+    where={"category": "devops"}  # Only search within devops category
+)
+
+# === UPDATE: Update a document ===
+collection.update(
+    ids=["doc1"],
+    documents=["PostgreSQL 17 supports JSON, full-text search, vectors, and more"],
+    metadatas=[{"category": "database", "language": "en", "version": "17"}]
+)
+
+# === DELETE: Remove a document ===
+collection.delete(ids=["doc6"])
+
+print(f"\nTotal documents: {collection.count()}")
+```
+
+<Callout type="warning">
+ChromaDB returns `distances` by default, not similarity scores. With cosine space, `similarity = 1 - distance`. A smaller distance means higher similarity.
+</Callout>
+
+## Hybrid Search: Combining Keyword and Vector
+
+Vector search is not always superior to keyword search. For example, searching for a product code "SKU-12345" is better served by keyword search. **Hybrid search** combines both approaches:
+
+<Diagram chart="graph LR\n    A[Query] --> B[Keyword Search - BM25]\n    A --> C[Vector Search - ANN]\n    B --> D[Keyword Results]\n    C --> E[Semantic Results]\n    D --> F[Reciprocal Rank Fusion]\n    E --> F\n    F --> G[Final Results]\n    style F fill:#f96,stroke:#333" />
+
+```python
+# Hybrid search example with Qdrant (native support)
+from qdrant_client import QdrantClient
+from qdrant_client.models import (
+    Distance, VectorParams, PointStruct,
+    SearchParams, FusionQuery, Prefetch, Query
+)
+
+client = QdrantClient(url="http://localhost:6333")
+
+# Hybrid search: combine sparse (keyword) + dense (semantic)
+results = client.query_points(
+    collection_name="articles",
+    prefetch=[
+        Prefetch(
+            query=dense_vector,      # Vector search
+            using="dense",
+            limit=20,
+        ),
+        Prefetch(
+            query=sparse_vector,     # Keyword search (BM25)
+            using="sparse",
+            limit=20,
+        ),
+    ],
+    query=FusionQuery(fusion="rrf"),  # Reciprocal Rank Fusion
+    limit=10,
+)
+```
+
+## Vector DB in RAG Architecture
+
+Retrieval-Augmented Generation (RAG) is the most important architecture when building AI applications with proprietary data. The vector database serves as the **long-term memory** for the LLM.
+
+<Diagram chart="graph TD\n    subgraph Indexing Pipeline\n    A[Documents] --> B[Chunking]\n    B --> C[Create Embeddings]\n    C --> D[(Vector Database)]\n    end\n    subgraph Query Pipeline\n    E[User Question] --> F[Create Query Embedding]\n    F --> G[Search Vector DB]\n    G --> H[Top-K Relevant Chunks]\n    H --> I[Build Prompt]\n    I --> J[LLM Generates Answer]\n    end\n    D --> G\n    style D fill:#bbf,stroke:#333\n    style J fill:#f96,stroke:#333" />
+
+### RAG Pipeline with ChromaDB and OpenAI
+
+```python
+import chromadb
+from openai import OpenAI
+
+# Step 1: Index documents
+chroma_client = chromadb.PersistentClient(path="./rag_data")
+collection = chroma_client.get_or_create_collection("knowledge_base")
+
+# Add document chunks (already split)
+collection.add(
+    documents=document_chunks,
+    ids=[f"chunk_{i}" for i in range(len(document_chunks))]
+)
+
+# Step 2: RAG query
+def ask_rag(question: str) -> str:
+    # Find relevant chunks
+    results = collection.query(
+        query_texts=[question],
+        n_results=5
+    )
+
+    # Build context
+    context = "\n\n".join(results['documents'][0])
+
+    # Call LLM with context
+    openai_client = OpenAI()
+    response = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": f"Answer based on this context:\n{context}"},
+            {"role": "user", "content": question}
+        ]
+    )
+    return response.choices[0].message.content
+
+answer = ask_rag("How do vector databases work?")
+print(answer)
+```
+
+<Callout type="danger">
+When building RAG, your **chunking strategy** (how you split documents) has an enormous impact on quality. Chunks that are too small lose context; chunks that are too large contain irrelevant information. Start with 500-1000 tokens per chunk with 100-200 token overlap.
+</Callout>
+
+## Summary
+
+Vector databases are an essential component of the modern AI ecosystem. They solve the problem of semantic search at scale — something traditional databases cannot do efficiently. Start with ChromaDB for prototyping, master the concepts of HNSW, cosine similarity, and hybrid search, then move to production-ready solutions when you are ready. Combined with RAG architecture, vector databases unlock the ability to build intelligent AI applications grounded in your organization's own data.

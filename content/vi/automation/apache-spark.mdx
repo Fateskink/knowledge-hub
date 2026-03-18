@@ -1,0 +1,244 @@
+---
+title: "Apache Spark - Xử lý Dữ liệu Lớn"
+description: "Tìm hiểu Apache Spark, framework xử lý dữ liệu phân tán. Khái niệm RDD, DataFrame, Spark SQL, và so sánh batch vs stream processing."
+category: "automation"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 13
+tags: ["apache-spark", "big-data", "rdd", "dataframe", "spark-sql", "batch-processing", "stream-processing", "hadoop"]
+featured: false
+order: 3
+sources:
+  - title: "Apache Spark Official Documentation"
+    url: "https://spark.apache.org/docs/latest/"
+  - title: "Apache Spark GitHub"
+    url: "https://github.com/apache/spark"
+  - title: "Databricks - Spark Guide"
+    url: "https://docs.databricks.com/en/spark/index.html"
+  - title: "Spark By Examples"
+    url: "https://sparkbyexamples.com/"
+---
+
+# Apache Spark - Xử lý Dữ liệu Lớn
+
+Apache Spark là một framework xử lý dữ liệu phân tán (distributed data processing) mã nguồn mở, được thiết kế để xử lý dữ liệu lớn với tốc độ cao. Được phát triển tại UC Berkeley AMPLab vào năm 2009 và trở thành dự án Apache cấp cao vào năm 2014, Spark đã thay thế Hadoop MapReduce trở thành tiêu chuẩn de facto cho xử lý Big Data.
+
+## Apache Spark là gì?
+
+Spark là một **unified analytics engine** cho xử lý dữ liệu quy mô lớn. Nó cung cấp các API cấp cao bằng Scala, Java, Python (PySpark) và R, cùng với các công cụ tích hợp cho SQL, streaming, machine learning và xử lý đồ thị.
+
+<Callout type="info">Spark có thể xử lý dữ liệu nhanh hơn Hadoop MapReduce tới 100 lần trong bộ nhớ (in-memory) và nhanh hơn 10 lần trên đĩa (on-disk), nhờ cơ chế xử lý in-memory và DAG execution engine tối ưu.</Callout>
+
+### Điểm nổi bật của Spark
+
+- **Tốc độ**: Xử lý in-memory, tối ưu hóa query plan
+- **Đa năng**: Batch, streaming, ML, graph processing trong một framework
+- **Dễ sử dụng**: API thân thiện với Python, Scala, Java, R, SQL
+- **Khả năng mở rộng**: Từ laptop đến hàng nghìn node cluster
+- **Fault tolerance**: Tự động phục hồi khi có lỗi
+
+## Kiến trúc Apache Spark
+
+<Diagram chart="graph TD\n    subgraph Spark Application\n    A[Driver Program - SparkContext] --> B[Cluster Manager]\n    B --> C[Worker Node 1]\n    B --> D[Worker Node 2]\n    B --> E[Worker Node 3]\n    C --> F[Executor - Cache + Tasks]\n    D --> G[Executor - Cache + Tasks]\n    E --> H[Executor - Cache + Tasks]\n    end" />
+
+| Thành phần | Chức năng |
+|-----------|-----------|
+| Driver Program | Chương trình chính, tạo SparkContext, chia công việc |
+| Cluster Manager | Quản lý tài nguyên (YARN, Mesos, K8s, Standalone) |
+| Worker Node | Máy tính trong cluster thực thi task |
+| Executor | Tiến trình chạy trên worker, thực hiện task và cache dữ liệu |
+| Task | Đơn vị công việc nhỏ nhất, chạy trên một partition |
+
+### Spark Ecosystem
+
+<Diagram chart="graph TD\n    A[Spark Core - RDD API] --> B[Spark SQL + DataFrame]\n    A --> C[Spark Streaming]\n    A --> D[MLlib - Machine Learning]\n    A --> E[GraphX - Graph Processing]\n    F[Data Sources] --> A\n    F --> G[HDFS / S3 / GCS]\n    F --> H[JDBC / Cassandra / MongoDB]\n    F --> I[Kafka / Kinesis]" />
+
+## Các khái niệm cốt lõi
+
+### RDD (Resilient Distributed Dataset)
+
+RDD là cấu trúc dữ liệu cơ bản nhất của Spark. Nó là một tập hợp các phần tử được phân phối trên cluster và có thể xử lý song song.
+
+```python
+from pyspark import SparkContext
+
+sc = SparkContext("local[*]", "RDD Example")
+
+# Tạo RDD từ danh sách
+numbers = sc.parallelize([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+# Transformation: tạo RDD mới từ RDD cũ
+even_numbers = numbers.filter(lambda x: x % 2 == 0)
+squared = even_numbers.map(lambda x: x ** 2)
+
+# Action: trả về kết quả
+result = squared.collect()
+print(result)  # [4, 16, 36, 64, 100]
+
+# Tính tổng
+total = numbers.reduce(lambda a, b: a + b)
+print(total)   # 55
+```
+
+<Callout type="warning">RDD là API cấp thấp của Spark. Trong hầu hết trường hợp, bạn nên sử dụng DataFrame API vì nó được tối ưu hóa tốt hơn qua Catalyst optimizer.</Callout>
+
+### DataFrame và Spark SQL
+
+DataFrame là cấu trúc dữ liệu dạng bảng (tabular) với schema rõ ràng, tương tự như DataFrame trong Pandas nhưng phân tán trên cluster:
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, avg, sum, count, when
+
+# Khởi tạo SparkSession
+spark = SparkSession.builder \
+    .appName("DataFrame Example") \
+    .master("local[*]") \
+    .getOrCreate()
+
+# Đọc dữ liệu từ CSV
+df = spark.read \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .csv("/data/sales.csv")
+
+# Hiển thị schema
+df.printSchema()
+# root
+#  |-- order_id: integer
+#  |-- product: string
+#  |-- category: string
+#  |-- amount: double
+#  |-- quantity: integer
+#  |-- sale_date: date
+
+# Xử lý dữ liệu với DataFrame API
+result = df \
+    .filter(col("amount") > 100) \
+    .groupBy("category") \
+    .agg(
+        count("order_id").alias("total_orders"),
+        sum("amount").alias("total_revenue"),
+        avg("amount").alias("avg_order_value")
+    ) \
+    .orderBy(col("total_revenue").desc())
+
+result.show()
+
+# Sử dụng Spark SQL
+df.createOrReplaceTempView("sales")
+
+sql_result = spark.sql("""
+    SELECT
+        category,
+        COUNT(*) as total_orders,
+        SUM(amount) as total_revenue,
+        AVG(amount) as avg_order_value
+    FROM sales
+    WHERE amount > 100
+    GROUP BY category
+    ORDER BY total_revenue DESC
+""")
+
+sql_result.show()
+```
+
+### Dataset (Scala/Java)
+
+Dataset kết hợp ưu điểm của RDD (type-safety) và DataFrame (tối ưu hóa). Chỉ có trong Scala và Java, trong Python thì DataFrame và Dataset là một.
+
+## Batch vs Stream Processing
+
+<ComparisonTable headers={["Tiêu chí", "Batch Processing", "Stream Processing"]} rows={[["Dữ liệu", "Tập dữ liệu cố định, đã lưu trữ", "Dòng dữ liệu liên tục, real-time"], ["Độ trễ", "Phút đến giờ", "Mili-giây đến giây"], ["Xử lý", "Toàn bộ dữ liệu cùng lúc", "Từng bản ghi hoặc micro-batch"], ["Sử dụng", "Báo cáo, ETL, phân tích lịch sử", "Monitoring, cảnh báo, dashboard real-time"], ["Spark API", "Spark SQL, DataFrame", "Structured Streaming"], ["Độ phức tạp", "Thấp hơn", "Cao hơn (xử lý muộn, thứ tự)"]]} />
+
+### Ví dụ Structured Streaming
+
+```python
+# Đọc dữ liệu streaming từ Kafka
+streaming_df = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("subscribe", "sales-events") \
+    .load()
+
+# Xử lý dữ liệu streaming
+from pyspark.sql.functions import from_json, window
+from pyspark.sql.types import StructType, StringType, DoubleType, TimestampType
+
+schema = StructType() \
+    .add("product", StringType()) \
+    .add("amount", DoubleType()) \
+    .add("timestamp", TimestampType())
+
+parsed = streaming_df \
+    .selectExpr("CAST(value AS STRING)") \
+    .select(from_json(col("value"), schema).alias("data")) \
+    .select("data.*")
+
+# Tính doanh thu theo cửa sổ 5 phút
+windowed_revenue = parsed \
+    .withWatermark("timestamp", "10 minutes") \
+    .groupBy(
+        window("timestamp", "5 minutes"),
+        "product"
+    ) \
+    .agg(sum("amount").alias("revenue"))
+
+# Ghi kết quả ra console
+query = windowed_revenue.writeStream \
+    .outputMode("update") \
+    .format("console") \
+    .start()
+
+query.awaitTermination()
+```
+
+## Spark vs Hadoop MapReduce
+
+<ComparisonTable headers={["Tiêu chí", "Apache Spark", "Hadoop MapReduce"]} rows={[["Tốc độ", "Nhanh hơn 10-100x", "Chậm hơn do đọc/ghi đĩa"], ["Xử lý", "In-memory", "Disk-based"], ["API", "Cao cấp (DataFrame, SQL)", "Thấp (Map/Reduce functions)"], ["Streaming", "Có (Structured Streaming)", "Không (cần Storm/Flink)"], ["Machine Learning", "Có (MLlib)", "Cần Mahout"], ["Ease of use", "Python, Scala, SQL", "Java chủ yếu"], ["Chi phí", "Cần nhiều RAM", "Chạy tốt trên commodity hardware"], ["Fault tolerance", "RDD lineage", "Replication"]]} />
+
+<Callout type="tip">Spark không thay thế hoàn toàn Hadoop. Spark thường chạy trên HDFS (Hadoop Distributed File System) và sử dụng YARN làm cluster manager. Chúng là công cụ bổ sung cho nhau.</Callout>
+
+## Tối ưu hóa hiệu suất Spark
+
+### 1. Partitioning
+
+```python
+# Kiểm tra số partition
+df.rdd.getNumPartitions()
+
+# Thay đổi số partition
+df_repartitioned = df.repartition(200, "category")
+
+# Giảm số partition (không shuffle)
+df_coalesced = df.coalesce(50)
+```
+
+### 2. Caching và Persistence
+
+```python
+# Cache DataFrame trong bộ nhớ
+df.cache()    # tương đương persist(MEMORY_ONLY)
+df.persist(StorageLevel.MEMORY_AND_DISK)
+
+# Giải phóng cache
+df.unpersist()
+```
+
+### 3. Broadcast Join
+
+```python
+from pyspark.sql.functions import broadcast
+
+# Khi một bảng nhỏ, dùng broadcast để tránh shuffle
+result = large_df.join(
+    broadcast(small_df),
+    "key_column"
+)
+```
+
+<Callout type="danger">Tránh sử dụng collect() trên DataFrame lớn vì nó sẽ kéo toàn bộ dữ liệu về Driver và có thể gây OutOfMemoryError. Chỉ dùng collect() khi bạn chắc chắn dữ liệu đủ nhỏ.</Callout>
+
+## Kết luận
+
+Apache Spark là framework xử lý dữ liệu phân tán mạnh mẽ nhất hiện nay. Với khả năng xử lý batch và streaming, tích hợp machine learning và SQL, Spark là nền tảng lý tưởng cho các hệ thống Big Data hiện đại. Dù bạn đang xây dựng ETL pipeline, phân tích dữ liệu real-time hay train model ML, Spark đều có thể đáp ứng.

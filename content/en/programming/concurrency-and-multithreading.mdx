@@ -1,0 +1,425 @@
+---
+title: "Concurrency and Multithreading: Threads, Goroutines, and Async/Await"
+description: "A comprehensive overview of concurrent programming: threads, goroutines, async/await, mutexes, deadlocks, and comparing concurrency models across Go, Rust, Java, Python, and JavaScript."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 16
+tags: ["concurrency", "multithreading", "goroutine", "async-await", "mutex", "deadlock", "parallelism"]
+featured: true
+order: 8
+sources:
+  - title: "Go Concurrency Patterns"
+    url: "https://go.dev/blog/pipelines"
+  - title: "The Rust Programming Language - Fearless Concurrency"
+    url: "https://doc.rust-lang.org/book/ch16-00-concurrency.html"
+  - title: "Java Concurrency in Practice"
+    url: "https://docs.oracle.com/javase/tutorial/essential/concurrency/"
+  - title: "Python asyncio Documentation"
+    url: "https://docs.python.org/3/library/asyncio.html"
+---
+
+# Concurrency and Multithreading: Threads, Goroutines, and Async/Await
+
+In modern software, handling multiple tasks simultaneously is a fundamental requirement. From web servers handling thousands of concurrent requests to mobile apps keeping the UI responsive while loading data, **concurrency** is a skill every programmer needs to master.
+
+## Concurrency vs Parallelism
+
+These two concepts are often confused but are fundamentally different:
+
+- **Concurrency**: Managing multiple tasks at once by interleaving their execution. A single-core CPU can achieve concurrency by rapidly switching between tasks.
+- **Parallelism**: Truly executing multiple tasks at the same instant, requiring multiple CPU cores (or multiple machines).
+
+<Diagram chart="graph LR
+    subgraph Concurrency - 1 CPU
+        A[Task A - running] --> B[Task B - running]
+        B --> C[Task A - resumed]
+        C --> D[Task B - resumed]
+    end
+    subgraph Parallelism - 2 CPUs
+        E[CPU 1: Task A runs continuously] ~~~ F[CPU 2: Task B runs continuously]
+    end" />
+
+<Callout type="info">Rob Pike (co-creator of Go) puts it well: "Concurrency is about dealing with lots of things at once. Parallelism is about doing lots of things at once." Concurrency is about structure; parallelism is about execution.</Callout>
+
+## Operating System Threads
+
+A **thread** is the smallest unit of execution managed by the operating system. Each process can contain multiple threads that share the same memory space.
+
+<Diagram chart="graph TD
+    A[Process] --> B[Thread 1\nOwn stack]
+    A --> C[Thread 2\nOwn stack]
+    A --> D[Thread 3\nOwn stack]
+    B --> E[Shared heap\nShared code\nShared data]
+    C --> E
+    D --> E" />
+
+### Thread Lifecycle
+
+<Diagram chart="graph LR
+    A[New] -->|start| B[Runnable]
+    B -->|scheduler| C[Running]
+    C -->|yield/preempt| B
+    C -->|wait/sleep| D[Blocked/Waiting]
+    D -->|notify/timeout| B
+    C -->|complete| E[Terminated]" />
+
+### Race Conditions and Deadlocks
+
+A **race condition** occurs when multiple threads access and modify shared data without proper synchronization.
+
+```java
+// DANGEROUS: Race condition
+public class Counter {
+    private int count = 0;
+
+    public void increment() {
+        count++;  // NOT atomic! Read -> Increment -> Write
+    }
+    // If 2 threads call simultaneously: count may increase by 1 instead of 2
+}
+```
+
+A **deadlock** occurs when two or more threads are each waiting for the other to release a resource, causing all of them to be permanently blocked.
+
+```java
+// Deadlock: Thread 1 holds lockA, waits for lockB
+//           Thread 2 holds lockB, waits for lockA
+Object lockA = new Object();
+Object lockB = new Object();
+
+// Thread 1
+synchronized (lockA) {
+    Thread.sleep(100);
+    synchronized (lockB) { /* ... */ }  // Waits for lockB forever
+}
+
+// Thread 2
+synchronized (lockB) {
+    Thread.sleep(100);
+    synchronized (lockA) { /* ... */ }  // Waits for lockA forever
+}
+```
+
+## Synchronization Mechanisms: Mutex, Semaphore, Lock
+
+### Mutex (Mutual Exclusion)
+
+A Mutex ensures only one thread can access a critical section at any given time.
+
+```cpp
+#include <mutex>
+#include <thread>
+#include <iostream>
+
+std::mutex mtx;
+int shared_counter = 0;
+
+void safe_increment(int times) {
+    for (int i = 0; i < times; i++) {
+        std::lock_guard<std::mutex> lock(mtx);  // Auto-unlocks when leaving scope
+        shared_counter++;
+    }
+}
+
+int main() {
+    std::thread t1(safe_increment, 100000);
+    std::thread t2(safe_increment, 100000);
+    t1.join();
+    t2.join();
+    std::cout << "Result: " << shared_counter << std::endl; // Always 200000
+    return 0;
+}
+```
+
+<Callout type="warning">Always use `lock_guard` or `unique_lock` in C++ instead of calling `mutex.lock()`/`mutex.unlock()` directly. If an exception occurs between lock and unlock, the mutex will never be released, causing a deadlock.</Callout>
+
+## Go: Goroutines and Channels
+
+Go was designed from the ground up for concurrency. A **goroutine** is a lightweight thread managed by the Go runtime, consuming only about 2KB of stack space (compared to 1-8MB for an OS thread).
+
+<Diagram chart="graph TD
+    A[Go Runtime Scheduler] --> B[OS Thread 1]
+    A --> C[OS Thread 2]
+    A --> D[OS Thread 3]
+    B --> E[Goroutine 1]
+    B --> F[Goroutine 2]
+    B --> G[Goroutine 3]
+    C --> H[Goroutine 4]
+    C --> I[Goroutine 5]
+    D --> J[Goroutine 6]
+    D --> K[Goroutine 7]" />
+
+```go
+package main
+
+import (
+    "fmt"
+    "sync"
+    "time"
+)
+
+// Example 1: Basic goroutines
+func fetchURL(url string, wg *sync.WaitGroup) {
+    defer wg.Done()
+    time.Sleep(100 * time.Millisecond) // Simulate network request
+    fmt.Printf("Fetched: %s\n", url)
+}
+
+// Example 2: Channels - communication between goroutines
+func producer(ch chan<- int) {
+    for i := 0; i < 5; i++ {
+        ch <- i * i  // Send value into channel
+        fmt.Printf("Sent: %d\n", i*i)
+    }
+    close(ch)
+}
+
+func consumer(ch <-chan int) {
+    for val := range ch {  // Receive until channel is closed
+        fmt.Printf("Received: %d\n", val)
+    }
+}
+
+func main() {
+    // Fetch 5 URLs concurrently
+    var wg sync.WaitGroup
+    urls := []string{
+        "https://go.dev",
+        "https://rust-lang.org",
+        "https://python.org",
+        "https://java.com",
+        "https://nodejs.org",
+    }
+
+    for _, url := range urls {
+        wg.Add(1)
+        go fetchURL(url, &wg) // Each URL runs in its own goroutine
+    }
+    wg.Wait() // Wait for all to complete
+
+    // Producer-Consumer pattern with channels
+    ch := make(chan int, 3) // Buffered channel, capacity 3
+    go producer(ch)
+    consumer(ch)
+}
+```
+
+<Callout type="tip">Go's philosophy: "Don't communicate by sharing memory; share memory by communicating." Instead of using mutexes to protect shared data, use channels to pass data between goroutines.</Callout>
+
+## Rust: Fearless Concurrency
+
+Rust uses its ownership system to **prevent data races at compile time**. If your code has a data race, the Rust compiler will refuse to compile it.
+
+```rust
+use std::thread;
+use std::sync::{Arc, Mutex};
+
+fn main() {
+    // Arc (Atomic Reference Counting) + Mutex for shared data
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap()); // Always 10
+
+    // Message passing with channels (similar to Go)
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    thread::spawn(move || {
+        let messages = vec![
+            String::from("hello"),
+            String::from("from"),
+            String::from("the"),
+            String::from("thread"),
+        ];
+        for msg in messages {
+            tx.send(msg).unwrap();
+        }
+    });
+
+    for received in rx {
+        println!("Got: {}", received);
+    }
+}
+```
+
+## Python: GIL and asyncio
+
+Python has the **Global Interpreter Lock** (GIL), a global mutex that only allows one thread to execute Python bytecode at a time. This makes Python threading ineffective for CPU-bound tasks on multiple cores.
+
+```python
+import asyncio
+import aiohttp
+import time
+
+# asyncio - ideal for I/O-bound tasks
+async def fetch_url(session, url):
+    async with session.get(url) as response:
+        data = await response.text()
+        print(f"Fetched {url}: {len(data)} bytes")
+        return len(data)
+
+async def main():
+    urls = [
+        "https://httpbin.org/delay/1",
+        "https://httpbin.org/delay/1",
+        "https://httpbin.org/delay/1",
+    ]
+
+    start = time.time()
+    async with aiohttp.ClientSession() as session:
+        # Run all requests concurrently
+        tasks = [fetch_url(session, url) for url in urls]
+        results = await asyncio.gather(*tasks)
+
+    elapsed = time.time() - start
+    print(f"Total time: {elapsed:.2f}s")  # ~1s instead of ~3s
+    print(f"Total bytes: {sum(results)}")
+
+asyncio.run(main())
+```
+
+<Callout type="info">Starting with Python 3.13, CPython is experimenting with a "free-threaded" mode (PEP 703) that allows disabling the GIL. This is a major step forward, enabling Python to leverage multiple cores for CPU-bound tasks without resorting to multiprocessing.</Callout>
+
+## JavaScript: The Event Loop
+
+JavaScript is single-threaded but achieves concurrency through the **event loop** and non-blocking I/O.
+
+<Diagram chart="graph TD
+    A[Call Stack] --> B{Stack empty?}
+    B -->|Yes| C[Dequeue from\nMicrotask Queue]
+    C --> A
+    B -->|Microtasks empty| D[Dequeue from\nMacrotask Queue]
+    D --> A
+    E[setTimeout, I/O] --> F[Web APIs]
+    F --> D
+    G[Promise.then, async/await] --> C" />
+
+```javascript
+// async/await in JavaScript
+async function fetchData(url) {
+    const response = await fetch(url);
+    return await response.json();
+}
+
+async function main() {
+    console.time("parallel");
+
+    // Run in parallel with Promise.all
+    const [users, posts, comments] = await Promise.all([
+        fetchData("/api/users"),
+        fetchData("/api/posts"),
+        fetchData("/api/comments"),
+    ]);
+
+    console.timeEnd("parallel"); // Time = max(3 requests)
+    console.log(`Users: ${users.length}, Posts: ${posts.length}`);
+}
+```
+
+## Java: Threads, ExecutorService, and CompletableFuture
+
+Java has a rich concurrency ecosystem, from basic threads to virtual threads (Java 21+).
+
+```java
+import java.util.concurrent.*;
+
+public class ConcurrencyDemo {
+    public static void main(String[] args) throws Exception {
+        // ExecutorService - automatically managed thread pool
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+
+        // CompletableFuture - async/await style
+        CompletableFuture<String> usersFuture = CompletableFuture.supplyAsync(
+            () -> fetchFromDB("users"), executor
+        );
+        CompletableFuture<String> ordersFuture = CompletableFuture.supplyAsync(
+            () -> fetchFromDB("orders"), executor
+        );
+
+        // Combine results
+        CompletableFuture<String> combined = usersFuture.thenCombine(
+            ordersFuture,
+            (users, orders) -> "Users: " + users + ", Orders: " + orders
+        );
+
+        System.out.println(combined.get()); // Wait for result
+
+        // Java 21+: Virtual Threads - lightweight like goroutines
+        // try (var executor2 = Executors.newVirtualThreadPerTaskExecutor()) {
+        //     executor2.submit(() -> fetchFromDB("products"));
+        // }
+
+        executor.shutdown();
+    }
+
+    static String fetchFromDB(String table) {
+        try { Thread.sleep(1000); } catch (InterruptedException e) {}
+        return table + "_data";
+    }
+}
+```
+
+## The Actor Model: Erlang/Elixir
+
+In the Actor model, each **actor** is an independent unit of computation that communicates exclusively through **message passing**. No shared data, no locks, no race conditions.
+
+```elixir
+# Elixir - Actor model with lightweight processes
+defmodule Counter do
+  def start(initial_count \\ 0) do
+    spawn(fn -> loop(initial_count) end)
+  end
+
+  defp loop(count) do
+    receive do
+      {:increment, caller} ->
+        send(caller, {:count, count + 1})
+        loop(count + 1)
+      {:get, caller} ->
+        send(caller, {:count, count})
+        loop(count)
+    end
+  end
+end
+
+# Usage
+counter = Counter.start(0)
+send(counter, {:increment, self()})
+receive do
+  {:count, value} -> IO.puts("Count: #{value}")  # Count: 1
+end
+```
+
+## Concurrency Model Comparison
+
+<ComparisonTable
+  headers={["Criteria", "Go", "Rust", "Java", "Python", "JavaScript"]}
+  rows={[
+    ["Primary model", "Goroutines + Channels", "Threads + Ownership", "Threads + Virtual Threads", "asyncio + GIL", "Event Loop"],
+    ["Concurrency unit", "Goroutine (~2KB)", "std::thread (OS thread)", "Thread / Virtual Thread", "Coroutine", "Promise/async function"],
+    ["Creation cost", "Very low", "High (OS thread)", "Low (virtual thread)", "Very low", "Very low"],
+    ["Max count", "Millions", "Thousands", "Millions (virtual)", "Hundreds of thousands", "Millions"],
+    ["Data race prevention", "Runtime (race detector)", "Compile time", "Runtime", "GIL (partially)", "Single-threaded"],
+    ["CPU-bound", "Good (GOMAXPROCS)", "Excellent", "Good", "Poor (needs multiprocessing)", "Poor (needs Workers)"],
+    ["I/O-bound", "Excellent", "Good (tokio)", "Good", "Good (asyncio)", "Excellent"],
+    ["Complexity", "Low", "High", "Medium", "Medium", "Low"]
+  ]}
+/>
+
+## Conclusion
+
+Each language takes a different approach to concurrency, suited to different use cases. Go excels with simple and efficient goroutines. Rust guarantees safety at compile time. Java offers a rich concurrency ecosystem with the addition of virtual threads. Python works well for I/O-bound tasks with asyncio. JavaScript leverages its event loop for non-blocking operations. Understanding the strengths and tradeoffs of each model helps you choose the right tool for each problem.

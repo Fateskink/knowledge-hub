@@ -1,0 +1,237 @@
+---
+title: "Index Trong Database: Cách Hoạt Động và Các Loại Index"
+description: "Tìm hiểu cách index hoạt động bên trong database, từ B-Tree, Hash, GIN, GiST đến BRIN, cùng các chiến lược indexing nâng cao như Composite, Covering và Partial Index."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["index", "b-tree", "hash-index", "gin", "gist", "brin", "postgresql", "mysql", "database", "performance"]
+featured: false
+order: 12
+sources:
+  - title: "PostgreSQL Index Types - Official Documentation"
+    url: "https://www.postgresql.org/docs/current/indexes-types.html"
+  - title: "A Tour of Postgres Index Types - Citus Data"
+    url: "https://www.citusdata.com/blog/2017/10/17/tour-of-postgres-index-types/"
+  - title: "Database Indexing Strategies"
+    url: "https://medium.com/@artemkhrenov/database-indexing-strategies-b-tree-hash-and-specialized-indexes-explained-95a3e5e3b632"
+---
+
+# Index Trong Database: Cách Hoạt Động và Các Loại Index
+
+## Index là gì?
+
+Hãy tưởng tượng bạn có một cuốn sách dày 1.000 trang và cần tìm phần nói về "B-Tree". Bạn có hai cách: lật từng trang một cho đến khi tìm thấy (sequential scan), hoặc mở mục lục ở cuối sách, tra chữ "B", và đi thẳng đến trang cần thiết. **Index trong database hoạt động chính xác như mục lục của cuốn sách.**
+
+Không có index, database phải quét toàn bộ bảng (full table scan) — kiểm tra từng row một. Với bảng hàng triệu row, điều này cực kỳ chậm.
+
+- **Không có index**: Sequential scan — độ phức tạp O(n)
+- **Có B-Tree index**: Tìm kiếm theo cây — độ phức tạp O(log n)
+- **Có Hash index**: Hash lookup — độ phức tạp O(1) trung bình
+
+<Callout type="info" title="Con số thực tế">
+Bảng 10 triệu row: sequential scan có thể phải đọc 10 triệu row. B-Tree index chỉ cần đọc khoảng 23-24 node (log₂(10.000.000) ≈ 23). Chênh lệch hàng trăm nghìn lần!
+</Callout>
+
+## B-Tree Index (Mặc định)
+
+B-Tree (Balanced Tree) là loại index mặc định trong hầu hết các database (PostgreSQL, MySQL, Oracle, SQL Server). Khi bạn viết `CREATE INDEX` mà không chỉ định loại, database sẽ tạo B-Tree index.
+
+### Cấu trúc B-Tree
+
+B-Tree là cây cân bằng, trong đó:
+- **Root node**: Node gốc, điểm bắt đầu mọi tìm kiếm
+- **Internal nodes**: Chứa các key và con trỏ tới node con, dùng để định hướng tìm kiếm
+- **Leaf nodes**: Chứa key thực tế và con trỏ tới row trong bảng (hoặc giá trị trực tiếp trong clustered index)
+
+Tất cả leaf nodes nằm ở cùng một độ sâu — đây là tính chất "balanced" đảm bảo mọi tìm kiếm đều có chi phí như nhau.
+
+<Diagram chart="graph TD\n    A[Root Node\n50] -->|≤50| B[Internal Node\n20 - 35]\n    A -->|>50| C[Internal Node\n70 - 85]\n    B -->|≤20| D[Leaf: 10, 15, 20\n→ Row pointers]\n    B -->|21-35| E[Leaf: 25, 30, 35\n→ Row pointers]\n    C -->|51-70| F[Leaf: 55, 60, 70\n→ Row pointers]\n    C -->|>70| G[Leaf: 75, 80, 85\n→ Row pointers]" />
+
+### Tại sao B-Tree chứ không phải Binary Tree?
+
+Câu hỏi phổ biến: tại sao database dùng B-Tree thay vì Binary Search Tree (BST)?
+
+Câu trả lời nằm ở **disk I/O**. Mỗi node trong cây tương ứng với một lần đọc disk (page). Binary Tree chỉ chứa 1 key mỗi node, nên cây rất cao — cần nhiều lần đọc disk. B-Tree chứa **hàng trăm key** trong mỗi node (thường là một page 8KB hoặc 16KB), nên cây rất thấp — thường chỉ 3-4 tầng cho hàng triệu row.
+
+<Callout type="tip" title="B-Tree thực tế rất phẳng">
+Một B-Tree node kích thước 16KB, mỗi key chiếm 16 bytes, có thể chứa khoảng 500 key. Cây 3 tầng: 500 × 500 × 500 = 125 triệu row. Chỉ cần 3 lần đọc disk để tìm bất kỳ row nào trong 125 triệu row!
+</Callout>
+
+### Các phép toán B-Tree hỗ trợ
+
+B-Tree hỗ trợ nhiều loại truy vấn nhờ dữ liệu được sắp xếp:
+- Equality: `WHERE email = 'user@example.com'`
+- Range: `WHERE age > 25 AND age < 50`
+- Comparison: `<`, `>`, `<=`, `>=`, `BETWEEN`, `IN`
+- Sorting: `ORDER BY created_at DESC`
+- Prefix matching: `WHERE name LIKE 'Nguyễn%'` (nhưng KHÔNG hỗ trợ `LIKE '%Nguyễn'`)
+
+## Hash Index
+
+Hash index sử dụng **hash function** để chuyển đổi key thành vị trí trong hash table (bucket). Mỗi bucket chứa con trỏ tới các row có cùng hash value.
+
+```sql
+-- PostgreSQL: tạo hash index
+CREATE INDEX idx_email_hash ON users USING HASH (email);
+```
+
+**Ưu điểm**: Nhanh hơn B-Tree cho exact equality match (`=`) — O(1) trung bình thay vì O(log n).
+
+**Nhược điểm**: Chỉ hỗ trợ equality (`=`), không hỗ trợ range query, sorting, hay prefix matching.
+
+<Callout type="warning" title="Hash Index trong PostgreSQL">
+Trước PostgreSQL 10, hash index KHÔNG được WAL-logged, nghĩa là không crash-safe và không thể replicate. Từ PostgreSQL 10 trở đi, hash index đã WAL-logged và an toàn để sử dụng. Tuy nhiên, trong thực tế, B-Tree vẫn là lựa chọn phổ biến hơn vì linh hoạt hơn nhiều.
+</Callout>
+
+## GIN (Generalized Inverted Index)
+
+GIN là **index đảo ngược**: thay vì ánh xạ từ row tới giá trị, GIN ánh xạ từ **mỗi giá trị thành phần** tới danh sách các row chứa nó. Cấu trúc này hoàn hảo cho dữ liệu chứa nhiều giá trị trong một cột.
+
+### Trường hợp sử dụng
+
+- **Full-text search** (tsvector): Tìm tất cả bài viết chứa từ "database"
+- **JSONB**: Tìm tất cả document có key "status" = "active"
+- **Arrays**: Tìm tất cả sản phẩm có tag "electronics"
+
+```sql
+-- Full-text search index
+CREATE INDEX idx_articles_search ON articles USING GIN (to_tsvector('english', content));
+
+-- JSONB index
+CREATE INDEX idx_data_gin ON events USING GIN (metadata jsonb_path_ops);
+
+-- Array index
+CREATE INDEX idx_tags ON products USING GIN (tags);
+```
+
+<Callout type="info" title="GIN hoạt động thế nào?">
+Ví dụ full-text search: GIN tách nội dung thành các từ riêng lẻ (lexeme). Mỗi từ trở thành một key trong index, trỏ tới danh sách các row chứa từ đó. Khi bạn tìm "database", GIN tra cứu key "database" và trả về danh sách row ngay lập tức, không cần quét toàn bộ bảng.
+</Callout>
+
+## GiST (Generalized Search Tree)
+
+GiST là một **framework tổng quát** cho phép xây dựng nhiều loại cây tìm kiếm khác nhau. Không giống B-Tree (chỉ hoạt động tốt với dữ liệu có thể sắp xếp tuyến tính), GiST hỗ trợ dữ liệu đa chiều và các phép toán phức tạp.
+
+### Trường hợp sử dụng
+
+- **Spatial data** (PostGIS): Tìm tất cả nhà hàng trong bán kính 5km
+- **Range types**: Tìm các booking trùng thời gian
+- **Nearest-neighbor search**: Tìm 10 điểm gần nhất
+
+```sql
+-- PostGIS: index cho dữ liệu không gian
+CREATE INDEX idx_location ON restaurants USING GiST (geom);
+
+-- Truy vấn: tìm nhà hàng trong bán kính 5km
+SELECT name FROM restaurants
+WHERE ST_DWithin(geom, ST_MakePoint(106.6297, 10.8231)::geography, 5000);
+
+-- Range: tìm booking trùng thời gian
+CREATE INDEX idx_booking_range ON bookings USING GiST (during);
+SELECT * FROM bookings WHERE during && '[2026-03-18, 2026-03-20]'::daterange;
+```
+
+## BRIN (Block Range Index)
+
+BRIN là loại index **siêu nhỏ gọn**, lưu trữ giá trị min/max cho mỗi **block of pages** (mặc định 128 pages). BRIN cực kỳ hiệu quả cho bảng lớn có dữ liệu được sắp xếp tự nhiên theo thứ tự vật lý (physical order correlates with logical order).
+
+### Khi nào BRIN hiệu quả?
+
+- **Time-series data**: Dữ liệu INSERT theo thời gian, cột `created_at` tương quan với thứ tự vật lý
+- **Log tables**: Bảng ghi log hàng tỷ row, query thường filter theo khoảng thời gian
+- **IoT sensor data**: Dữ liệu cảm biến ghi liên tục
+
+```sql
+-- BRIN index cho bảng time-series
+CREATE INDEX idx_logs_created ON logs USING BRIN (created_at);
+-- Index chỉ chiếm vài KB cho bảng hàng triệu row!
+```
+
+<Callout type="tip" title="Kích thước BRIN rất nhỏ">
+Bảng 100 triệu row: B-Tree index có thể chiếm 2-3GB. BRIN index tương đương chỉ chiếm 50-100KB — nhỏ hơn hàng chục nghìn lần! Đánh đổi là BRIN kém chính xác hơn: nó chỉ loại trừ các block chắc chắn không chứa kết quả, các block còn lại vẫn cần scan.
+</Callout>
+
+## So sánh các loại Index
+
+<ComparisonTable
+  headers={["Loại Index", "Phép toán hỗ trợ", "Dùng cho", "Kích thước", "Tốc độ ghi"]}
+  rows={[
+    ["B-Tree", "=, <, >, <=, >=, BETWEEN, IN, ORDER BY, LIKE prefix", "Đa mục đích, mặc định", "Trung bình", "Trung bình"],
+    ["Hash", "= (chỉ equality)", "Exact match, key lookup", "Nhỏ", "Nhanh"],
+    ["GIN", "Contains, overlap, full-text search", "JSONB, arrays, tsvector", "Lớn", "Chậm (cập nhật tốn kém)"],
+    ["GiST", "Overlap, contains, distance, nearest-neighbor", "Spatial, range, geometric", "Trung bình", "Trung bình"],
+    ["BRIN", "=, <, >, range (block-level)", "Time-series, dữ liệu sắp xếp tự nhiên", "Rất nhỏ", "Rất nhanh"]
+  ]}
+/>
+
+## Composite Index, Covering Index, Partial Index
+
+### Composite Index (Multi-column Index)
+
+Index trên nhiều cột. **Thứ tự các cột rất quan trọng** — index hoạt động theo nguyên tắc "leftmost prefix".
+
+```sql
+CREATE INDEX idx_name_email ON users (last_name, first_name, email);
+
+-- Sử dụng được index:
+WHERE last_name = 'Nguyễn'
+WHERE last_name = 'Nguyễn' AND first_name = 'Văn'
+WHERE last_name = 'Nguyễn' AND first_name = 'Văn' AND email = '...'
+
+-- KHÔNG sử dụng được index:
+WHERE first_name = 'Văn'              -- bỏ qua cột đầu tiên
+WHERE email = 'user@example.com'       -- bỏ qua hai cột đầu
+```
+
+### Covering Index (INCLUDE)
+
+Thêm các cột phụ vào index để tránh phải đọc bảng chính (index-only scan).
+
+```sql
+-- PostgreSQL: Covering index
+CREATE INDEX idx_orders_status ON orders (status) INCLUDE (total_amount, created_at);
+
+-- Query này chỉ cần đọc index, không cần truy cập bảng:
+SELECT total_amount, created_at FROM orders WHERE status = 'pending';
+```
+
+### Partial Index
+
+Index chỉ áp dụng cho một subset của bảng, được định nghĩa bởi điều kiện WHERE.
+
+```sql
+-- Chỉ index các order chưa hoàn thành
+CREATE INDEX idx_active_orders ON orders (created_at)
+WHERE status IN ('pending', 'processing');
+
+-- Index nhỏ hơn nhiều so với full index, và nhanh hơn cho query phổ biến
+SELECT * FROM orders WHERE status = 'pending' ORDER BY created_at;
+```
+
+<Callout type="tip" title="Kết hợp Covering + Partial">
+Bạn có thể kết hợp cả hai: `CREATE INDEX idx ON orders (status) INCLUDE (amount) WHERE status != 'completed'`. Index cực nhỏ, chỉ phục vụ đúng query pattern phổ biến nhất.
+</Callout>
+
+## Khi nào KHÔNG nên dùng Index
+
+Index không phải lúc nào cũng tốt. Mỗi index đi kèm chi phí:
+
+- **Bảng nhỏ** (dưới vài nghìn row): Sequential scan có thể nhanh hơn B-Tree lookup do overhead của việc đọc index
+- **Cột ít giá trị phân biệt** (low cardinality): Index trên cột `gender` (chỉ có 2-3 giá trị) hầu như không giúp ích gì vì vẫn phải đọc phần lớn bảng
+- **Bảng ghi nhiều**: Mỗi INSERT/UPDATE/DELETE phải cập nhật tất cả index trên bảng đó. Bảng có 10 index nghĩa là mỗi INSERT phải ghi 11 lần (1 bảng + 10 index)
+- **Trade-off cơ bản**: Đọc nhanh hơn nhưng ghi chậm hơn, và tốn thêm dung lượng disk
+
+```sql
+-- Kiểm tra index có được sử dụng không
+EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'test@example.com';
+-- Nếu output hiện "Seq Scan" thay vì "Index Scan" → index không được dùng!
+
+-- PostgreSQL: kiểm tra index không sử dụng
+SELECT indexrelname, idx_scan FROM pg_stat_user_indexes
+WHERE idx_scan = 0 ORDER BY pg_relation_size(indexrelid) DESC;
+```
+
+## Tổng kết
+
+Index là công cụ mạnh mẽ nhất để tối ưu hiệu năng đọc trong database. B-Tree phù hợp đa mục đích, Hash cho exact match, GIN cho dữ liệu phức tạp (JSONB, full-text), GiST cho dữ liệu không gian, và BRIN cho time-series. Kết hợp với Composite, Covering, và Partial Index, bạn có thể tinh chỉnh hiệu năng đến mức tối ưu. Tuy nhiên, luôn nhớ rằng mỗi index đều có chi phí — chỉ tạo index khi bạn có query pattern thực tế cần nó, và sử dụng `EXPLAIN ANALYZE` để xác nhận index được sử dụng.

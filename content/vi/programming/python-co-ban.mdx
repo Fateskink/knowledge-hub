@@ -1,0 +1,355 @@
+---
+title: "Python Cơ Bản"
+description: "Hướng dẫn toàn diện về ngôn ngữ Python cho người mới bắt đầu - từ cú pháp, biến, hàm, class đến xử lý file và cấu trúc dữ liệu."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["python", "lap-trinh", "co-ban", "huong-dan", "nguoi-moi"]
+featured: true
+order: 3
+sources:
+  - title: "Python Official Documentation"
+    url: "https://docs.python.org/3/"
+  - title: "Real Python Tutorials"
+    url: "https://realpython.com/"
+  - title: "W3Schools Python"
+    url: "https://www.w3schools.com/python/"
+---
+
+# Python Cơ Bản
+
+Python là một trong những ngôn ngữ lập trình phổ biến nhất thế giới, được sử dụng rộng rãi trong phát triển web, khoa học dữ liệu, trí tuệ nhân tạo và tự động hóa. Với cú pháp đơn giản và dễ đọc, Python là lựa chọn lý tưởng cho người mới bắt đầu học lập trình.
+
+## Tại sao chọn Python?
+
+Python nổi bật nhờ những ưu điểm sau:
+
+- **Cú pháp đơn giản**: Đọc như tiếng Anh, dễ hiểu và dễ nhớ.
+- **Đa năng**: Từ web, AI, data science đến tự động hóa.
+- **Cộng đồng lớn**: Hàng triệu lập trình viên và thư viện phong phú.
+- **Nhu cầu cao**: Nhiều công ty tuyển dụng lập trình viên Python.
+
+<Callout type="info">Python được tạo bởi Guido van Rossum vào năm 1991 và đặt tên theo chương trình hài Monty Python, không phải loài rắn!</Callout>
+
+## Cài đặt và chạy Python
+
+Trước khi bắt đầu, bạn cần cài đặt Python trên máy tính:
+
+```bash
+# Kiểm tra phiên bản Python đã cài đặt
+python3 --version
+
+# Chạy file Python
+python3 ten_file.py
+
+# Chạy Python interactive mode
+python3
+```
+
+<Callout type="tip">Sử dụng Visual Studio Code với extension Python để có trải nghiệm lập trình tốt nhất. VS Code hỗ trợ gợi ý code, debug và chạy trực tiếp.</Callout>
+
+## Biến và kiểu dữ liệu
+
+Trong Python, bạn không cần khai báo kiểu dữ liệu trước - Python tự động nhận biết kiểu dữ liệu của biến.
+
+```python
+# Các kiểu dữ liệu cơ bản
+ten = "Nguyễn Văn A"          # str - chuỗi ký tự
+tuoi = 25                     # int - số nguyên
+chieu_cao = 1.75              # float - số thực
+la_sinh_vien = True           # bool - giá trị logic
+danh_sach = [1, 2, 3]         # list - danh sách
+thong_tin = {"ten": "A"}      # dict - từ điển
+
+# Kiểm tra kiểu dữ liệu
+print(type(ten))       # <class 'str'>
+print(type(tuoi))      # <class 'int'>
+
+# Ép kiểu dữ liệu
+so_text = "42"
+so_nguyen = int(so_text)      # Chuyển chuỗi thành số
+print(so_nguyen + 8)          # 50
+
+# F-string - định dạng chuỗi hiện đại
+print(f"Tên: {ten}, Tuổi: {tuoi}")
+```
+
+## Cấu trúc điều khiển
+
+### If / Elif / Else
+
+```python
+diem = 85
+
+if diem >= 90:
+    xep_loai = "Xuất sắc"
+elif diem >= 80:
+    xep_loai = "Giỏi"
+elif diem >= 65:
+    xep_loai = "Khá"
+elif diem >= 50:
+    xep_loai = "Trung bình"
+else:
+    xep_loai = "Yếu"
+
+print(f"Điểm: {diem} - Xếp loại: {xep_loai}")
+```
+
+### Vòng lặp
+
+```python
+# Vòng lặp for
+for i in range(1, 6):
+    print(f"Lần thứ {i}")
+
+# Vòng lặp while
+dem = 0
+while dem < 5:
+    print(f"Đếm: {dem}")
+    dem += 1
+
+# Duyệt qua danh sách
+trai_cay = ["Táo", "Cam", "Chuối", "Nho"]
+for tc in trai_cay:
+    print(f"Tôi thích ăn {tc}")
+
+# List comprehension - cách viết gọn
+so_chan = [x for x in range(1, 21) if x % 2 == 0]
+print(so_chan)  # [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+```
+
+## Hàm (Functions)
+
+Hàm giúp bạn tổ chức code thành các khối logic, có thể tái sử dụng.
+
+```python
+# Hàm cơ bản
+def chao(ten):
+    """Hàm chào hỏi."""
+    return f"Xin chào, {ten}!"
+
+print(chao("An"))  # Xin chào, An!
+
+# Hàm với giá trị mặc định
+def tinh_dien_tich(dai, rong=10):
+    """Tính diện tích hình chữ nhật."""
+    return dai * rong
+
+print(tinh_dien_tich(5))       # 50 (rộng mặc định = 10)
+print(tinh_dien_tich(5, 3))    # 15
+
+# Hàm với *args và **kwargs
+def tong(*args):
+    """Tính tổng nhiều số."""
+    return sum(args)
+
+print(tong(1, 2, 3, 4, 5))    # 15
+
+# Lambda - hàm ẩn danh
+binh_phuong = lambda x: x ** 2
+print(binh_phuong(5))           # 25
+```
+
+<Callout type="warning">Luôn viết docstring (chuỗi mô tả) cho hàm để người khác (và chính bạn trong tương lai) hiểu hàm làm gì.</Callout>
+
+## List và Dictionary
+
+Đây là hai cấu trúc dữ liệu quan trọng nhất trong Python.
+
+### List (Danh sách)
+
+```python
+# Tạo và thao tác list
+sinh_vien = ["An", "Bình", "Cường", "Dương"]
+
+# Truy cập phần tử
+print(sinh_vien[0])       # An (vị trí đầu tiên)
+print(sinh_vien[-1])      # Dương (vị trí cuối)
+
+# Thêm và xóa phần tử
+sinh_vien.append("Em")          # Thêm vào cuối
+sinh_vien.insert(1, "Anh")     # Chèn vào vị trí 1
+sinh_vien.remove("Cường")       # Xóa theo giá trị
+phan_tu = sinh_vien.pop()       # Xóa và trả về phần tử cuối
+
+# Cắt (slicing)
+print(sinh_vien[1:3])     # Lấy phần tử từ vị trí 1 đến 2
+
+# Sắp xếp
+diem = [85, 92, 78, 95, 88]
+diem.sort()                     # Sắp xếp tăng dần
+diem.sort(reverse=True)         # Sắp xếp giảm dần
+```
+
+### Dictionary (Từ điển)
+
+```python
+# Tạo dictionary
+sinh_vien = {
+    "ten": "Nguyễn Văn An",
+    "tuoi": 20,
+    "lop": "CNTT-K20",
+    "diem": [8, 9, 7, 8.5]
+}
+
+# Truy cập giá trị
+print(sinh_vien["ten"])              # Nguyễn Văn An
+print(sinh_vien.get("email", "N/A")) # N/A (không có key)
+
+# Thêm và cập nhật
+sinh_vien["email"] = "an@email.com"
+sinh_vien.update({"sdt": "0123456789"})
+
+# Duyệt dictionary
+for key, value in sinh_vien.items():
+    print(f"{key}: {value}")
+
+# Dictionary comprehension
+binh_phuong = {x: x**2 for x in range(1, 6)}
+print(binh_phuong)  # {1: 1, 2: 4, 3: 9, 4: 16, 5: 25}
+```
+
+## So sánh Python và JavaScript
+
+<ComparisonTable
+  headers={["Tiêu chí", "Python", "JavaScript"]}
+  rows={[
+    ["Cú pháp", "Dùng indent (thụt dòng)", "Dùng dấu ngoặc nhọn {}"],
+    ["Kiểu dữ liệu", "Động (dynamic typing)", "Động (dynamic typing)"],
+    ["Mảng/Danh sách", "list: [1, 2, 3]", "Array: [1, 2, 3]"],
+    ["Từ điển/Object", "dict: {'a': 1}", "Object: {a: 1}"],
+    ["Hàm", "def ham():", "function ham() {} hoặc () => {}"],
+    ["In ra màn hình", "print()", "console.log()"],
+    ["Vòng lặp", "for x in range(10):", "for (let x = 0; x < 10; x++)"],
+    ["Null", "None", "null / undefined"],
+    ["Ứng dụng chính", "AI, Data, Backend", "Web, Full-stack"]
+  ]}
+/>
+
+## Lập trình hướng đối tượng (OOP)
+
+Class cho phép bạn tạo các đối tượng với thuộc tính và phương thức.
+
+```python
+class SinhVien:
+    """Lớp đại diện cho sinh viên."""
+
+    def __init__(self, ten, tuoi, lop):
+        """Khởi tạo đối tượng sinh viên."""
+        self.ten = ten
+        self.tuoi = tuoi
+        self.lop = lop
+        self.diem = []
+
+    def them_diem(self, diem):
+        """Thêm điểm vào danh sách."""
+        self.diem.append(diem)
+
+    def diem_trung_binh(self):
+        """Tính điểm trung bình."""
+        if not self.diem:
+            return 0
+        return sum(self.diem) / len(self.diem)
+
+    def __str__(self):
+        """Chuỗi mô tả đối tượng."""
+        return f"SinhVien({self.ten}, Lớp: {self.lop})"
+
+
+# Sử dụng class
+sv = SinhVien("Nguyễn Văn An", 20, "CNTT-K20")
+sv.them_diem(8.5)
+sv.them_diem(9.0)
+sv.them_diem(7.5)
+
+print(sv)                              # SinhVien(Nguyễn Văn An, Lớp: CNTT-K20)
+print(f"ĐTB: {sv.diem_trung_binh()}")  # ĐTB: 8.333...
+
+
+# Kế thừa (Inheritance)
+class SinhVienIT(SinhVien):
+    """Lớp sinh viên ngành CNTT."""
+
+    def __init__(self, ten, tuoi, lop, ngon_ngu):
+        super().__init__(ten, tuoi, lop)
+        self.ngon_ngu = ngon_ngu
+
+    def gioi_thieu(self):
+        return f"{self.ten} biết lập trình {', '.join(self.ngon_ngu)}"
+
+
+sv_it = SinhVienIT("Lê Thị B", 21, "CNTT-K19", ["Python", "Java"])
+print(sv_it.gioi_thieu())
+```
+
+## Xử lý File
+
+Đọc và ghi file là kỹ năng thiết yếu khi làm việc với dữ liệu.
+
+```python
+# Ghi file
+with open("du_lieu.txt", "w", encoding="utf-8") as f:
+    f.write("Dòng thứ nhất\n")
+    f.write("Dòng thứ hai\n")
+    f.write("Dòng thứ ba\n")
+
+# Đọc file
+with open("du_lieu.txt", "r", encoding="utf-8") as f:
+    noi_dung = f.read()
+    print(noi_dung)
+
+# Đọc từng dòng
+with open("du_lieu.txt", "r", encoding="utf-8") as f:
+    for dong in f:
+        print(dong.strip())
+
+# Làm việc với file JSON
+import json
+
+du_lieu = {
+    "sinh_vien": [
+        {"ten": "An", "diem": 8.5},
+        {"ten": "Bình", "diem": 9.0}
+    ]
+}
+
+# Ghi JSON
+with open("du_lieu.json", "w", encoding="utf-8") as f:
+    json.dump(du_lieu, f, ensure_ascii=False, indent=2)
+
+# Đọc JSON
+with open("du_lieu.json", "r", encoding="utf-8") as f:
+    data = json.load(f)
+    print(data["sinh_vien"][0]["ten"])  # An
+```
+
+<Callout type="tip">Luôn sử dụng `with open(...)` để đảm bảo file được đóng đúng cách sau khi sử dụng, ngay cả khi có lỗi xảy ra.</Callout>
+
+## Xử lý ngoại lệ (Exception Handling)
+
+```python
+# Try / Except cơ bản
+try:
+    so = int(input("Nhập một số: "))
+    ket_qua = 100 / so
+    print(f"Kết quả: {ket_qua}")
+except ValueError:
+    print("Bạn phải nhập một số nguyên!")
+except ZeroDivisionError:
+    print("Không thể chia cho 0!")
+except Exception as e:
+    print(f"Lỗi không xác định: {e}")
+finally:
+    print("Chương trình kết thúc.")
+```
+
+## Tổng quan cấu trúc chương trình Python
+
+<Diagram chart="graph TD\n    A[Bắt đầu học Python] --> B[Biến và Kiểu dữ liệu]\n    B --> C[Cấu trúc điều khiển]\n    C --> D[Hàm - Functions]\n    D --> E[List và Dictionary]\n    E --> F[Xử lý File]\n    F --> G[OOP - Class]\n    G --> H[Module và Package]\n    H --> I{Chọn hướng đi}\n    I --> J[Web: Django/Flask]\n    I --> K[Data: Pandas/NumPy]\n    I --> L[AI: TensorFlow/PyTorch]" />
+
+## Kết luận
+
+Python là ngôn ngữ tuyệt vời để bắt đầu hành trình lập trình. Với cú pháp đơn giản, thư viện phong phú và cộng đồng hỗ trợ mạnh mẽ, bạn có thể nhanh chóng xây dựng được những ứng dụng thực tế. Hãy bắt đầu từ những ví dụ đơn giản trong bài viết này, thực hành mỗi ngày, và dần dần tiến đến những dự án phức tạp hơn.
+
+Bước tiếp theo là tìm hiểu về các thư viện phổ biến của Python như Pandas, Flask, hoặc Django để mở rộng kỹ năng của bạn.

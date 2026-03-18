@@ -1,0 +1,328 @@
+---
+title: "Docker Cơ bản"
+description: "Tìm hiểu các khái niệm cơ bản về Docker: container, image, Dockerfile, và docker-compose để bắt đầu với container hóa ứng dụng."
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["docker", "container", "devops", "dockerfile", "docker-compose", "deploy"]
+featured: false
+order: 1
+sources:
+  - title: "Docker Official Documentation"
+    url: "https://docs.docker.com/"
+  - title: "Docker Hub"
+    url: "https://hub.docker.com/"
+  - title: "Docker Curriculum - Prakhar Srivastav"
+    url: "https://docker-curriculum.com/"
+  - title: "Play with Docker"
+    url: "https://labs.play-with-docker.com/"
+---
+
+# Docker Cơ bản
+
+Docker là một nền tảng mã nguồn mở giúp bạn đóng gói, phân phối và chạy ứng dụng trong các container. Thay vì cài đặt môi trường phức tạp trên từng máy, Docker cho phép bạn tạo ra các môi trường độc lập, nhất quán và có thể tái tạo trên bất kỳ hệ thống nào. Bài viết này sẽ giúp bạn hiểu rõ các khái niệm cơ bản của Docker và bắt đầu sử dụng nó.
+
+## Container là gì?
+
+Container là một đơn vị phần mềm nhẹ, độc lập, chứa tất cả những gì cần thiết để chạy một ứng dụng: mã nguồn, thư viện, công cụ hệ thống và cấu hình. Container chia sẻ kernel của hệ điều hành nên nhẹ hơn nhiều so với máy ảo (Virtual Machine).
+
+<Diagram chart="graph LR\n    subgraph Máy ảo truyền thống\n    A[Hardware] --> B[Host OS]\n    B --> C[Hypervisor]\n    C --> D1[Guest OS 1]\n    C --> D2[Guest OS 2]\n    D1 --> E1[App 1]\n    D2 --> E2[App 2]\n    end" />
+
+<Diagram chart="graph LR\n    subgraph Docker Container\n    F[Hardware] --> G[Host OS]\n    G --> H[Docker Engine]\n    H --> I1[Container 1 - App 1]\n    H --> I2[Container 2 - App 2]\n    H --> I3[Container 3 - App 3]\n    end" />
+
+### So sánh Container và Máy ảo
+
+| Tiêu chí | Container | Máy ảo (VM) |
+|---------|-----------|-------------|
+| Kích thước | MB | GB |
+| Thời gian khởi động | Giây | Phút |
+| Hiệu suất | Gần như native | Có overhead |
+| Cách ly | Cấp process | Cấp OS |
+| Sử dụng RAM | Ít | Nhiều |
+| Di động | Rất cao | Trung bình |
+
+<Callout type="info">Container không thay thế máy ảo hoàn toàn. Mỗi loại phù hợp với các trường hợp sử dụng khác nhau. Container lý tưởng cho microservices, trong khi VM phù hợp khi cần cách ly hoàn toàn ở cấp hệ điều hành.</Callout>
+
+## Các khái niệm cốt lõi của Docker
+
+<Diagram chart="graph TD\n    A[Dockerfile] -->|docker build| B[Docker Image]\n    B -->|docker run| C[Docker Container]\n    B -->|docker push| D[Docker Registry]\n    D -->|docker pull| B\n    C -->|docker commit| B" />
+
+### Docker Image
+
+Image là bản thiết kế (blueprint) của container. Nó chứa hệ điều hành cơ bản, mã nguồn ứng dụng, thư viện và cấu hình. Image là bất biến (immutable) -- khi đã tạo thì không thể thay đổi.
+
+### Docker Container
+
+Container là một instance đang chạy của image. Bạn có thể tạo nhiều container từ cùng một image, mỗi container hoạt động độc lập.
+
+### Dockerfile
+
+Dockerfile là tập tin văn bản chứa các lệnh để xây dựng một Docker image.
+
+### Docker Registry
+
+Registry là kho lưu trữ và phân phối Docker images. Docker Hub là registry công khai phổ biến nhất.
+
+## Cài đặt Docker
+
+```bash
+# Trên macOS: sử dụng Docker Desktop
+# Tải từ: https://www.docker.com/products/docker-desktop/
+
+# Trên Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io
+
+# Kiểm tra cài đặt thành công
+docker --version
+docker run hello-world
+```
+
+<Callout type="tip">Trên macOS và Windows, Docker Desktop là cách dễ nhất để cài đặt. Nó bao gồm Docker Engine, Docker CLI, Docker Compose và giao diện đồ họa.</Callout>
+
+## Các lệnh Docker cơ bản
+
+```bash
+# Tải image từ Docker Hub
+docker pull nginx
+
+# Liệt kê các image đã tải
+docker images
+
+# Chạy một container
+docker run -d --name webserver -p 8080:80 nginx
+
+# Liệt kê các container đang chạy
+docker ps
+
+# Liệt kê tất cả container (bao gồm đã dừng)
+docker ps -a
+
+# Xem log của container
+docker logs webserver
+
+# Truy cập vào trong container
+docker exec -it webserver bash
+
+# Dừng container
+docker stop webserver
+
+# Xóa container
+docker rm webserver
+
+# Xóa image
+docker rmi nginx
+```
+
+### Giải thích lệnh docker run
+
+```bash
+docker run -d --name webserver -p 8080:80 -v ./html:/usr/share/nginx/html nginx
+#          |   |                |           |                                 |
+#          |   |                |           |                                 +-- Image name
+#          |   |                |           +-- Mount volume (thư mục local : thư mục container)
+#          |   |                +-- Map port (port máy host : port container)
+#          |   +-- Đặt tên cho container
+#          +-- Chạy ở chế độ nền (detached)
+```
+
+## Viết Dockerfile
+
+Dockerfile là cách bạn định nghĩa môi trường cho ứng dụng của mình. Dưới đây là ví dụ với một ứng dụng Node.js.
+
+```dockerfile
+# Sử dụng image Node.js làm base
+FROM node:20-alpine
+
+# Đặt thư mục làm việc trong container
+WORKDIR /app
+
+# Sao chép file package.json và cài đặt dependencies
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Sao chép mã nguồn ứng dụng
+COPY . .
+
+# Khai báo port ứng dụng sẽ lắng nghe
+EXPOSE 3000
+
+# Tạo user không phải root để bảo mật
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
+# Lệnh chạy khi container khởi động
+CMD ["node", "server.js"]
+```
+
+### Ví dụ Dockerfile cho Python Flask
+
+```dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Cài đặt dependencies trước để tận dụng Docker cache
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 5000
+
+# Sử dụng Gunicorn cho production
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "app:app"]
+```
+
+### Xây dựng và chạy image
+
+```bash
+# Xây dựng image từ Dockerfile
+docker build -t my-app:1.0 .
+
+# Chạy container từ image vừa tạo
+docker run -d --name my-app -p 3000:3000 my-app:1.0
+
+# Kiểm tra ứng dụng
+curl http://localhost:3000
+```
+
+<Callout type="warning">Luôn sử dụng file .dockerignore để tránh sao chép các file không cần thiết vào image (như node_modules, .git, .env). Điều này giúp image nhỏ hơn và bảo mật hơn.</Callout>
+
+```text
+# .dockerignore
+node_modules
+.git
+.gitignore
+.env
+*.md
+docker-compose*.yml
+.dockerignore
+Dockerfile
+```
+
+## Docker Compose
+
+Docker Compose cho phép bạn định nghĩa và quản lý nhiều container cùng lúc bằng một file YAML duy nhất. Đây là công cụ lý tưởng cho các ứng dụng có nhiều thành phần (web server, database, cache, v.v.).
+
+### Ví dụ: Ứng dụng web với Database
+
+```yaml
+# docker-compose.yml
+version: "3.8"
+
+services:
+  # Ứng dụng web
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://user:password@db:5432/myapp
+      - REDIS_URL=redis://cache:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: myapp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d myapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  cache:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+### Các lệnh Docker Compose cơ bản
+
+```bash
+# Khởi động tất cả services
+docker compose up -d
+
+# Xem trạng thái các services
+docker compose ps
+
+# Xem log của tất cả services
+docker compose logs -f
+
+# Xem log của một service cụ thể
+docker compose logs -f web
+
+# Dừng tất cả services
+docker compose down
+
+# Dừng và xóa cả volumes (mất dữ liệu!)
+docker compose down -v
+
+# Rebuild và khởi động lại
+docker compose up -d --build
+```
+
+<Callout type="tip">Sử dụng `docker compose up -d --build` khi bạn thay đổi code hoặc Dockerfile. Flag `--build` sẽ rebuild image trước khi khởi động container.</Callout>
+
+## Best Practices
+
+### 1. Sử dụng multi-stage builds
+
+Multi-stage builds giúp giảm kích thước image đáng kể:
+
+```dockerfile
+# Stage 1: Build
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Stage 2: Production
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+EXPOSE 3000
+CMD ["node", "dist/server.js"]
+```
+
+### 2. Một số quy tắc quan trọng
+
+- **Một process mỗi container**: Mỗi container chỉ nên chạy một process chính.
+- **Sử dụng tag cụ thể**: Dùng `node:20-alpine` thay vì `node:latest` để đảm bảo tính nhất quán.
+- **Không lưu dữ liệu nhạy cảm trong image**: Sử dụng environment variables hoặc Docker secrets.
+- **Tận dụng layer caching**: Đặt các lệnh ít thay đổi (như cài đặt dependencies) trước các lệnh thay đổi thường xuyên (như sao chép mã nguồn).
+- **Sử dụng Alpine images**: Các image dựa trên Alpine Linux nhẹ hơn nhiều so với bản đầy đủ.
+
+<Callout type="warning">Không bao giờ lưu mật khẩu, API key hoặc thông tin nhạy cảm trong Dockerfile hoặc image. Sử dụng environment variables hoặc công cụ quản lý secrets như Docker Secrets hoặc HashiCorp Vault.</Callout>
+
+## Quy trình làm việc với Docker
+
+<Diagram chart="graph LR\n    A[Viết code] --> B[Viết Dockerfile]\n    B --> C[Build Image]\n    C --> D[Test Local]\n    D --> E{OK?}\n    E -->|Không| A\n    E -->|Có| F[Push to Registry]\n    F --> G[Deploy to Server]\n    G --> H[Monitoring]" />
+
+## Kết luận
+
+Docker đã thay đổi cách chúng ta phát triển, đóng gói và triển khai phần mềm. Với kiến thức cơ bản về container, image, Dockerfile và Docker Compose, bạn đã có đủ công cụ để bắt đầu container hóa ứng dụng của mình. Bước tiếp theo là thực hành bằng cách Docker hóa một dự án thực tế của bạn.

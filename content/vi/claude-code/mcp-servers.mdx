@@ -1,0 +1,335 @@
+---
+title: "MCP Servers - Mở rộng khả năng Claude Code"
+description: "Tìm hiểu Model Context Protocol (MCP), cách cài đặt và cấu hình MCP servers, và hướng dẫn viết MCP server riêng để mở rộng Claude Code."
+category: "claude-code"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 9
+tags: ["claude-code", "mcp", "servers", "protocol", "extensions", "integration"]
+featured: false
+order: 6
+sources:
+  - title: "Model Context Protocol Documentation"
+    url: "https://modelcontextprotocol.io/introduction"
+  - title: "Claude Code MCP Configuration"
+    url: "https://docs.anthropic.com/en/docs/claude-code/mcp-servers"
+  - title: "MCP TypeScript SDK"
+    url: "https://github.com/modelcontextprotocol/typescript-sdk"
+---
+
+# MCP Servers - Mở rộng khả năng Claude Code
+
+## Model Context Protocol (MCP) là gì?
+
+Model Context Protocol (MCP) là một **giao thức mở** do Anthropic phát triển, cho phép các ứng dụng AI kết nối với các nguồn dữ liệu và công cụ bên ngoài một cách chuẩn hóa. Trong Claude Code, MCP servers hoạt động như các **plugin mở rộng**, bổ sung thêm tools và capabilities mà Claude Code có thể sử dụng.
+
+<Callout type="info" title="Ý nghĩa của MCP">
+Nếu Claude Code built-in tools giống như bộ công cụ cơ bản (đọc file, chỉnh sửa, chạy lệnh), thì MCP servers là cách bạn thêm công cụ chuyên dụng: truy vấn database, tương tác với API, quản lý infrastructure, v.v.
+</Callout>
+
+## Kiến trúc MCP
+
+MCP hoạt động theo mô hình client-server. Claude Code đóng vai trò MCP client, kết nối đến một hoặc nhiều MCP servers, mỗi server cung cấp một tập tools riêng.
+
+<Diagram chart="graph TB\n    subgraph Claude Code - MCP Client\n        A[Agent Loop] --> B[MCP Client Manager]\n    end\n    B --> C[MCP Server 1: Database]\n    B --> D[MCP Server 2: GitHub]\n    B --> E[MCP Server 3: Slack]\n    B --> F[MCP Server 4: Custom]\n    C --> C1[Tool: query]\n    C --> C2[Tool: migrate]\n    D --> D1[Tool: create_issue]\n    D --> D2[Tool: list_prs]\n    E --> E1[Tool: send_message]\n    E --> E2[Tool: read_channel]\n    F --> F1[Tool: custom_action]\n    style A fill:#e1f5fe\n    style B fill:#e1f5fe" />
+
+### Giao tiếp giữa Client và Server
+
+MCP sử dụng **JSON-RPC 2.0** qua stdio hoặc HTTP (SSE) để giao tiếp:
+
+```
+Client (Claude Code)          Server (MCP Server)
+       |                              |
+       |-- initialize -->             |
+       |<-- capabilities --           |
+       |                              |
+       |-- tools/list -->             |
+       |<-- tool definitions --       |
+       |                              |
+       |-- tools/call (query) -->     |
+       |<-- result --                 |
+```
+
+## Cài đặt MCP Servers
+
+### Cấu hình trong Claude Code
+
+MCP servers được cấu hình trong file `.claude/settings.json` (cấp dự án) hoặc `~/.claude/settings.json` (cấp user):
+
+```json
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "DATABASE_URL": "postgresql://user:pass@localhost:5432/mydb"
+      }
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_..."
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y", "@modelcontextprotocol/server-filesystem",
+        "/path/to/allowed/directory"
+      ]
+    }
+  }
+}
+```
+
+### MCP Servers phổ biến
+
+<ComparisonTable
+  headers={["Server", "Chức năng", "Package"]}
+  rows={[
+    ["PostgreSQL", "Truy vấn và quản lý PostgreSQL database", "@modelcontextprotocol/server-postgres"],
+    ["GitHub", "Issues, PRs, repositories, code search", "@modelcontextprotocol/server-github"],
+    ["Filesystem", "Đọc/ghi file ngoài working directory", "@modelcontextprotocol/server-filesystem"],
+    ["Puppeteer", "Browser automation, screenshots, scraping", "@modelcontextprotocol/server-puppeteer"],
+    ["Memory", "Persistent knowledge graph storage", "@modelcontextprotocol/server-memory"],
+    ["Brave Search", "Web search qua Brave API", "@modelcontextprotocol/server-brave-search"],
+    ["Slack", "Đọc/gửi messages, quản lý channels", "@modelcontextprotocol/server-slack"],
+    ["Linear", "Project management - issues, projects", "mcp-linear"]
+  ]}
+/>
+
+### Ví dụ sử dụng
+
+Sau khi cấu hình, Claude Code tự động có thể sử dụng tools từ MCP servers:
+
+```bash
+# Trong phiên Claude Code, sau khi cấu hình postgres MCP server:
+
+> Liệt kê tất cả users đã đăng ký trong 7 ngày qua
+# Claude Code sẽ sử dụng MCP tool "query" để chạy SQL:
+# SELECT * FROM users WHERE created_at > NOW() - INTERVAL '7 days'
+
+> Tạo GitHub issue cho bug login không hoạt động trên Safari
+# Claude Code sẽ dùng MCP tool "create_issue" từ GitHub server
+
+> Gửi tin nhắn vào channel #dev-updates trên Slack rằng feature X đã deploy
+# Claude Code dùng MCP tool "send_message" từ Slack server
+```
+
+<Callout type="warning" title="Bảo mật MCP Servers">
+MCP servers có thể truy cập dữ liệu nhạy cảm (database, API tokens). Hãy: (1) Không commit API keys vào repo - sử dụng environment variables, (2) Giới hạn quyền truy cập tối thiểu cần thiết, (3) Chỉ cài đặt MCP servers từ nguồn đáng tin cậy, (4) Review tool calls trước khi approve.
+</Callout>
+
+## Viết MCP Server riêng
+
+Khi các MCP servers có sẵn không đáp ứng nhu cầu, bạn có thể viết server riêng. MCP SDK hỗ trợ TypeScript, Python, và các ngôn ngữ khác.
+
+### Cấu trúc MCP Server cơ bản (TypeScript)
+
+```typescript
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+// Tạo server instance
+const server = new McpServer({
+  name: "my-custom-server",
+  version: "1.0.0",
+});
+
+// Định nghĩa tool: Kiểm tra trạng thái deployment
+server.tool(
+  "check-deployment",
+  "Kiểm tra trạng thái deployment của một service",
+  {
+    service: z.string().describe("Tên service cần kiểm tra"),
+    environment: z
+      .enum(["staging", "production"])
+      .describe("Môi trường cần kiểm tra"),
+  },
+  async ({ service, environment }) => {
+    // Logic kiểm tra deployment
+    const status = await checkDeploymentStatus(service, environment);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(status, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+// Định nghĩa tool: Deploy service
+server.tool(
+  "deploy-service",
+  "Deploy một service lên environment chỉ định",
+  {
+    service: z.string().describe("Tên service"),
+    environment: z.enum(["staging", "production"]),
+    version: z.string().describe("Version tag cần deploy"),
+  },
+  async ({ service, environment, version }) => {
+    const result = await deployService(service, environment, version);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Deployed ${service}@${version} to ${environment}. Status: ${result.status}`,
+        },
+      ],
+    };
+  }
+);
+
+// Khởi chạy server
+const transport = new StdioServerTransport();
+await server.connect(transport);
+```
+
+### Setup project cho MCP Server
+
+```bash
+# Tạo project mới
+mkdir my-mcp-server && cd my-mcp-server
+npm init -y
+
+# Cài dependencies
+npm install @modelcontextprotocol/sdk zod
+
+# Cấu trúc thư mục
+# my-mcp-server/
+# ├── src/
+# │   ├── index.ts        # Entry point
+# │   ├── tools/           # Tool definitions
+# │   │   ├── deploy.ts
+# │   │   └── monitor.ts
+# │   └── utils/           # Helper functions
+# │       └── api-client.ts
+# ├── package.json
+# └── tsconfig.json
+```
+
+### package.json cho MCP Server
+
+```json
+{
+  "name": "my-mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "my-mcp-server": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
+```
+
+### Đăng ký MCP Server tùy chỉnh
+
+```json
+// .claude/settings.json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "node",
+      "args": ["/path/to/my-mcp-server/dist/index.js"],
+      "env": {
+        "API_KEY": "your-api-key",
+        "API_URL": "https://api.yourservice.com"
+      }
+    }
+  }
+}
+```
+
+<Callout type="tip" title="Debug MCP Server">
+Để debug MCP server trong quá trình phát triển, bạn có thể sử dụng MCP Inspector - một công cụ UI cho phép test tools trực tiếp mà không cần qua Claude Code: `npx @modelcontextprotocol/inspector node dist/index.js`
+</Callout>
+
+## MCP Server với Python
+
+Nếu bạn quen Python hơn TypeScript, MCP SDK cũng hỗ trợ Python:
+
+```python
+# server.py
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+import mcp.types as types
+
+server = Server("my-python-server")
+
+@server.list_tools()
+async def list_tools() -> list[types.Tool]:
+    return [
+        types.Tool(
+            name="analyze-logs",
+            description="Phân tích log files và tìm patterns",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "log_path": {
+                        "type": "string",
+                        "description": "Đường dẫn đến file log"
+                    },
+                    "pattern": {
+                        "type": "string",
+                        "description": "Pattern cần tìm (regex)"
+                    }
+                },
+                "required": ["log_path"]
+            }
+        )
+    ]
+
+@server.call_tool()
+async def call_tool(
+    name: str,
+    arguments: dict
+) -> list[types.TextContent]:
+    if name == "analyze-logs":
+        result = analyze_log_file(
+            arguments["log_path"],
+            arguments.get("pattern")
+        )
+        return [types.TextContent(type="text", text=result)]
+
+async def main():
+    async with stdio_server() as (read, write):
+        await server.run(read, write)
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
+```
+
+## Luồng dữ liệu MCP hoàn chỉnh
+
+<Diagram chart="sequenceDiagram\n    participant User\n    participant CC as Claude Code\n    participant MCP as MCP Manager\n    participant S1 as DB Server\n    participant S2 as GitHub Server\n    User->>CC: Tạo issue cho bug và log query liên quan\n    CC->>MCP: Cần tools từ DB và GitHub\n    MCP->>S1: tools/call: query\n    S1-->>MCP: Query results\n    MCP-->>CC: DB data\n    CC->>MCP: Cần tạo GitHub issue\n    MCP->>S2: tools/call: create_issue\n    S2-->>MCP: Issue created #42\n    MCP-->>CC: Issue URL\n    CC->>User: Đã tạo issue #42 với log data đính kèm" />
+
+<Callout type="info" title="Hệ sinh thái MCP đang phát triển">
+MCP là giao thức mở, cộng đồng liên tục đóng góp các server mới. Kiểm tra [MCP Server Registry](https://github.com/modelcontextprotocol/servers) để tìm servers phù hợp với stack công nghệ của bạn trước khi viết server riêng.
+</Callout>
+
+## Best Practices
+
+1. **Principle of least privilege** - Chỉ cấp quyền tối thiểu cần thiết cho mỗi MCP server
+2. **Error handling** - MCP server phải xử lý lỗi gracefully và trả về messages rõ ràng
+3. **Input validation** - Sử dụng Zod hoặc tương đương để validate tất cả input
+4. **Idempotency** - Tools nên idempotent khi có thể, tránh side effects không mong muốn
+5. **Documentation** - Viết descriptions rõ ràng cho mỗi tool để Claude Code hiểu khi nào nên sử dụng
+6. **Rate limiting** - Implement rate limiting cho các tools gọi external APIs

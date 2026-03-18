@@ -1,0 +1,476 @@
+---
+title: "Design Patterns"
+description: "Learn the most common design patterns in software development - Singleton, Factory, Observer, and Strategy with code examples in Python and TypeScript."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["design-patterns", "oop", "python", "typescript", "architecture"]
+featured: false
+order: 5
+sources:
+  - title: "Refactoring Guru - Design Patterns"
+    url: "https://refactoring.guru/design-patterns"
+  - title: "Python Design Patterns"
+    url: "https://python-patterns.guide/"
+  - title: "TypeScript Design Patterns"
+    url: "https://www.typescriptlang.org/docs/"
+---
+
+# Design Patterns
+
+Design patterns are proven solutions to common problems that arise in software development. They are not ready-made code you can copy and paste, but rather blueprints that help you solve recurring challenges in a structured and efficient way. This article introduces the four most commonly used design patterns with practical examples in Python and TypeScript.
+
+## Why Learn Design Patterns?
+
+- **Maintainable code**: Well-structured code that is easier to modify and extend.
+- **Effective communication**: Teams understand each other faster when they share a common vocabulary.
+- **Avoid reinventing the wheel**: Learn from the collective experience of developers before you.
+- **Interview readiness**: Many companies ask about design patterns in technical interviews.
+
+<Callout type="info">Design patterns were popularized by the book "Design Patterns: Elements of Reusable Object-Oriented Software" (1994) by the Gang of Four (GoF). The book describes 23 patterns organized into three categories: Creational, Structural, and Behavioral.</Callout>
+
+## Categories of Design Patterns
+
+<Diagram chart="graph TD\n    A[Design Patterns] --> B[Creational]\n    A --> C[Structural]\n    A --> D[Behavioral]\n    B --> B1[Singleton]\n    B --> B2[Factory]\n    B --> B3[Builder]\n    C --> C1[Adapter]\n    C --> C2[Decorator]\n    C --> C3[Facade]\n    D --> D1[Observer]\n    D --> D2[Strategy]\n    D --> D3[Command]" />
+
+## 1. Singleton Pattern
+
+The Singleton pattern ensures that a class has only one instance throughout the entire application, providing a global point of access to that instance.
+
+### When to Use It
+
+- Database connection management
+- Application configuration (config)
+- Logging systems
+- Caching layers
+
+<Diagram chart="graph LR\n    A[Client A] --> S[Singleton Instance]\n    B[Client B] --> S\n    C[Client C] --> S\n    S --> D[(Database)]" />
+
+### Python Example
+
+```python
+class DatabaseConnection:
+    """Singleton pattern - only one database connection is created."""
+
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+        self._initialized = True
+        self.connection = "Connected to PostgreSQL"
+        print("Creating new database connection")
+
+    def query(self, sql):
+        return f"Executing: {sql}"
+
+
+# Usage
+db1 = DatabaseConnection()  # Prints: "Creating new database connection"
+db2 = DatabaseConnection()  # Prints nothing - reuses existing instance
+
+print(db1 is db2)           # True - same object
+print(db1.query("SELECT * FROM users"))
+```
+
+### TypeScript Example
+
+```typescript
+class AppConfig {
+  private static instance: AppConfig;
+  private settings: Map<string, string>;
+
+  private constructor() {
+    this.settings = new Map();
+    console.log("Initializing application configuration");
+  }
+
+  static getInstance(): AppConfig {
+    if (!AppConfig.instance) {
+      AppConfig.instance = new AppConfig();
+    }
+    return AppConfig.instance;
+  }
+
+  set(key: string, value: string): void {
+    this.settings.set(key, value);
+  }
+
+  get(key: string): string | undefined {
+    return this.settings.get(key);
+  }
+}
+
+// Usage
+const config1 = AppConfig.getInstance();
+const config2 = AppConfig.getInstance();
+console.log(config1 === config2); // true
+```
+
+<Callout type="warning">Singleton can make code harder to test because it introduces global state. Consider using dependency injection as an alternative when possible.</Callout>
+
+## 2. Factory Pattern
+
+The Factory pattern creates objects without specifying the exact class to instantiate. Instead of calling `new` directly, you use a "factory" to decide which object to create.
+
+### When to Use It
+
+- Creating objects of the same type but with different implementations
+- When object creation logic is complex
+- When you want to separate creation logic from usage logic
+
+<Diagram chart="graph TD\n    A[Client] --> F[Factory]\n    F -->|type=email| B[EmailNotification]\n    F -->|type=sms| C[SMSNotification]\n    F -->|type=push| D[PushNotification]" />
+
+### Python Example
+
+```python
+from abc import ABC, abstractmethod
+
+
+class Notification(ABC):
+    """Common interface for all notification types."""
+
+    @abstractmethod
+    def send(self, message: str) -> str:
+        pass
+
+
+class EmailNotification(Notification):
+    def send(self, message: str) -> str:
+        return f"[EMAIL] Sending email: {message}"
+
+
+class SMSNotification(Notification):
+    def send(self, message: str) -> str:
+        return f"[SMS] Sending text message: {message}"
+
+
+class PushNotification(Notification):
+    def send(self, message: str) -> str:
+        return f"[PUSH] Sending push notification: {message}"
+
+
+class NotificationFactory:
+    """Factory that creates Notification objects."""
+
+    @staticmethod
+    def create(notification_type: str) -> Notification:
+        factories = {
+            "email": EmailNotification,
+            "sms": SMSNotification,
+            "push": PushNotification,
+        }
+        factory = factories.get(notification_type)
+        if factory is None:
+            raise ValueError(f"Notification type '{notification_type}' is not valid")
+        return factory()
+
+
+# Usage
+for ntype in ["email", "sms", "push"]:
+    notification = NotificationFactory.create(ntype)
+    print(notification.send("Your order has been confirmed!"))
+```
+
+### TypeScript Example
+
+```typescript
+interface Payment {
+  process(amount: number): string;
+}
+
+class CreditCardPayment implements Payment {
+  process(amount: number): string {
+    return `Processing $${amount} via credit card`;
+  }
+}
+
+class PayPalPayment implements Payment {
+  process(amount: number): string {
+    return `Processing $${amount} via PayPal`;
+  }
+}
+
+class BankTransferPayment implements Payment {
+  process(amount: number): string {
+    return `Transferring $${amount} via bank transfer`;
+  }
+}
+
+class PaymentFactory {
+  static create(method: string): Payment {
+    switch (method) {
+      case "credit_card": return new CreditCardPayment();
+      case "paypal": return new PayPalPayment();
+      case "bank": return new BankTransferPayment();
+      default: throw new Error(`Payment method '${method}' is not supported`);
+    }
+  }
+}
+
+// Usage
+const payment = PaymentFactory.create("paypal");
+console.log(payment.process(99.99));
+```
+
+## 3. Observer Pattern
+
+The Observer pattern establishes a one-to-many relationship: when one object (the subject) changes state, all its dependents (observers) are notified and updated automatically.
+
+### When to Use It
+
+- Notification systems
+- Event handling in user interfaces
+- Pub/Sub messaging architectures
+- Reactive programming
+
+<Diagram chart="graph TD\n    S[Subject - Event Source] -->|notify| O1[Observer 1 - Email]\n    S -->|notify| O2[Observer 2 - SMS]\n    S -->|notify| O3[Observer 3 - Dashboard]\n    U[User Action] -->|triggers change| S" />
+
+### Python Example
+
+```python
+from abc import ABC, abstractmethod
+from typing import List
+
+
+class Observer(ABC):
+    """Interface for observers."""
+
+    @abstractmethod
+    def update(self, event: str, data: dict) -> None:
+        pass
+
+
+class EventSystem:
+    """Subject - manages and notifies observers."""
+
+    def __init__(self):
+        self._observers: dict[str, List[Observer]] = {}
+
+    def subscribe(self, event: str, observer: Observer) -> None:
+        if event not in self._observers:
+            self._observers[event] = []
+        self._observers[event].append(observer)
+
+    def unsubscribe(self, event: str, observer: Observer) -> None:
+        if event in self._observers:
+            self._observers[event].remove(observer)
+
+    def notify(self, event: str, data: dict) -> None:
+        for observer in self._observers.get(event, []):
+            observer.update(event, data)
+
+
+class EmailAlert(Observer):
+    def update(self, event: str, data: dict) -> None:
+        print(f"[Email] Event '{event}': {data.get('message', '')}")
+
+
+class LogSystem(Observer):
+    def update(self, event: str, data: dict) -> None:
+        print(f"[Log] Recorded event '{event}' at {data.get('time', 'N/A')}")
+
+
+# Usage
+system = EventSystem()
+email = EmailAlert()
+logger = LogSystem()
+
+system.subscribe("new_order", email)
+system.subscribe("new_order", logger)
+system.subscribe("system_error", logger)
+
+system.notify("new_order", {
+    "message": "Order #1234 has been placed",
+    "time": "2026-03-18 10:30"
+})
+# [Email] Event 'new_order': Order #1234 has been placed
+# [Log] Recorded event 'new_order' at 2026-03-18 10:30
+```
+
+## 4. Strategy Pattern
+
+The Strategy pattern lets you define a family of algorithms, encapsulate each one in its own class, and make them interchangeable at runtime.
+
+### When to Use It
+
+- Multiple pricing strategies (discounts, VIP tiers, etc.)
+- Multiple sorting algorithms
+- Multiple authentication methods
+- When you want to eliminate long if/elif/else chains
+
+<Diagram chart="graph LR\n    C[Context] --> S{Strategy Interface}\n    S --> S1[Strategy A - Percentage Off]\n    S --> S2[Strategy B - Fixed Amount Off]\n    S --> S3[Strategy C - Buy One Get One]" />
+
+### Python Example
+
+```python
+from abc import ABC, abstractmethod
+
+
+class DiscountStrategy(ABC):
+    """Interface for discount strategies."""
+
+    @abstractmethod
+    def calculate(self, price: float) -> float:
+        pass
+
+    @abstractmethod
+    def description(self) -> str:
+        pass
+
+
+class NoDiscount(DiscountStrategy):
+    def calculate(self, price: float) -> float:
+        return price
+
+    def description(self) -> str:
+        return "No discount"
+
+
+class PercentageDiscount(DiscountStrategy):
+    def __init__(self, percent: float):
+        self.percent = percent
+
+    def calculate(self, price: float) -> float:
+        return price * (1 - self.percent / 100)
+
+    def description(self) -> str:
+        return f"{self.percent}% off"
+
+
+class FixedDiscount(DiscountStrategy):
+    def __init__(self, amount: float):
+        self.amount = amount
+
+    def calculate(self, price: float) -> float:
+        return max(0, price - self.amount)
+
+    def description(self) -> str:
+        return f"${self.amount:.2f} off"
+
+
+class ShoppingCart:
+    """Context - uses a strategy to calculate the total."""
+
+    def __init__(self):
+        self.items: list[tuple[str, float]] = []
+        self._discount: DiscountStrategy = NoDiscount()
+
+    def add_item(self, name: str, price: float) -> None:
+        self.items.append((name, price))
+
+    def set_discount(self, strategy: DiscountStrategy) -> None:
+        self._discount = strategy
+
+    def total(self) -> float:
+        subtotal = sum(price for _, price in self.items)
+        return self._discount.calculate(subtotal)
+
+    def checkout(self) -> None:
+        subtotal = sum(price for _, price in self.items)
+        final = self.total()
+        print(f"Subtotal: ${subtotal:.2f}")
+        print(f"Discount: {self._discount.description()}")
+        print(f"Total: ${final:.2f}")
+
+
+# Usage
+cart = ShoppingCart()
+cart.add_item("T-Shirt", 25.00)
+cart.add_item("Jeans", 45.00)
+
+# No discount
+cart.checkout()
+
+# Apply 20% discount
+cart.set_discount(PercentageDiscount(20))
+cart.checkout()
+
+# Apply $10 fixed discount
+cart.set_discount(FixedDiscount(10))
+cart.checkout()
+```
+
+### TypeScript Example
+
+```typescript
+interface SortStrategy<T> {
+  sort(data: T[]): T[];
+  name: string;
+}
+
+class BubbleSort<T> implements SortStrategy<T> {
+  name = "Bubble Sort";
+  sort(data: T[]): T[] {
+    const arr = [...data];
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = 0; j < arr.length - i - 1; j++) {
+        if (arr[j] > arr[j + 1]) {
+          [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+        }
+      }
+    }
+    return arr;
+  }
+}
+
+class QuickSort<T> implements SortStrategy<T> {
+  name = "Quick Sort";
+  sort(data: T[]): T[] {
+    if (data.length <= 1) return data;
+    const pivot = data[0];
+    const left = data.slice(1).filter(x => x <= pivot);
+    const right = data.slice(1).filter(x => x > pivot);
+    return [...this.sort(left), pivot, ...this.sort(right)];
+  }
+}
+
+class Sorter<T> {
+  private strategy: SortStrategy<T>;
+
+  constructor(strategy: SortStrategy<T>) {
+    this.strategy = strategy;
+  }
+
+  setStrategy(strategy: SortStrategy<T>): void {
+    this.strategy = strategy;
+  }
+
+  sort(data: T[]): T[] {
+    console.log(`Using ${this.strategy.name}`);
+    return this.strategy.sort(data);
+  }
+}
+
+// Usage
+const sorter = new Sorter(new BubbleSort<number>());
+console.log(sorter.sort([5, 2, 8, 1, 9]));
+
+sorter.setStrategy(new QuickSort<number>());
+console.log(sorter.sort([5, 2, 8, 1, 9]));
+```
+
+<Callout type="tip">The Strategy pattern helps you follow the Open/Closed Principle: your code is open for extension but closed for modification. You can add new strategies without changing existing code.</Callout>
+
+## Summary Comparison
+
+<ComparisonTable
+  headers={["Pattern", "Purpose", "Category", "Real-World Use"]}
+  rows={[
+    ["Singleton", "Ensure only one instance exists", "Creational", "Database connection, Config"],
+    ["Factory", "Flexible object creation", "Creational", "Notifications, Payments"],
+    ["Observer", "Notify on state changes", "Behavioral", "Event systems, UI updates"],
+    ["Strategy", "Swap algorithms at runtime", "Behavioral", "Discounts, Sorting, Auth"]
+  ]}
+/>
+
+## Conclusion
+
+Design patterns are powerful tools that help you write well-structured, maintainable, and extensible code. Start by understanding the four fundamental patterns presented in this article, and then apply them to real projects. There is no need to memorize all 23 GoF patterns at once. Instead, learn them gradually as you encounter specific problems in your software development work.

@@ -1,0 +1,321 @@
+---
+title: "Kubernetes Basics"
+description: "Learn the fundamentals of Kubernetes: Pods, Services, Deployments, kubectl, and how to orchestrate containers at scale."
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 13
+tags: ["kubernetes", "k8s", "devops", "container-orchestration", "pods", "kubectl"]
+featured: false
+order: 3
+sources:
+  - title: "Kubernetes Official Documentation"
+    url: "https://kubernetes.io/docs/home/"
+  - title: "Kubernetes Basics Tutorial"
+    url: "https://kubernetes.io/docs/tutorials/kubernetes-basics/"
+  - title: "The Illustrated Children's Guide to Kubernetes"
+    url: "https://www.cncf.io/phippy/the-childrens-illustrated-guide-to-kubernetes/"
+  - title: "Kubernetes the Hard Way - Kelsey Hightower"
+    url: "https://github.com/kelseyhightower/kubernetes-the-hard-way"
+---
+
+# Kubernetes Basics
+
+As your application grows and needs to run dozens or hundreds of containers, managing them manually becomes impractical. Kubernetes (commonly abbreviated as K8s) is a container orchestration platform that automates the deployment, scaling, and management of containerized applications. This article introduces the core concepts of Kubernetes and guides you through getting started.
+
+## What Is Kubernetes?
+
+Kubernetes is an open-source system originally developed by Google and now maintained by the CNCF (Cloud Native Computing Foundation). It helps you:
+
+- **Automatically deploy** containers across multiple servers
+- **Automatically scale** based on system load
+- **Automatically recover** when containers fail
+- **Manage configuration** and secrets
+- **Load balance** traffic across containers
+
+<Callout type="info">The name "K8s" is a shorthand for Kubernetes -- the number 8 represents the eight characters between "K" and "s". This is a common abbreviation convention in the community.</Callout>
+
+## Kubernetes Architecture
+
+<Diagram chart="graph TD\n    subgraph Control Plane\n    A[API Server] --> B[etcd]\n    A --> C[Scheduler]\n    A --> D[Controller Manager]\n    end\n    subgraph Worker Node 1\n    E[kubelet] --> F[Pod A]\n    E --> G[Pod B]\n    H[kube-proxy]\n    end\n    subgraph Worker Node 2\n    I[kubelet] --> J[Pod C]\n    I --> K[Pod D]\n    L[kube-proxy]\n    end\n    A --> E\n    A --> I" />
+
+### Control Plane (Master)
+
+- **API Server**: The main entry point for the cluster, accepting all requests from kubectl and other components
+- **etcd**: A key-value database that stores the entire state of the cluster
+- **Scheduler**: Decides which Worker Node a Pod should be placed on
+- **Controller Manager**: Manages controllers that ensure the desired state of the system
+
+### Worker Node
+
+- **kubelet**: An agent running on each node that manages Pods on that node
+- **kube-proxy**: Handles networking and load balancing for Services
+- **Container Runtime**: Runs containers (Docker, containerd, CRI-O)
+
+## Core Concepts
+
+### Pod
+
+A Pod is the smallest deployable unit in Kubernetes. A Pod contains one or more containers that share networking and storage.
+
+```yaml
+# pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-app-pod
+  labels:
+    app: my-app
+spec:
+  containers:
+    - name: my-app
+      image: my-app:1.0
+      ports:
+        - containerPort: 3000
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+```
+
+<Callout type="warning">In practice, you almost never create Pods directly. Instead, use a Deployment to manage Pods, as Deployments provide automatic recovery and scaling capabilities.</Callout>
+
+### Deployment
+
+A Deployment manages the creation and updating of Pods. It ensures the desired number of Pods are always running and supports rolling updates.
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: my-app
+          image: my-app:1.0
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: database-url
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+```
+
+### Service
+
+A Service provides a stable network address to access Pods. Since Pods can be recreated and change IP addresses at any time, Services ensure traffic is always routed correctly.
+
+```yaml
+# service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-service
+spec:
+  type: ClusterIP
+  selector:
+    app: my-app
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+```
+
+Service types:
+
+- **ClusterIP** (default): Only accessible from within the cluster
+- **NodePort**: Opens a port on every node for external access
+- **LoadBalancer**: Creates a cloud provider load balancer
+- **ExternalName**: Maps a service to an external DNS name
+
+### Namespace
+
+Namespaces divide a cluster into logical spaces, helping organize and isolate resources:
+
+```bash
+# Create namespaces
+kubectl create namespace staging
+kubectl create namespace production
+
+# Deploy to a specific namespace
+kubectl apply -f deployment.yaml -n staging
+```
+
+## Essential kubectl Commands
+
+```bash
+# Cluster information
+kubectl cluster-info
+kubectl get nodes
+
+# Managing Pods
+kubectl get pods                          # List pods
+kubectl get pods -o wide                  # List with detailed info
+kubectl describe pod my-app-pod           # View pod details
+kubectl logs my-app-pod                   # View pod logs
+kubectl logs -f my-app-pod               # Follow logs in real-time
+kubectl exec -it my-app-pod -- /bin/sh   # Open a shell in the pod
+
+# Managing Deployments
+kubectl get deployments                   # List deployments
+kubectl apply -f deployment.yaml          # Create or update deployment
+kubectl rollout status deployment/my-app  # Check rollout status
+kubectl rollout undo deployment/my-app    # Rollback to previous version
+kubectl scale deployment/my-app --replicas=5  # Scale to 5 pods
+
+# Managing Services
+kubectl get services                      # List services
+kubectl apply -f service.yaml             # Create or update service
+kubectl port-forward svc/my-app 8080:80   # Forward port for local testing
+
+# View all resources
+kubectl get all                           # List all resources
+kubectl get all -n staging                # In a specific namespace
+```
+
+<Callout type="tip">Set up an alias with `alias k=kubectl` to save typing. You can also enable kubectl auto-completion in your shell for faster command entry.</Callout>
+
+## Docker vs Kubernetes
+
+<ComparisonTable headers={["Criteria", "Docker", "Kubernetes"]} rows={[["Purpose", "Package and run individual containers", "Orchestrate multiple containers across machines"], ["Scale", "Single host", "Multi-host cluster"], ["Scaling", "Manual (docker-compose scale)", "Automatic (HPA, VPA)"], ["Load Balancing", "Basic (Docker Compose)", "Built-in (Service, Ingress)"], ["Self-Healing", "Simple restart policies", "Automatic Pod replacement on failure"], ["Rolling Updates", "Not built-in", "Built into Deployments"], ["Networking", "Simple bridge networks", "Complex overlay networks"], ["Complexity", "Easy to learn and use", "Steeper learning curve"], ["Best For", "Local development, small projects", "Production, large projects, microservices"]]} />
+
+<Callout type="info">Docker and Kubernetes are not competitors -- they complement each other. Docker packages applications into containers, and Kubernetes orchestrates those containers at scale. You need Docker to build images and Kubernetes to run them in production.</Callout>
+
+## Example: Deploying a Complete Application
+
+Below is an example of deploying a web application with a database on Kubernetes:
+
+```yaml
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+---
+# secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+type: Opaque
+data:
+  database-url: cG9zdGdyZXM6Ly91c2VyOnBhc3NAZGI6NTQzMi9teWFwcA==
+---
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+        - name: web-app
+          image: myregistry/web-app:1.0
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: database-url
+---
+# service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: web-app
+  ports:
+    - port: 80
+      targetPort: 3000
+```
+
+```bash
+# Deploy everything
+kubectl apply -f configmap.yaml
+kubectl apply -f secret.yaml
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+
+# Check status
+kubectl get all
+kubectl get pods -w  # Watch in real-time
+```
+
+## Helpful Tools
+
+- **minikube**: Run Kubernetes locally for learning and testing
+- **kind** (Kubernetes in Docker): Run a K8s cluster using Docker containers
+- **Helm**: Package manager for Kubernetes, managing applications with charts
+- **Lens / k9s**: GUI / terminal tools for cluster management
+- **kubectl krew**: Plugin manager for kubectl
+
+```bash
+# Install minikube for practice
+# macOS
+brew install minikube
+
+# Start a cluster
+minikube start
+
+# Open the dashboard
+minikube dashboard
+```
+
+<Callout type="tip">If you are just getting started, install minikube and practice on your local machine before working with real clusters. This is the safest and most effective way to learn Kubernetes.</Callout>
+
+## Conclusion
+
+Kubernetes is a powerful tool for container orchestration, but it does come with considerable complexity. Start with the fundamental concepts (Pod, Deployment, Service), practice with minikube, and gradually explore advanced features. Once you have mastered Kubernetes, you will have the ability to manage any system from small to large scale.

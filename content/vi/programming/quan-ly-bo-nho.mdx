@@ -1,0 +1,304 @@
+---
+title: "Quản Lý Bộ Nhớ: Stack, Heap và Cấp Phát Vùng Nhớ"
+description: "Tìm hiểu sâu về cách quản lý bộ nhớ trong lập trình: Stack vs Heap, cấp phát tĩnh và động, smart pointers trong C++, Ownership trong Rust, và Garbage Collector trong Go, Java, Python."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["memory-management", "stack", "heap", "c-plus-plus", "rust", "garbage-collector", "smart-pointers"]
+featured: true
+order: 6
+sources:
+  - title: "cppreference.com - Dynamic Memory Management"
+    url: "https://en.cppreference.com/w/cpp/memory"
+  - title: "The Rust Programming Language - Ownership"
+    url: "https://doc.rust-lang.org/book/ch04-00-understanding-ownership.html"
+  - title: "A Guide to the Go Garbage Collector"
+    url: "https://go.dev/doc/gc-guide"
+  - title: "Java Garbage Collection Basics - Oracle"
+    url: "https://www.oracle.com/java/technologies/javase/gc-tuning.html"
+---
+
+# Quản Lý Bộ Nhớ: Stack, Heap và Cấp Phát Vùng Nhớ
+
+Quản lý bộ nhớ là một trong những chủ đề quan trọng nhất mà mọi lập trình viên cần nắm vững. Hiểu cách chương trình sử dụng bộ nhớ giúp bạn viết code hiệu quả hơn, tránh được các lỗi nghiêm trọng như memory leak hay dangling pointer, và đưa ra quyết định đúng đắn khi chọn ngôn ngữ lập trình cho dự án.
+
+## Stack vs Heap: Hai Vùng Nhớ Cơ Bản
+
+Khi một chương trình chạy, hệ điều hành cấp phát cho nó hai vùng nhớ chính: **Stack** và **Heap**. Mỗi vùng có đặc điểm và mục đích sử dụng riêng.
+
+<Diagram chart="graph TB
+    subgraph Memory Layout
+        direction TB
+        A[Stack - Tăng trưởng xuống dưới] --> B[...]
+        B --> C[Heap - Tăng trưởng lên trên]
+        C --> D[BSS - Biến toàn cục chưa khởi tạo]
+        D --> E[Data - Biến toàn cục đã khởi tạo]
+        E --> F[Text - Mã máy của chương trình]
+    end" />
+
+### Stack (Ngăn xếp)
+
+Stack hoạt động theo nguyên tắc **LIFO** (Last In, First Out). Mỗi khi một hàm được gọi, một **stack frame** mới được đẩy lên đỉnh stack, chứa các biến cục bộ và địa chỉ trả về. Khi hàm kết thúc, stack frame bị loại bỏ ngay lập tức.
+
+- **Tốc độ cấp phát**: Cực nhanh, chỉ cần di chuyển stack pointer
+- **Kích thước**: Giới hạn (thường 1-8 MB), gây **stack overflow** nếu vượt quá
+- **Quản lý**: Tự động hoàn toàn, không cần lập trình viên can thiệp
+- **Dữ liệu phù hợp**: Biến cục bộ, tham số hàm, giá trị trả về
+
+### Heap (Đống)
+
+Heap là vùng nhớ lớn hơn nhiều, dùng để lưu trữ dữ liệu có kích thước không biết trước hoặc cần tồn tại lâu hơn phạm vi một hàm.
+
+- **Tốc độ cấp phát**: Chậm hơn Stack (cần tìm vùng trống phù hợp)
+- **Kích thước**: Lớn hơn nhiều, giới hạn bởi RAM hệ thống
+- **Quản lý**: Lập trình viên phải tự giải phóng (C/C++) hoặc dựa vào GC
+- **Dữ liệu phù hợp**: Đối tượng lớn, mảng động, dữ liệu chia sẻ giữa các hàm
+
+<Callout type="info">Trong thực tế, khi bạn khai báo `int x = 5;` trong C, biến `x` nằm trên Stack. Khi bạn gọi `int* p = malloc(sizeof(int));`, vùng nhớ được cấp phát trên Heap, nhưng biến con trỏ `p` vẫn nằm trên Stack.</Callout>
+
+## Cấp Phát Tĩnh vs Cấp Phát Động
+
+**Cấp phát tĩnh** (static allocation) xảy ra tại thời điểm biên dịch. Trình biên dịch biết chính xác bao nhiêu bộ nhớ cần dùng và phân bổ trước khi chương trình chạy.
+
+**Cấp phát động** (dynamic allocation) xảy ra tại thời điểm chạy. Chương trình yêu cầu hệ điều hành cấp phát bộ nhớ khi cần và phải giải phóng khi không dùng nữa.
+
+```cpp
+// Cấp phát tĩnh - kích thước biết trước lúc biên dịch
+int arr_static[100];          // 100 phần tử trên stack
+static int global_var = 42;   // Trong vùng data segment
+
+// Cấp phát động - kích thước quyết định lúc chạy
+int n;
+std::cin >> n;
+int* arr_dynamic = new int[n]; // n phần tử trên heap
+// ... sử dụng mảng ...
+delete[] arr_dynamic;          // PHẢI giải phóng thủ công
+```
+
+## Quản Lý Bộ Nhớ Trong C++
+
+C++ cho lập trình viên toàn quyền kiểm soát bộ nhớ, nhưng điều đó cũng đồng nghĩa với trách nhiệm lớn.
+
+### new/delete vs malloc/free
+
+```cpp
+#include <iostream>
+#include <cstdlib>
+
+struct Student {
+    std::string name;
+    int age;
+    Student(std::string n, int a) : name(n), age(a) {
+        std::cout << "Constructor được gọi cho " << name << std::endl;
+    }
+    ~Student() {
+        std::cout << "Destructor được gọi cho " << name << std::endl;
+    }
+};
+
+int main() {
+    // C-style: malloc/free - KHÔNG gọi constructor/destructor
+    Student* s1 = (Student*)malloc(sizeof(Student));
+    // s1->name và s1->age KHÔNG được khởi tạo - undefined behavior!
+    free(s1); // Destructor KHÔNG được gọi
+
+    // C++ style: new/delete - GỌI constructor/destructor
+    Student* s2 = new Student("Minh", 22);  // Constructor được gọi
+    std::cout << s2->name << " - " << s2->age << std::endl;
+    delete s2;  // Destructor được gọi, bộ nhớ được giải phóng
+
+    // Mảng động
+    int* arr = new int[1000];
+    delete[] arr;  // Dùng delete[] cho mảng, KHÔNG dùng delete
+
+    return 0;
+}
+```
+
+<Callout type="warning">Trong C++ hiện đại (C++11 trở lên), bạn nên tránh dùng `new`/`delete` trực tiếp. Thay vào đó, hãy sử dụng **smart pointers** để tự động quản lý vòng đời bộ nhớ.</Callout>
+
+### Smart Pointers trong C++ Hiện Đại
+
+```cpp
+#include <memory>
+#include <iostream>
+#include <vector>
+
+class Resource {
+public:
+    Resource(int id) : id_(id) {
+        std::cout << "Resource " << id_ << " được tạo" << std::endl;
+    }
+    ~Resource() {
+        std::cout << "Resource " << id_ << " được giải phóng" << std::endl;
+    }
+    void use() { std::cout << "Đang dùng Resource " << id_ << std::endl; }
+private:
+    int id_;
+};
+
+int main() {
+    // unique_ptr: sở hữu độc quyền, không thể copy
+    {
+        auto res1 = std::make_unique<Resource>(1);
+        res1->use();
+        // auto res2 = res1;          // LỖI biên dịch! Không copy được
+        auto res2 = std::move(res1);   // OK: chuyển quyền sở hữu
+        // res1 bây giờ là nullptr
+    } // res2 tự động giải phóng Resource 1
+
+    // shared_ptr: nhiều con trỏ cùng sở hữu, đếm tham chiếu
+    {
+        auto res3 = std::make_shared<Resource>(3);
+        std::cout << "Ref count: " << res3.use_count() << std::endl; // 1
+        {
+            auto res4 = res3; // Chia sẻ quyền sở hữu
+            std::cout << "Ref count: " << res3.use_count() << std::endl; // 2
+        } // res4 ra khỏi scope, ref count giảm xuống 1
+        std::cout << "Ref count: " << res3.use_count() << std::endl; // 1
+    } // ref count = 0, Resource 3 được giải phóng
+
+    return 0;
+}
+```
+
+## Rust: Ownership, Borrowing và Lifetimes
+
+Rust giải quyết vấn đề quản lý bộ nhớ một cách triệt để mà **không cần Garbage Collector**. Trình biên dịch kiểm tra tất cả quy tắc bộ nhớ tại thời điểm biên dịch.
+
+<Diagram chart="graph LR
+    A[Giá trị được tạo] --> B[Owner duy nhất sở hữu]
+    B --> C{Chuyển ownership?}
+    C -->|Move| D[Owner mới sở hữu]
+    C -->|Borrow &T| E[Mượn tham chiếu chỉ đọc]
+    C -->|Borrow &mut T| F[Mượn tham chiếu ghi - duy nhất]
+    D --> G[Owner ra khỏi scope -> drop]
+    B --> G" />
+
+### Ba Quy Tắc Ownership
+
+1. Mỗi giá trị có đúng **một owner** (chủ sở hữu)
+2. Tại một thời điểm, chỉ có thể có **nhiều borrow bất biến** (`&T`) HOẶC **một borrow khả biến** (`&mut T`)
+3. Khi owner ra khỏi scope, giá trị bị **drop** (giải phóng) tự động
+
+```rust
+fn main() {
+    // Ownership và Move
+    let s1 = String::from("Xin chào"); // s1 sở hữu String trên heap
+    let s2 = s1;                        // Ownership chuyển sang s2
+    // println!("{}", s1);              // LỖI biên dịch! s1 không còn hợp lệ
+
+    // Borrowing - mượn tham chiếu
+    let s3 = String::from("Việt Nam");
+    let len = calculate_length(&s3);     // Mượn &s3, không chuyển ownership
+    println!("{} có {} ký tự", s3, len); // s3 vẫn hợp lệ
+
+    // Mutable borrow
+    let mut s4 = String::from("Hello");
+    change_string(&mut s4);
+    println!("{}", s4); // "Hello, World!"
+}
+
+fn calculate_length(s: &String) -> usize {
+    s.len()
+} // s ra khỏi scope nhưng không drop vì chỉ là tham chiếu
+
+fn change_string(s: &mut String) {
+    s.push_str(", World!");
+}
+```
+
+<Callout type="tip">Rust phát hiện lỗi bộ nhớ tại thời điểm biên dịch thay vì lúc chạy. Điều này có nghĩa là nếu code Rust biên dịch thành công, bạn có thể yên tâm rằng không có data race, dangling pointer hay double free.</Callout>
+
+## Garbage Collector Trong Các Ngôn Ngữ Bậc Cao
+
+Nhiều ngôn ngữ hiện đại sử dụng **Garbage Collector** (GC) để tự động thu hồi bộ nhớ không còn được sử dụng.
+
+### Go: Tri-color Mark-and-Sweep
+
+Go sử dụng thuật toán **tri-color mark-and-sweep** chạy đồng thời (concurrent) với chương trình. GC của Go được tối ưu cho **low latency** - thời gian pause cực ngắn (dưới 1ms).
+
+```go
+func createData() {
+    // GC của Go tự động phát hiện và thu hồi khi không còn tham chiếu
+    data := make([]byte, 1024*1024) // 1MB trên heap
+    process(data)
+} // data không còn tham chiếu -> GC sẽ thu hồi
+```
+
+### Java: G1 Garbage Collector
+
+Java chia heap thành nhiều **region** nhỏ và ưu tiên thu hồi những region có nhiều rác nhất (Garbage-First). G1 GC cân bằng giữa throughput và latency.
+
+### Python: Reference Counting + Cycle Detector
+
+Python đếm số tham chiếu đến mỗi đối tượng. Khi bộ đếm về 0, đối tượng được giải phóng ngay lập tức. Với các tham chiếu vòng (circular references), Python dùng thêm **cycle detector** để phát hiện và thu hồi.
+
+```python
+import sys
+
+a = [1, 2, 3]
+print(sys.getrefcount(a))  # 2 (biến a + tham số hàm getrefcount)
+b = a
+print(sys.getrefcount(a))  # 3 (a, b, và tham số hàm)
+del b
+print(sys.getrefcount(a))  # 2 trở lại
+```
+
+## So Sánh Các Cách Quản Lý Bộ Nhớ
+
+<ComparisonTable
+  headers={["Tiêu chí", "C++", "Rust", "Go", "Java", "Python"]}
+  rows={[
+    ["Cơ chế chính", "Thủ công / Smart pointers", "Ownership + Borrowing", "Tri-color Mark-Sweep GC", "G1 GC (phân vùng)", "Reference Counting + Cycle Detector"],
+    ["GC Pause", "Không có GC", "Không có GC", "< 1ms", "Có thể vài ms", "Không đáng kể (ref count)"],
+    ["An toàn bộ nhớ", "Không đảm bảo", "Đảm bảo tại compile time", "Đảm bảo bởi GC", "Đảm bảo bởi GC", "Đảm bảo bởi GC"],
+    ["Memory leak có thể?", "Có (quên delete)", "Rất khó (có thể với Rc cycle)", "Có (goroutine leak)", "Có (giữ ref không cần thiết)", "Có (circular ref phức tạp)"],
+    ["Hiệu suất bộ nhớ", "Cao nhất (kiểm soát hoàn toàn)", "Rất cao", "Tốt", "Trung bình", "Thấp (overhead mỗi object)"],
+    ["Độ phức tạp", "Cao", "Cao (learning curve)", "Thấp", "Thấp", "Rất thấp"]
+  ]}
+/>
+
+## Các Lỗi Bộ Nhớ Phổ Biến
+
+### Memory Leak (Rò rỉ bộ nhớ)
+
+Xảy ra khi bộ nhớ được cấp phát nhưng không bao giờ được giải phóng, khiến chương trình tiêu thụ ngày càng nhiều RAM.
+
+```cpp
+void memory_leak_example() {
+    for (int i = 0; i < 1000000; i++) {
+        int* data = new int[1000];
+        // Quên delete[] data -> mỗi vòng lặp mất 4KB
+        // Tổng cộng: ~4GB bị rò rỉ!
+    }
+}
+```
+
+### Dangling Pointer (Con trỏ treo)
+
+Con trỏ trỏ đến vùng nhớ đã bị giải phóng. Truy cập vào vùng nhớ này gây **undefined behavior**.
+
+```cpp
+int* create_dangling() {
+    int local = 42;
+    return &local;  // NGUY HIỂM: local bị hủy khi hàm kết thúc
+} // Con trỏ trả về trỏ đến vùng nhớ không hợp lệ
+```
+
+### Double Free
+
+Giải phóng cùng một vùng nhớ hai lần, có thể gây crash hoặc lỗ hổng bảo mật.
+
+```cpp
+int* p = new int(10);
+delete p;
+delete p;  // DOUBLE FREE - undefined behavior, có thể bị khai thác
+```
+
+<Callout type="danger">Double free là một lỗ hổng bảo mật nghiêm trọng. Kẻ tấn công có thể khai thác nó để thực thi mã độc. Luôn gán `nullptr` cho con trỏ sau khi delete, hoặc tốt hơn là sử dụng smart pointers.</Callout>
+
+## Kết Luận
+
+Quản lý bộ nhớ là nền tảng giúp bạn hiểu cách chương trình hoạt động ở mức thấp. Dù bạn đang dùng C++ với smart pointers, Rust với ownership model, hay Python với garbage collector, việc hiểu rõ Stack và Heap, cấp phát tĩnh và động, cùng các lỗi bộ nhớ phổ biến sẽ giúp bạn trở thành lập trình viên giỏi hơn và viết code an toàn, hiệu quả hơn.

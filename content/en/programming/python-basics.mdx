@@ -1,0 +1,355 @@
+---
+title: "Python Basics"
+description: "A comprehensive guide to the Python programming language for beginners - covering syntax, variables, functions, classes, data structures, and file handling."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["python", "programming", "basics", "tutorial", "beginner"]
+featured: true
+order: 3
+sources:
+  - title: "Python Official Documentation"
+    url: "https://docs.python.org/3/"
+  - title: "Real Python Tutorials"
+    url: "https://realpython.com/"
+  - title: "W3Schools Python"
+    url: "https://www.w3schools.com/python/"
+---
+
+# Python Basics
+
+Python is one of the most popular programming languages in the world, widely used in web development, data science, artificial intelligence, and automation. With its clean, readable syntax, Python is an ideal choice for anyone starting their programming journey.
+
+## Why Choose Python?
+
+Python stands out for several compelling reasons:
+
+- **Simple syntax**: Reads almost like plain English, making it easy to learn and remember.
+- **Versatile**: From web apps and AI to data science and automation.
+- **Large community**: Millions of developers and a rich ecosystem of libraries.
+- **High demand**: Companies across all industries seek Python developers.
+
+<Callout type="info">Python was created by Guido van Rossum in 1991 and was named after the comedy show Monty Python, not the snake!</Callout>
+
+## Installing and Running Python
+
+Before you begin, make sure Python is installed on your system:
+
+```bash
+# Check installed Python version
+python3 --version
+
+# Run a Python file
+python3 my_script.py
+
+# Start Python interactive mode
+python3
+```
+
+<Callout type="tip">Use Visual Studio Code with the Python extension for the best development experience. VS Code provides code suggestions, debugging, and integrated terminal support.</Callout>
+
+## Variables and Data Types
+
+In Python, you do not need to declare variable types explicitly. Python automatically infers the type based on the assigned value.
+
+```python
+# Basic data types
+name = "Alice Johnson"          # str - string
+age = 25                        # int - integer
+height = 1.75                   # float - decimal number
+is_student = True               # bool - boolean
+items = [1, 2, 3]               # list - ordered collection
+info = {"name": "Alice"}        # dict - key-value pairs
+
+# Check data types
+print(type(name))       # <class 'str'>
+print(type(age))        # <class 'int'>
+
+# Type conversion
+num_text = "42"
+num_int = int(num_text)         # Convert string to integer
+print(num_int + 8)              # 50
+
+# F-strings - modern string formatting
+print(f"Name: {name}, Age: {age}")
+```
+
+## Control Flow
+
+### If / Elif / Else
+
+```python
+score = 85
+
+if score >= 90:
+    grade = "Excellent"
+elif score >= 80:
+    grade = "Good"
+elif score >= 65:
+    grade = "Satisfactory"
+elif score >= 50:
+    grade = "Pass"
+else:
+    grade = "Fail"
+
+print(f"Score: {score} - Grade: {grade}")
+```
+
+### Loops
+
+```python
+# For loop
+for i in range(1, 6):
+    print(f"Iteration {i}")
+
+# While loop
+count = 0
+while count < 5:
+    print(f"Count: {count}")
+    count += 1
+
+# Iterating over a list
+fruits = ["Apple", "Orange", "Banana", "Grape"]
+for fruit in fruits:
+    print(f"I like {fruit}")
+
+# List comprehension - concise syntax
+even_numbers = [x for x in range(1, 21) if x % 2 == 0]
+print(even_numbers)  # [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+```
+
+## Functions
+
+Functions help you organize code into reusable, logical blocks.
+
+```python
+# Basic function
+def greet(name):
+    """Return a greeting message."""
+    return f"Hello, {name}!"
+
+print(greet("Alice"))  # Hello, Alice!
+
+# Function with default parameters
+def calculate_area(length, width=10):
+    """Calculate the area of a rectangle."""
+    return length * width
+
+print(calculate_area(5))       # 50 (width defaults to 10)
+print(calculate_area(5, 3))    # 15
+
+# Function with *args and **kwargs
+def total(*args):
+    """Calculate the sum of multiple numbers."""
+    return sum(args)
+
+print(total(1, 2, 3, 4, 5))   # 15
+
+# Lambda - anonymous functions
+square = lambda x: x ** 2
+print(square(5))                # 25
+```
+
+<Callout type="warning">Always write docstrings for your functions so that others (and your future self) can understand what the function does.</Callout>
+
+## Lists and Dictionaries
+
+These are the two most important data structures in Python.
+
+### Lists
+
+```python
+# Creating and manipulating lists
+students = ["Alice", "Bob", "Charlie", "Diana"]
+
+# Accessing elements
+print(students[0])        # Alice (first element)
+print(students[-1])       # Diana (last element)
+
+# Adding and removing elements
+students.append("Eve")           # Add to the end
+students.insert(1, "Anna")       # Insert at index 1
+students.remove("Charlie")       # Remove by value
+last = students.pop()             # Remove and return last item
+
+# Slicing
+print(students[1:3])      # Elements from index 1 to 2
+
+# Sorting
+scores = [85, 92, 78, 95, 88]
+scores.sort()                     # Sort ascending
+scores.sort(reverse=True)         # Sort descending
+```
+
+### Dictionaries
+
+```python
+# Creating a dictionary
+student = {
+    "name": "Alice Johnson",
+    "age": 20,
+    "major": "Computer Science",
+    "grades": [85, 92, 78, 90]
+}
+
+# Accessing values
+print(student["name"])                   # Alice Johnson
+print(student.get("email", "N/A"))      # N/A (key not found)
+
+# Adding and updating
+student["email"] = "alice@email.com"
+student.update({"phone": "555-0123"})
+
+# Iterating over a dictionary
+for key, value in student.items():
+    print(f"{key}: {value}")
+
+# Dictionary comprehension
+squares = {x: x**2 for x in range(1, 6)}
+print(squares)  # {1: 1, 2: 4, 3: 9, 4: 16, 5: 25}
+```
+
+## Python vs JavaScript Comparison
+
+<ComparisonTable
+  headers={["Criteria", "Python", "JavaScript"]}
+  rows={[
+    ["Syntax", "Uses indentation", "Uses curly braces {}"],
+    ["Typing", "Dynamic typing", "Dynamic typing"],
+    ["Arrays/Lists", "list: [1, 2, 3]", "Array: [1, 2, 3]"],
+    ["Dict/Object", "dict: {'a': 1}", "Object: {a: 1}"],
+    ["Functions", "def func():", "function func() {} or () => {}"],
+    ["Print output", "print()", "console.log()"],
+    ["Loops", "for x in range(10):", "for (let x = 0; x < 10; x++)"],
+    ["Null value", "None", "null / undefined"],
+    ["Primary use", "AI, Data, Backend", "Web, Full-stack"]
+  ]}
+/>
+
+## Object-Oriented Programming (OOP)
+
+Classes let you create objects with attributes and methods.
+
+```python
+class Student:
+    """Represents a student."""
+
+    def __init__(self, name, age, major):
+        """Initialize a student object."""
+        self.name = name
+        self.age = age
+        self.major = major
+        self.grades = []
+
+    def add_grade(self, grade):
+        """Add a grade to the student's record."""
+        self.grades.append(grade)
+
+    def average_grade(self):
+        """Calculate the average grade."""
+        if not self.grades:
+            return 0
+        return sum(self.grades) / len(self.grades)
+
+    def __str__(self):
+        """String representation of the student."""
+        return f"Student({self.name}, Major: {self.major})"
+
+
+# Using the class
+student = Student("Alice Johnson", 20, "Computer Science")
+student.add_grade(85)
+student.add_grade(92)
+student.add_grade(78)
+
+print(student)                                    # Student(Alice Johnson, Major: Computer Science)
+print(f"Average: {student.average_grade():.1f}")  # Average: 85.0
+
+
+# Inheritance
+class CSStudent(Student):
+    """Represents a Computer Science student."""
+
+    def __init__(self, name, age, major, languages):
+        super().__init__(name, age, major)
+        self.languages = languages
+
+    def introduce(self):
+        return f"{self.name} programs in {', '.join(self.languages)}"
+
+
+cs_student = CSStudent("Bob", 21, "CS", ["Python", "Java"])
+print(cs_student.introduce())
+```
+
+## File Handling
+
+Reading and writing files is an essential skill when working with data.
+
+```python
+# Writing to a file
+with open("data.txt", "w", encoding="utf-8") as f:
+    f.write("First line\n")
+    f.write("Second line\n")
+    f.write("Third line\n")
+
+# Reading a file
+with open("data.txt", "r", encoding="utf-8") as f:
+    content = f.read()
+    print(content)
+
+# Reading line by line
+with open("data.txt", "r", encoding="utf-8") as f:
+    for line in f:
+        print(line.strip())
+
+# Working with JSON files
+import json
+
+data = {
+    "students": [
+        {"name": "Alice", "grade": 85},
+        {"name": "Bob", "grade": 92}
+    ]
+}
+
+# Write JSON
+with open("data.json", "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+
+# Read JSON
+with open("data.json", "r", encoding="utf-8") as f:
+    loaded = json.load(f)
+    print(loaded["students"][0]["name"])  # Alice
+```
+
+<Callout type="tip">Always use `with open(...)` to ensure files are properly closed after use, even if an error occurs during processing.</Callout>
+
+## Exception Handling
+
+```python
+# Basic try / except
+try:
+    number = int(input("Enter a number: "))
+    result = 100 / number
+    print(f"Result: {result}")
+except ValueError:
+    print("You must enter a valid integer!")
+except ZeroDivisionError:
+    print("Cannot divide by zero!")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+finally:
+    print("Program finished.")
+```
+
+## Python Learning Roadmap
+
+<Diagram chart="graph TD\n    A[Start Learning Python] --> B[Variables and Data Types]\n    B --> C[Control Flow]\n    C --> D[Functions]\n    D --> E[Lists and Dictionaries]\n    E --> F[File Handling]\n    F --> G[OOP - Classes]\n    G --> H[Modules and Packages]\n    H --> I{Choose a Path}\n    I --> J[Web: Django/Flask]\n    I --> K[Data: Pandas/NumPy]\n    I --> L[AI: TensorFlow/PyTorch]" />
+
+## Conclusion
+
+Python is a fantastic language to start your programming journey. With its simple syntax, rich library ecosystem, and supportive community, you can quickly move from writing basic scripts to building real-world applications. Start with the examples in this article, practice daily, and gradually progress to more advanced topics and projects.
+
+Your next step is to explore popular Python libraries like Pandas, Flask, or Django to expand your skill set and start building meaningful projects.

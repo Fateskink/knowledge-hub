@@ -1,0 +1,302 @@
+---
+title: "Git and GitHub"
+description: "A comprehensive guide to Git and GitHub - from basic commands like init, commit, and branch to pull requests, issues, and GitHub Actions."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 14
+tags: ["git", "github", "version-control", "programming", "tools"]
+featured: false
+order: 4
+sources:
+  - title: "Git Official Documentation"
+    url: "https://git-scm.com/doc"
+  - title: "GitHub Docs"
+    url: "https://docs.github.com/"
+  - title: "Atlassian Git Tutorials"
+    url: "https://www.atlassian.com/git/tutorials"
+---
+
+# Git and GitHub
+
+Git is the most widely used version control system in the world, allowing you to track every change made to your code. GitHub is an online platform for hosting Git repositories, where developers collaborate and share projects. Mastering Git and GitHub is an essential skill for every software developer.
+
+## What Is Git?
+
+Git is a distributed version control system created by Linus Torvalds in 2005. Git helps you:
+
+- **Track change history**: Every modification is recorded with a timestamp and author.
+- **Collaborate with teams**: Multiple developers can work on the same project simultaneously.
+- **Recover easily**: Roll back to any previous version at any time.
+- **Experiment safely**: Create branches to test new ideas without affecting the main codebase.
+
+<Callout type="info">Git stores the entire project history on your local machine. You do not need an internet connection to use basic Git commands like commit, branch, and log.</Callout>
+
+## Installing and Configuring Git
+
+```bash
+# Check Git version
+git --version
+
+# Configure your identity (only needed once)
+git config --global user.name "Your Name"
+git config --global user.email "your@email.com"
+
+# View current configuration
+git config --list
+```
+
+## Essential Git Commands
+
+### Initializing and Committing
+
+```bash
+# Initialize a new repository
+git init
+
+# Check the status of your files
+git status
+
+# Add files to the staging area
+git add filename.py          # Add a single file
+git add .                    # Add all changed files
+
+# Create a commit
+git commit -m "Add user authentication feature"
+
+# View commit history
+git log
+git log --oneline            # Compact view
+git log --oneline --graph    # Tree view with branches
+```
+
+<Callout type="tip">Write clear, specific commit messages. Instead of "fix bug", write "Fix login error when password contains special characters".</Callout>
+
+### The Basic Git Workflow
+
+<Diagram chart="graph LR\n    A[Working Directory] -->|git add| B[Staging Area]\n    B -->|git commit| C[Local Repository]\n    C -->|git push| D[Remote Repository]\n    D -->|git pull| A\n    C -->|git checkout| A" />
+
+## Branches
+
+Branches allow you to work on multiple features simultaneously without interfering with each other.
+
+```bash
+# List all branches
+git branch
+
+# Create a new branch
+git branch feature/login
+
+# Switch to a different branch
+git checkout feature/login
+
+# Create and switch to a new branch (shortcut)
+git checkout -b feature/signup
+
+# Delete a branch (after merging)
+git branch -d feature/login
+```
+
+### Common Branching Model (Git Flow)
+
+<Diagram chart="graph LR\n    A[main] --> B[develop]\n    B --> C[feature/login]\n    B --> D[feature/signup]\n    C -->|merge| B\n    D -->|merge| B\n    B -->|release| E[release/v1.0]\n    E -->|merge| A\n    A --> F[hotfix/bug-fix]\n    F -->|merge| A\n    F -->|merge| B" />
+
+<Callout type="info">Git Flow is a popular model for large projects. For smaller projects, you can use the simpler GitHub Flow, which only uses main and feature branches.</Callout>
+
+## Merge and Rebase
+
+### Merge
+
+Merge combines changes from one branch into another, preserving the full history.
+
+```bash
+# Switch to the main branch
+git checkout main
+
+# Merge a feature branch into main
+git merge feature/login
+
+# If there are conflicts
+# 1. Open the conflicted file and resolve manually
+# 2. Stage the resolved file
+git add filename.py
+# 3. Complete the merge
+git commit -m "Merge feature/login into main"
+```
+
+### Rebase
+
+Rebase moves your branch's commits on top of another branch, creating a linear history.
+
+```bash
+# While on a feature branch
+git checkout feature/login
+
+# Rebase onto main
+git rebase main
+
+# If there are conflicts, resolve them and continue
+git add filename.py
+git rebase --continue
+```
+
+<Callout type="warning">Never rebase branches that have been pushed to a remote and are being used by others. Rebase rewrites commit history and can cause conflicts for your teammates.</Callout>
+
+### Merge vs Rebase Comparison
+
+<ComparisonTable
+  headers={["Criteria", "Merge", "Rebase"]}
+  rows={[
+    ["History", "Preserves original history", "Creates linear history"],
+    ["Merge commit", "Creates a merge commit", "No merge commit created"],
+    ["Safety", "Safer option", "Can cause issues if misused"],
+    ["When to use", "Merging feature into main", "Updating feature with latest main"],
+    ["Team usage", "Suitable for teams", "Primarily for personal branches"]
+  ]}
+/>
+
+## GitHub Basics
+
+GitHub is an online platform for hosting Git repositories with powerful collaboration features.
+
+### Push and Pull
+
+```bash
+# Connect a local repository to GitHub
+git remote add origin https://github.com/username/repo.git
+
+# Push code to GitHub
+git push -u origin main
+
+# Pull code from GitHub
+git pull origin main
+
+# Clone a repository from GitHub
+git clone https://github.com/username/repo.git
+```
+
+### Pull Requests (PRs)
+
+Pull Requests are the primary way to contribute code on GitHub. Here is the typical workflow:
+
+```bash
+# 1. Create a new branch for your feature
+git checkout -b feature/shopping-cart
+
+# 2. Write code and commit
+git add .
+git commit -m "Add shopping cart functionality"
+
+# 3. Push the branch to GitHub
+git push -u origin feature/shopping-cart
+
+# 4. On GitHub: Create a Pull Request
+# 5. Team members review the code
+# 6. Merge the PR after approval
+```
+
+<Diagram chart="graph TD\n    A[Create Branch] --> B[Write Code and Commit]\n    B --> C[Push to GitHub]\n    C --> D[Create Pull Request]\n    D --> E[Code Review]\n    E --> F{Approved?}\n    F -->|Yes| G[Merge into main]\n    F -->|No| H[Address Feedback]\n    H --> B" />
+
+### Issues
+
+Issues are used to track bugs, feature requests, and tasks that need to be completed.
+
+```markdown
+## Bug Description
+When a user enters a password with special characters (#, @, !),
+the system displays a 500 error.
+
+## Steps to Reproduce
+1. Go to the login page
+2. Enter email: test@example.com
+3. Enter password: P@ss#word!
+4. Click the "Login" button
+
+## Expected Result
+Successful login.
+
+## Actual Result
+500 error page is displayed.
+```
+
+### GitHub Actions
+
+GitHub Actions is a built-in CI/CD tool that automatically runs tasks when events occur (push, PR, etc.).
+
+```yaml
+# .github/workflows/ci.yml
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run tests
+        run: python -m pytest
+```
+
+<Callout type="tip">Start with a simple CI workflow that runs your tests automatically on every push. This helps catch bugs early and ensures code quality across the team.</Callout>
+
+## The .gitignore File
+
+The `.gitignore` file specifies which files and directories Git should ignore and not track.
+
+```bash
+# .gitignore for a Python project
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+*.db
+*.sqlite3
+.DS_Store
+node_modules/
+dist/
+build/
+*.log
+```
+
+<Callout type="danger">Never commit files that contain sensitive information such as passwords, API keys, or tokens. Use .gitignore and environment variables (.env files) to protect secrets.</Callout>
+
+## Additional Useful Git Commands
+
+```bash
+# View uncommitted changes
+git diff
+
+# Temporarily save changes (stash)
+git stash
+git stash pop           # Restore stashed changes
+
+# Discard unstaged changes to a file
+git checkout -- filename.py
+
+# Amend the last commit message
+git commit --amend -m "Updated commit message"
+
+# See who changed each line (blame)
+git blame filename.py
+
+# Create a version tag
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+## Conclusion
+
+Git and GitHub are indispensable tools in modern software development. Start with the basic commands like `init`, `add`, and `commit`, then gradually learn about branching, merging, and pull requests. Regular practice with personal projects and contributing to open-source repositories on GitHub will help you master these tools quickly and become a more effective developer.

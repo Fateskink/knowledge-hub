@@ -1,0 +1,237 @@
+---
+title: "Database Indexing: How It Works and Index Types Explained"
+description: "Understand how database indexes work under the hood, from B-Tree, Hash, GIN, GiST to BRIN, plus advanced indexing strategies like Composite, Covering, and Partial Indexes."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["index", "b-tree", "hash-index", "gin", "gist", "brin", "postgresql", "mysql", "database", "performance"]
+featured: false
+order: 12
+sources:
+  - title: "PostgreSQL Index Types - Official Documentation"
+    url: "https://www.postgresql.org/docs/current/indexes-types.html"
+  - title: "A Tour of Postgres Index Types - Citus Data"
+    url: "https://www.citusdata.com/blog/2017/10/17/tour-of-postgres-index-types/"
+  - title: "Database Indexing Strategies"
+    url: "https://medium.com/@artemkhrenov/database-indexing-strategies-b-tree-hash-and-specialized-indexes-explained-95a3e5e3b632"
+---
+
+# Database Indexing: How It Works and Index Types Explained
+
+## What is an Index?
+
+Imagine you have a 1,000-page book and need to find the section about "B-Tree". You have two options: flip through every page until you find it (sequential scan), or open the index at the back of the book, look up "B", and go directly to the right page. **A database index works exactly like a book index.**
+
+Without an index, the database must perform a full table scan — checking every row one by one. For a table with millions of rows, this is extremely slow.
+
+- **Without index**: Sequential scan — O(n) complexity
+- **With B-Tree index**: Tree search — O(log n) complexity
+- **With Hash index**: Hash lookup — O(1) average complexity
+
+<Callout type="info" title="Real Numbers">
+A table with 10 million rows: a sequential scan may read all 10 million rows. A B-Tree index only needs to read about 23-24 nodes (log2(10,000,000) is approximately 23). That is a difference of hundreds of thousands of times!
+</Callout>
+
+## B-Tree Index (The Default)
+
+B-Tree (Balanced Tree) is the default index type in most databases (PostgreSQL, MySQL, Oracle, SQL Server). When you write `CREATE INDEX` without specifying a type, the database creates a B-Tree index.
+
+### B-Tree Structure
+
+A B-Tree is a balanced tree where:
+- **Root node**: The starting point for every search
+- **Internal nodes**: Contain keys and pointers to child nodes, used to guide the search
+- **Leaf nodes**: Contain actual keys and pointers to rows in the table (or the data directly in a clustered index)
+
+All leaf nodes are at the same depth — this "balanced" property guarantees that every lookup costs the same.
+
+<Diagram chart="graph TD\n    A[Root Node\n50] -->|≤50| B[Internal Node\n20 - 35]\n    A -->|>50| C[Internal Node\n70 - 85]\n    B -->|≤20| D[Leaf: 10, 15, 20\n→ Row pointers]\n    B -->|21-35| E[Leaf: 25, 30, 35\n→ Row pointers]\n    C -->|51-70| F[Leaf: 55, 60, 70\n→ Row pointers]\n    C -->|>70| G[Leaf: 75, 80, 85\n→ Row pointers]" />
+
+### Why B-Tree and Not Binary Tree?
+
+A common question: why do databases use B-Trees instead of Binary Search Trees (BSTs)?
+
+The answer lies in **disk I/O**. Each node in the tree corresponds to one disk read (one page). A Binary Tree holds only 1 key per node, so the tree is very tall — requiring many disk reads. A B-Tree holds **hundreds of keys** in each node (typically one 8KB or 16KB page), so the tree is very short — usually only 3-4 levels for millions of rows.
+
+<Callout type="tip" title="B-Trees are remarkably flat">
+A B-Tree node of 16KB, with each key taking 16 bytes, can hold roughly 500 keys. A 3-level tree: 500 x 500 x 500 = 125 million rows. Only 3 disk reads to find any row among 125 million!
+</Callout>
+
+### Operations Supported by B-Tree
+
+B-Tree supports many query types because data is stored in sorted order:
+- Equality: `WHERE email = 'user@example.com'`
+- Range: `WHERE age > 25 AND age < 50`
+- Comparison: `<`, `>`, `<=`, `>=`, `BETWEEN`, `IN`
+- Sorting: `ORDER BY created_at DESC`
+- Prefix matching: `WHERE name LIKE 'John%'` (but NOT `LIKE '%John'`)
+
+## Hash Index
+
+A Hash index uses a **hash function** to convert a key into a position in a hash table (bucket). Each bucket contains pointers to rows with the same hash value.
+
+```sql
+-- PostgreSQL: create a hash index
+CREATE INDEX idx_email_hash ON users USING HASH (email);
+```
+
+**Advantage**: Faster than B-Tree for exact equality match (`=`) — O(1) average instead of O(log n).
+
+**Disadvantage**: Only supports equality (`=`). Does not support range queries, sorting, or prefix matching.
+
+<Callout type="warning" title="Hash Index in PostgreSQL">
+Before PostgreSQL 10, hash indexes were NOT WAL-logged, meaning they were not crash-safe and could not be replicated. From PostgreSQL 10 onward, hash indexes are WAL-logged and safe to use. In practice, however, B-Tree remains the more popular choice due to its far greater flexibility.
+</Callout>
+
+## GIN (Generalized Inverted Index)
+
+GIN is an **inverted index**: instead of mapping rows to values, GIN maps **each component value** to a list of rows containing it. This structure is perfect for data with multiple values within a single column.
+
+### Use Cases
+
+- **Full-text search** (tsvector): Find all articles containing the word "database"
+- **JSONB**: Find all documents where key "status" = "active"
+- **Arrays**: Find all products with the tag "electronics"
+
+```sql
+-- Full-text search index
+CREATE INDEX idx_articles_search ON articles USING GIN (to_tsvector('english', content));
+
+-- JSONB index
+CREATE INDEX idx_data_gin ON events USING GIN (metadata jsonb_path_ops);
+
+-- Array index
+CREATE INDEX idx_tags ON products USING GIN (tags);
+```
+
+<Callout type="info" title="How GIN Works">
+For full-text search: GIN splits content into individual words (lexemes). Each word becomes a key in the index, pointing to a list of rows containing that word. When you search for "database", GIN looks up the key "database" and returns the row list immediately, without scanning the entire table.
+</Callout>
+
+## GiST (Generalized Search Tree)
+
+GiST is a **general-purpose framework** for building many different types of search trees. Unlike B-Tree (which only works well with linearly sortable data), GiST supports multi-dimensional data and complex operations.
+
+### Use Cases
+
+- **Spatial data** (PostGIS): Find all restaurants within a 5km radius
+- **Range types**: Find bookings with overlapping time periods
+- **Nearest-neighbor search**: Find the 10 closest points
+
+```sql
+-- PostGIS: index for spatial data
+CREATE INDEX idx_location ON restaurants USING GiST (geom);
+
+-- Query: find restaurants within 5km
+SELECT name FROM restaurants
+WHERE ST_DWithin(geom, ST_MakePoint(-73.9857, 40.7484)::geography, 5000);
+
+-- Range: find overlapping bookings
+CREATE INDEX idx_booking_range ON bookings USING GiST (during);
+SELECT * FROM bookings WHERE during && '[2026-03-18, 2026-03-20]'::daterange;
+```
+
+## BRIN (Block Range Index)
+
+BRIN is an **ultra-compact index** that stores min/max values for each **block of pages** (128 pages by default). BRIN is extremely efficient for large tables where data is naturally ordered by physical position (physical order correlates with logical order).
+
+### When is BRIN Effective?
+
+- **Time-series data**: Data INSERTed chronologically, so the `created_at` column correlates with physical order
+- **Log tables**: Tables with billions of rows, where queries typically filter by time range
+- **IoT sensor data**: Continuously recorded sensor readings
+
+```sql
+-- BRIN index for a time-series table
+CREATE INDEX idx_logs_created ON logs USING BRIN (created_at);
+-- This index only takes a few KB for a table with millions of rows!
+```
+
+<Callout type="tip" title="BRIN Index Size Is Tiny">
+A table with 100 million rows: a B-Tree index might take 2-3GB. An equivalent BRIN index takes only 50-100KB — tens of thousands of times smaller! The trade-off is that BRIN is less precise: it can only eliminate blocks that definitely do not contain results; remaining blocks still need to be scanned.
+</Callout>
+
+## Comparing Index Types
+
+<ComparisonTable
+  headers={["Index Type", "Supported Operations", "Use Case", "Size", "Write Speed"]}
+  rows={[
+    ["B-Tree", "=, <, >, <=, >=, BETWEEN, IN, ORDER BY, LIKE prefix", "General purpose, default", "Medium", "Medium"],
+    ["Hash", "= (equality only)", "Exact match, key lookup", "Small", "Fast"],
+    ["GIN", "Contains, overlap, full-text search", "JSONB, arrays, tsvector", "Large", "Slow (expensive updates)"],
+    ["GiST", "Overlap, contains, distance, nearest-neighbor", "Spatial, range, geometric", "Medium", "Medium"],
+    ["BRIN", "=, <, >, range (block-level)", "Time-series, naturally ordered data", "Very small", "Very fast"]
+  ]}
+/>
+
+## Composite Index, Covering Index, Partial Index
+
+### Composite Index (Multi-column Index)
+
+An index on multiple columns. **Column order matters significantly** — the index follows the "leftmost prefix" rule.
+
+```sql
+CREATE INDEX idx_name_email ON users (last_name, first_name, email);
+
+-- Can use the index:
+WHERE last_name = 'Smith'
+WHERE last_name = 'Smith' AND first_name = 'John'
+WHERE last_name = 'Smith' AND first_name = 'John' AND email = '...'
+
+-- Cannot use the index:
+WHERE first_name = 'John'              -- skips the first column
+WHERE email = 'user@example.com'       -- skips the first two columns
+```
+
+### Covering Index (INCLUDE)
+
+Add extra columns to the index to avoid reading the main table (index-only scan).
+
+```sql
+-- PostgreSQL: Covering index
+CREATE INDEX idx_orders_status ON orders (status) INCLUDE (total_amount, created_at);
+
+-- This query only reads the index, no table access needed:
+SELECT total_amount, created_at FROM orders WHERE status = 'pending';
+```
+
+### Partial Index
+
+An index that only applies to a subset of the table, defined by a WHERE condition.
+
+```sql
+-- Only index incomplete orders
+CREATE INDEX idx_active_orders ON orders (created_at)
+WHERE status IN ('pending', 'processing');
+
+-- Much smaller than a full index, and faster for common queries
+SELECT * FROM orders WHERE status = 'pending' ORDER BY created_at;
+```
+
+<Callout type="tip" title="Combining Covering + Partial">
+You can combine both: `CREATE INDEX idx ON orders (status) INCLUDE (amount) WHERE status != 'completed'`. An extremely small index that serves exactly the most common query pattern.
+</Callout>
+
+## When NOT to Use an Index
+
+Indexes are not always beneficial. Every index comes with costs:
+
+- **Small tables** (under a few thousand rows): A sequential scan may be faster than a B-Tree lookup due to the overhead of reading the index
+- **Low cardinality columns**: An index on a `gender` column (only 2-3 distinct values) provides almost no benefit because most of the table must be read anyway
+- **Write-heavy tables**: Every INSERT/UPDATE/DELETE must update all indexes on that table. A table with 10 indexes means each INSERT requires 11 writes (1 table + 10 indexes)
+- **The fundamental trade-off**: Faster reads but slower writes, plus additional disk space
+
+```sql
+-- Check if an index is being used
+EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'test@example.com';
+-- If the output shows "Seq Scan" instead of "Index Scan" → the index is not being used!
+
+-- PostgreSQL: find unused indexes
+SELECT indexrelname, idx_scan FROM pg_stat_user_indexes
+WHERE idx_scan = 0 ORDER BY pg_relation_size(indexrelid) DESC;
+```
+
+## Summary
+
+Indexes are the most powerful tool for optimizing read performance in a database. B-Tree works as a versatile default, Hash excels at exact matches, GIN handles complex data types (JSONB, full-text), GiST powers spatial queries, and BRIN is ideal for time-series data. Combined with Composite, Covering, and Partial Indexes, you can fine-tune performance to an optimal level. However, always remember that every index has a cost — only create indexes when you have real query patterns that need them, and use `EXPLAIN ANALYZE` to confirm the index is actually being used.

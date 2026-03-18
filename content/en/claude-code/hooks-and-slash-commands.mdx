@@ -1,0 +1,373 @@
+---
+title: "Hooks and Slash Commands: Automating Claude Code Workflows"
+description: "Master the hooks system and slash commands in Claude Code to automate repetitive tasks, enforce team standards, and build powerful development workflows triggered by lifecycle events."
+category: "claude-code"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 8
+tags: ["claude-code", "hooks", "slash-commands", "automation", "workflows"]
+featured: false
+order: 5
+sources:
+  - title: "Claude Code Hooks"
+    url: "https://docs.anthropic.com/en/docs/claude-code/hooks"
+  - title: "Claude Code Slash Commands"
+    url: "https://docs.anthropic.com/en/docs/claude-code/skills"
+  - title: "Claude Code Configuration"
+    url: "https://docs.anthropic.com/en/docs/claude-code/settings"
+---
+
+## What Are Hooks?
+
+Hooks in Claude Code are **lifecycle event handlers** that allow you to execute custom shell commands at specific points during Claude Code's operation. They run outside the AI model's control, meaning they execute deterministically and reliably every time the specified event occurs.
+
+Think of hooks as git hooks, but for your Claude Code sessions. They let you inject custom behavior into Claude Code's workflow without modifying its core functionality.
+
+<Diagram chart="graph TD\n    A[Claude Code Session] --> B{Lifecycle Event}\n    B -->|Session Start| C[PreSession Hooks]\n    B -->|Before Tool Exec| D[PreTool Hooks]\n    B -->|After Tool Exec| E[PostTool Hooks]\n    B -->|Notification| F[Notification Hooks]\n    B -->|Session End| G[PostSession Hooks]\n    C --> H[Continue Session]\n    D --> I{Hook Result}\n    I -->|Allow| J[Execute Tool]\n    I -->|Block| K[Skip Tool]\n    E --> L[Process Result]\n    F --> M[Custom Notification]\n    G --> N[Cleanup]" />
+
+<Callout type="info">
+Hooks execute shell commands directly on your machine. They bypass the AI model entirely, so there is no risk of the model deciding to skip or modify your hook. If the event fires, the hook runs.
+</Callout>
+
+## Hook Types
+
+Claude Code supports four categories of hooks, each triggered at a different point in the lifecycle:
+
+<ComparisonTable
+  headers={["Hook Type", "When It Fires", "Use Case"]}
+  rows={[
+    ["PreSession", "When a conversation starts", "Environment setup, dependency checks"],
+    ["PreTool", "Before any tool executes", "Validation, logging, blocking dangerous commands"],
+    ["PostTool", "After a tool completes", "Post-processing, notifications, audit logging"],
+    ["Notification", "When Claude sends a notification", "Custom alerts, desktop notifications"],
+    ["PostSession", "When a conversation ends", "Cleanup, summary reports, metrics"]
+  ]}
+/>
+
+## Configuring Hooks
+
+Hooks are defined in your Claude Code settings file. You can configure them at the project level (`.claude/settings.json`) or user level (`~/.claude/settings.json`).
+
+### Basic Hook Structure
+
+```json
+{
+  "hooks": {
+    "PreTool": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Tool about to execute: $CLAUDE_TOOL_NAME'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### PreTool Hook: Command Validation
+
+One of the most powerful uses of hooks is validating commands before they execute. Here is an example that blocks destructive git operations:
+
+```json
+{
+  "hooks": {
+    "PreTool": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/scripts/validate-command.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The validation script:
+
+```bash
+#!/bin/bash
+# validate-command.sh
+# Block dangerous git operations
+
+COMMAND="$CLAUDE_TOOL_INPUT"
+
+# Check for destructive patterns
+if echo "$COMMAND" | grep -qE "git (push --force|reset --hard|clean -fd)"; then
+  echo '{"error": "Blocked: destructive git operation detected"}' >&2
+  exit 1
+fi
+
+# Check for production database access
+if echo "$COMMAND" | grep -qE "psql.*production|mysql.*prod"; then
+  echo '{"error": "Blocked: production database access not allowed"}' >&2
+  exit 1
+fi
+
+exit 0
+```
+
+<Callout type="warning">
+Hook scripts must be executable (`chmod +x script.sh`). If a PreTool hook exits with a non-zero status code, the tool execution is blocked. Always test your hook scripts outside of Claude Code first.
+</Callout>
+
+### PostTool Hook: Audit Logging
+
+Track every action Claude Code takes in your project:
+
+```json
+{
+  "hooks": {
+    "PostTool": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/scripts/audit-log.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/bin/bash
+# audit-log.sh
+# Log all tool executions
+
+LOG_FILE=".claude/audit.log"
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+echo "$TIMESTAMP | Tool: $CLAUDE_TOOL_NAME | Exit: $CLAUDE_TOOL_EXIT_CODE" >> "$LOG_FILE"
+```
+
+### Notification Hook: Desktop Alerts
+
+Get notified when Claude Code completes a long-running task:
+
+```json
+{
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "osascript -e 'display notification \"$CLAUDE_NOTIFICATION\" with title \"Claude Code\"'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Slash Commands
+
+Slash commands are in-session commands that trigger specific behaviors. Some are built into Claude Code, and others are provided by skills (covered in the Skills article).
+
+### Built-in Slash Commands
+
+```
+/help              Show all available commands
+/clear             Clear conversation history
+/compact           Compress context to save tokens
+/model             Switch the active model
+/permissions       Manage tool permissions
+/memory            View or edit CLAUDE.md files
+/quit              Exit the session
+```
+
+### How Slash Commands Differ from Hooks
+
+<Diagram chart="graph LR\n    A[Slash Commands] --> B[User-Triggered]\n    A --> C[Run Inside Session]\n    A --> D[Interact with Agent]\n    E[Hooks] --> F[Event-Triggered]\n    E --> G[Run Outside Agent]\n    E --> H[Deterministic Execution]" />
+
+<ComparisonTable
+  headers={["Aspect", "Slash Commands", "Hooks"]}
+  rows={[
+    ["Trigger", "User types command", "Lifecycle event fires"],
+    ["Execution", "Processed by agent", "Shell command runs directly"],
+    ["AI Involvement", "Yes, agent interprets and acts", "No, runs independently"],
+    ["Customizable", "Via skills (.md files)", "Via settings.json"],
+    ["Can block actions", "No", "Yes (PreTool hooks)"],
+    ["Has access to model", "Yes", "No"]
+  ]}
+/>
+
+## Building Automation Workflows
+
+Combining hooks and slash commands enables sophisticated automation. Here are practical patterns.
+
+### Pattern 1: Pre-Commit Quality Gate
+
+Ensure code quality before every commit Claude makes:
+
+```json
+{
+  "hooks": {
+    "PreTool": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/scripts/pre-commit-check.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/bin/bash
+# pre-commit-check.sh
+
+COMMAND="$CLAUDE_TOOL_INPUT"
+
+# Only intercept git commit commands
+if echo "$COMMAND" | grep -q "git commit"; then
+  # Run linter
+  npx eslint src/ --quiet
+  if [ $? -ne 0 ]; then
+    echo '{"error": "Lint errors detected. Fix them before committing."}' >&2
+    exit 1
+  fi
+
+  # Run type check
+  npx tsc --noEmit
+  if [ $? -ne 0 ]; then
+    echo '{"error": "Type errors detected. Fix them before committing."}' >&2
+    exit 1
+  fi
+fi
+
+exit 0
+```
+
+### Pattern 2: Automatic Test Running
+
+Automatically run related tests after any file edit:
+
+```json
+{
+  "hooks": {
+    "PostTool": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/scripts/auto-test.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/bin/bash
+# auto-test.sh
+# Run tests related to the edited file
+
+FILE="$CLAUDE_TOOL_INPUT_FILE"
+TEST_FILE="${FILE%.ts}.test.ts"
+
+if [ -f "$TEST_FILE" ]; then
+  npx jest "$TEST_FILE" --silent 2>/dev/null
+  if [ $? -ne 0 ]; then
+    echo "WARNING: Tests failing for $TEST_FILE"
+  fi
+fi
+```
+
+### Pattern 3: Session Metrics
+
+Track how Claude Code is being used across your team:
+
+```json
+{
+  "hooks": {
+    "PreSession": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo $(date -u +%Y-%m-%dT%H:%M:%SZ) SESSION_START >> ~/.claude/metrics.log"
+          }
+        ]
+      }
+    ],
+    "PostSession": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo $(date -u +%Y-%m-%dT%H:%M:%SZ) SESSION_END >> ~/.claude/metrics.log"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+<Callout type="tip">
+When building hook scripts, always handle errors gracefully. A crashing hook script can disrupt your Claude Code workflow. Use set -e carefully and ensure meaningful error messages are written to stderr.
+</Callout>
+
+## Environment Variables in Hooks
+
+Hooks have access to several environment variables that provide context about the current operation:
+
+```bash
+# Available in all hooks
+$CLAUDE_SESSION_ID       # Current session identifier
+
+# Available in PreTool and PostTool hooks
+$CLAUDE_TOOL_NAME        # Name of the tool being executed
+$CLAUDE_TOOL_INPUT       # Input parameters (JSON or string)
+
+# Available in PostTool hooks
+$CLAUDE_TOOL_EXIT_CODE   # Exit code of the tool execution
+$CLAUDE_TOOL_OUTPUT      # Output from the tool
+
+# Available in Notification hooks
+$CLAUDE_NOTIFICATION     # Notification message content
+```
+
+## Security Considerations
+
+Hooks execute with your user permissions on your local machine. This is powerful but requires caution:
+
+1. **Review hook configurations** in shared projects before running Claude Code
+2. **Never add secrets** directly in hook commands; use environment variables
+3. **Validate inputs** in hook scripts to prevent injection attacks
+4. **Log hook executions** for audit purposes in team environments
+5. **Test hooks independently** before integrating them into your Claude Code configuration
+
+<Callout type="danger">
+Project-level hook configurations (`.claude/settings.json`) are shared via version control. A malicious contributor could add hooks that execute harmful commands on your machine. Always review changes to `.claude/settings.json` in pull requests.
+</Callout>
+
+## Combining Hooks with Skills
+
+The real power emerges when you combine hooks with skills. A skill can define the workflow logic (what Claude should do), while hooks enforce guardrails and automation around that workflow (what must always happen).
+
+For example, a `/deploy` skill might instruct Claude to build and deploy your application, while a PreTool hook ensures that deployment commands only run against staging, never production. This layered approach gives you the flexibility of AI-driven workflows with the safety of deterministic guardrails.

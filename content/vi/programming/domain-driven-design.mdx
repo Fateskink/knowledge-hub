@@ -1,0 +1,355 @@
+---
+title: "Domain-Driven Design (DDD): Thiết Kế Phần Mềm Theo Nghiệp Vụ"
+description: "Tìm hiểu Domain-Driven Design từ khái niệm Ubiquitous Language, Bounded Context, Entity, Value Object, Aggregate đến ví dụ thực tế xây dựng hệ thống e-commerce với TypeScript."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["ddd", "domain-driven-design", "architecture", "microservices", "typescript", "bounded-context"]
+featured: false
+order: 10
+sources:
+  - title: "Eric Evans - Domain-Driven Design: Tackling Complexity in the Heart of Software"
+    url: "https://www.domainlanguage.com/ddd/"
+  - title: "Martin Fowler - Domain-Driven Design"
+    url: "https://martinfowler.com/tags/domain%20driven%20design.html"
+  - title: "Microsoft - Domain-Driven Design"
+    url: "https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/"
+---
+
+# Domain-Driven Design (DDD): Thiết Kế Phần Mềm Theo Nghiệp Vụ
+
+Khi ứng dụng phát triển lớn dần, business logic trở nên phức tạp, và mô hình MVC đơn giản không còn đủ để quản lý sự phức tạp đó. Domain-Driven Design (DDD) ra đời như một phương pháp luận giúp đội ngũ phát triển đối mặt với độ phức tạp nghiệp vụ bằng cách đặt **domain** (lĩnh vực nghiệp vụ) vào trung tâm của thiết kế phần mềm.
+
+## DDD là gì?
+
+Domain-Driven Design là một phương pháp tiếp cận phát triển phần mềm được Eric Evans giới thiệu trong cuốn sách cùng tên năm 2003. Ý tưởng cốt lõi của DDD là:
+
+- **Phần mềm phải phản ánh domain** (lĩnh vực nghiệp vụ) mà nó phục vụ
+- **Đội phát triển phải hiểu sâu nghiệp vụ**, không chỉ viết code theo yêu cầu
+- **Ngôn ngữ trong code phải trùng khớp** với ngôn ngữ mà chuyên gia nghiệp vụ sử dụng
+
+<Callout type="info">DDD không phải là một framework hay thư viện — đó là một triết lý và tập hợp các nguyên tắc thiết kế. Bạn có thể áp dụng DDD với bất kỳ ngôn ngữ lập trình hay công nghệ nào.</Callout>
+
+## Tại sao cần DDD?
+
+Trong nhiều dự án, code dần trở nên khó hiểu không phải vì thiếu design pattern, mà vì **code không phản ánh đúng nghiệp vụ**:
+
+- Developer dùng từ khác với chuyên gia nghiệp vụ → hiểu sai yêu cầu
+- Business logic nằm rải rác khắp nơi (controller, service, utility) → khó bảo trì
+- Không có ranh giới rõ ràng giữa các phần nghiệp vụ → thay đổi một chỗ ảnh hưởng nhiều chỗ khác
+
+DDD giải quyết những vấn đề này bằng hai nhóm công cụ thiết kế: **Strategic Design** (thiết kế chiến lược) và **Tactical Design** (thiết kế chiến thuật).
+
+## Ubiquitous Language — Ngôn ngữ chung
+
+Ubiquitous Language là nền tảng quan trọng nhất của DDD. Đó là **ngôn ngữ chung** mà cả developer và chuyên gia nghiệp vụ (domain expert) đều sử dụng — trong cuộc họp, trong tài liệu, và trong code.
+
+**Ví dụ trong hệ thống e-commerce:**
+
+| Thuật ngữ nghiệp vụ | Trong code |
+|---|---|
+| Đơn hàng | `Order` |
+| Sản phẩm | `Product` |
+| Đặt hàng | `placeOrder()` |
+| Hủy đơn | `cancelOrder()` |
+| Giỏ hàng | `ShoppingCart` |
+| Thanh toán | `Payment` |
+
+<Callout type="warning">Tránh dùng tên chung chung như `DataManager`, `ItemProcessor`, `handleStuff()`. Tên trong code phải phản ánh chính xác khái niệm nghiệp vụ. Nếu chuyên gia nghiệp vụ không hiểu tên class/method của bạn, bạn đang vi phạm nguyên tắc Ubiquitous Language.</Callout>
+
+## Strategic Design: Thiết kế chiến lược
+
+Strategic Design giúp bạn phân chia hệ thống lớn thành các phần có ranh giới rõ ràng.
+
+### Bounded Context — Ngữ cảnh giới hạn
+
+Bounded Context là ranh giới mà trong đó một model nghiệp vụ cụ thể có ý nghĩa nhất quán. Cùng một khái niệm có thể có ý nghĩa khác nhau trong các Bounded Context khác nhau.
+
+**Ví dụ:** Trong hệ thống e-commerce, khái niệm "Product":
+- **Catalog Context**: Product có tên, mô tả, hình ảnh, danh mục
+- **Inventory Context**: Product có số lượng tồn kho, vị trí kho
+- **Pricing Context**: Product có giá gốc, giá khuyến mãi, chiết khấu
+- **Shipping Context**: Product có trọng lượng, kích thước, loại vận chuyển
+
+<Diagram chart="graph TB\n    subgraph Catalog\n        P1[Product\nTên, Mô tả, Hình ảnh]\n    end\n    subgraph Inventory\n        P2[Product\nSố lượng, Vị trí kho]\n    end\n    subgraph Pricing\n        P3[Product\nGiá gốc, Khuyến mãi]\n    end\n    subgraph Shipping\n        P4[Product\nTrọng lượng, Kích thước]\n    end\n    Catalog <-->|Context Map| Inventory\n    Catalog <-->|Context Map| Pricing\n    Inventory <-->|Context Map| Shipping" />
+
+### Subdomains — Phân vùng nghiệp vụ
+
+DDD chia domain thành ba loại subdomain:
+
+- **Core Domain**: Nghiệp vụ cốt lõi, tạo lợi thế cạnh tranh — cần đầu tư nhiều nhất
+- **Supporting Subdomain**: Hỗ trợ Core Domain, có logic nghiệp vụ riêng nhưng không phải lợi thế cạnh tranh
+- **Generic Subdomain**: Nghiệp vụ chung, có thể dùng giải pháp có sẵn (authentication, email, payment gateway)
+
+### Context Map — Bản đồ ngữ cảnh
+
+Context Map mô tả mối quan hệ giữa các Bounded Context. Các kiểu quan hệ phổ biến:
+- **Partnership**: Hai context phối hợp chặt chẽ
+- **Customer-Supplier**: Một context cung cấp dữ liệu cho context khác
+- **Anti-Corruption Layer (ACL)**: Lớp chuyển đổi để bảo vệ model khỏi ảnh hưởng bên ngoài
+
+## Tactical Design: Thiết kế chiến thuật
+
+Tactical Design cung cấp các building block cụ thể để xây dựng domain model trong code.
+
+### Entity — Thực thể
+
+Entity là đối tượng có **danh tính (identity)** duy nhất, tồn tại xuyên suốt vòng đời. Hai Entity có cùng thuộc tính nhưng khác ID thì là hai đối tượng khác nhau.
+
+### Value Object — Đối tượng giá trị
+
+Value Object là đối tượng **không có identity**, được xác định hoàn toàn bởi các thuộc tính. Hai Value Object có cùng thuộc tính thì bằng nhau. Value Object nên là **immutable** (bất biến).
+
+### Aggregate — Tổng hợp
+
+Aggregate là một cụm các Entity và Value Object được coi như một đơn vị thống nhất. Mỗi Aggregate có một **Aggregate Root** — Entity chính là cổng duy nhất để truy cập và thay đổi dữ liệu bên trong.
+
+<Diagram chart="graph TB\n    subgraph Order Aggregate\n        OR[Order\nAggregate Root] --> OI[OrderItem\nEntity]\n        OR --> SA[ShippingAddress\nValue Object]\n        OR --> M[Money\nValue Object]\n        OI --> M2[Money\nValue Object]\n    end\n    R[OrderRepository] --> OR" />
+
+<Callout type="tip">Quy tắc vàng của Aggregate: Mỗi transaction chỉ nên thay đổi MỘT Aggregate. Nếu bạn cần thay đổi nhiều Aggregate trong một thao tác, hãy sử dụng Domain Event để đảm bảo eventual consistency.</Callout>
+
+## Ví dụ thực tế: E-Commerce với TypeScript
+
+Dưới đây là ví dụ xây dựng Order Aggregate cho hệ thống e-commerce:
+
+### Value Objects
+
+```typescript
+// domain/value-objects/Money.ts
+export class Money {
+  constructor(
+    public readonly amount: number,
+    public readonly currency: string
+  ) {
+    if (amount < 0) throw new Error('Số tiền không được âm');
+    if (!currency) throw new Error('Đơn vị tiền tệ là bắt buộc');
+  }
+
+  add(other: Money): Money {
+    if (this.currency !== other.currency) {
+      throw new Error('Không thể cộng hai đơn vị tiền tệ khác nhau');
+    }
+    return new Money(this.amount + other.amount, this.currency);
+  }
+
+  multiply(factor: number): Money {
+    return new Money(this.amount * factor, this.currency);
+  }
+
+  equals(other: Money): boolean {
+    return this.amount === other.amount && this.currency === other.currency;
+  }
+}
+
+// domain/value-objects/Address.ts
+export class Address {
+  constructor(
+    public readonly street: string,
+    public readonly city: string,
+    public readonly province: string,
+    public readonly postalCode: string,
+    public readonly country: string
+  ) {
+    if (!street || !city) throw new Error('Địa chỉ không hợp lệ');
+  }
+
+  equals(other: Address): boolean {
+    return (
+      this.street === other.street &&
+      this.city === other.city &&
+      this.province === other.province &&
+      this.postalCode === other.postalCode &&
+      this.country === other.country
+    );
+  }
+}
+```
+
+### Entity và Aggregate Root
+
+```typescript
+// domain/entities/OrderItem.ts
+export class OrderItem {
+  constructor(
+    public readonly id: string,
+    public readonly productId: string,
+    public readonly productName: string,
+    private _quantity: number,
+    public readonly unitPrice: Money
+  ) {
+    if (_quantity <= 0) throw new Error('Số lượng phải lớn hơn 0');
+  }
+
+  get quantity(): number { return this._quantity; }
+
+  get totalPrice(): Money {
+    return this.unitPrice.multiply(this._quantity);
+  }
+
+  updateQuantity(newQuantity: number): void {
+    if (newQuantity <= 0) throw new Error('Số lượng phải lớn hơn 0');
+    this._quantity = newQuantity;
+  }
+}
+
+// domain/aggregates/Order.ts — Aggregate Root
+export class Order {
+  private _items: OrderItem[] = [];
+  private _status: OrderStatus;
+
+  constructor(
+    public readonly id: string,
+    public readonly customerId: string,
+    private _shippingAddress: Address,
+    public readonly createdAt: Date = new Date()
+  ) {
+    this._status = OrderStatus.DRAFT;
+  }
+
+  get status(): OrderStatus { return this._status; }
+  get items(): ReadonlyArray<OrderItem> { return [...this._items]; }
+
+  addItem(item: OrderItem): void {
+    if (this._status !== OrderStatus.DRAFT) {
+      throw new Error('Chỉ có thể thêm sản phẩm khi đơn hàng ở trạng thái nháp');
+    }
+    const existing = this._items.find(i => i.productId === item.productId);
+    if (existing) {
+      existing.updateQuantity(existing.quantity + item.quantity);
+    } else {
+      this._items.push(item);
+    }
+  }
+
+  removeItem(productId: string): void {
+    if (this._status !== OrderStatus.DRAFT) {
+      throw new Error('Chỉ có thể xóa sản phẩm khi đơn hàng ở trạng thái nháp');
+    }
+    this._items = this._items.filter(i => i.productId !== productId);
+  }
+
+  get totalAmount(): Money {
+    return this._items.reduce(
+      (sum, item) => sum.add(item.totalPrice),
+      new Money(0, 'VND')
+    );
+  }
+
+  place(): void {
+    if (this._items.length === 0) {
+      throw new Error('Đơn hàng phải có ít nhất một sản phẩm');
+    }
+    this._status = OrderStatus.PLACED;
+    // Có thể phát ra Domain Event: OrderPlacedEvent
+  }
+
+  cancel(): void {
+    if (this._status === OrderStatus.SHIPPED) {
+      throw new Error('Không thể hủy đơn hàng đã giao');
+    }
+    this._status = OrderStatus.CANCELLED;
+  }
+}
+
+enum OrderStatus {
+  DRAFT = 'DRAFT',
+  PLACED = 'PLACED',
+  CONFIRMED = 'CONFIRMED',
+  SHIPPED = 'SHIPPED',
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED',
+}
+```
+
+### Repository và Domain Service
+
+```typescript
+// domain/repositories/OrderRepository.ts
+export interface OrderRepository {
+  findById(id: string): Promise<Order | null>;
+  save(order: Order): Promise<void>;
+  findByCustomerId(customerId: string): Promise<Order[]>;
+}
+
+// domain/services/OrderService.ts
+export class OrderService {
+  constructor(
+    private orderRepo: OrderRepository,
+    private inventoryService: InventoryService
+  ) {}
+
+  async placeOrder(orderId: string): Promise<void> {
+    const order = await this.orderRepo.findById(orderId);
+    if (!order) throw new Error('Đơn hàng không tồn tại');
+
+    // Kiểm tra tồn kho trước khi đặt hàng
+    for (const item of order.items) {
+      const available = await this.inventoryService.checkStock(item.productId);
+      if (available < item.quantity) {
+        throw new Error(`Sản phẩm ${item.productName} không đủ tồn kho`);
+      }
+    }
+
+    order.place();
+    await this.orderRepo.save(order);
+  }
+}
+```
+
+## Kiến trúc phân lớp với DDD
+
+<Diagram chart="graph TB\n    A[Presentation Layer\nControllers, API] --> B[Application Layer\nUse Cases, DTOs]\n    B --> C[Domain Layer\nEntities, Value Objects\nAggregates, Domain Services]\n    B --> D[Infrastructure Layer\nRepositories, Database\nExternal APIs]\n    D --> C" />
+
+- **Domain Layer**: Chứa toàn bộ business logic, không phụ thuộc vào bất kỳ layer nào khác
+- **Application Layer**: Điều phối use case, gọi Domain Layer
+- **Infrastructure Layer**: Triển khai cụ thể (database, API), phụ thuộc vào Domain Layer thông qua interface
+- **Presentation Layer**: Giao diện người dùng, API endpoints
+
+<Callout type="info">Domain Layer nằm ở trung tâm và không phụ thuộc vào gì — đây là nguyên tắc Dependency Inversion. Repository interface được định nghĩa trong Domain Layer, nhưng implementation nằm ở Infrastructure Layer.</Callout>
+
+## Các khái niệm DDD tổng hợp
+
+<ComparisonTable
+  headers={["Khái niệm", "Mô tả", "Ví dụ"]}
+  rows={[
+    ["Entity", "Có identity duy nhất, có vòng đời", "Order, Customer, Product"],
+    ["Value Object", "Không có identity, immutable, so sánh bằng giá trị", "Money, Address, Email"],
+    ["Aggregate", "Cụm Entity/VO, đảm bảo tính nhất quán", "Order + OrderItems"],
+    ["Aggregate Root", "Entity chính, cổng truy cập duy nhất", "Order trong Order Aggregate"],
+    ["Repository", "Interface truy xuất/lưu trữ Aggregate", "OrderRepository"],
+    ["Domain Service", "Logic nghiệp vụ không thuộc Entity nào", "PricingService, OrderService"],
+    ["Domain Event", "Sự kiện nghiệp vụ quan trọng", "OrderPlaced, PaymentReceived"],
+    ["Bounded Context", "Ranh giới model nghiệp vụ", "Catalog, Inventory, Pricing"]
+  ]}
+/>
+
+## DDD với Microservices
+
+DDD và microservices có mối quan hệ tự nhiên: **mỗi Bounded Context có thể trở thành một microservice**.
+
+- **Bounded Context = Service boundary**: Mỗi context có database riêng, API riêng
+- **Context Map = Service communication**: Các context giao tiếp qua API, message queue
+- **Anti-Corruption Layer = API Gateway/Adapter**: Chuyển đổi dữ liệu giữa các service
+
+<Callout type="warning">Không phải mọi Bounded Context đều cần là một microservice riêng. Bắt đầu với modular monolith — chia module theo Bounded Context nhưng deploy chung. Khi cần scale, tách module thành microservice.</Callout>
+
+## Khi nào nên dùng DDD?
+
+**Phù hợp khi:**
+- Nghiệp vụ phức tạp, nhiều quy tắc business logic
+- Domain thay đổi thường xuyên, cần linh hoạt
+- Dự án dài hạn, cần bảo trì lâu dài
+- Team có quyền truy cập domain expert
+
+**Không phù hợp khi:**
+- Ứng dụng CRUD đơn giản — DDD là quá mức cần thiết (over-engineering)
+- Team nhỏ, dự án ngắn hạn — chi phí học và triển khai DDD cao
+- Không có domain expert để tham vấn
+- Nghiệp vụ đơn giản, ít quy tắc business logic
+
+<Callout type="danger">DDD không phải thuốc tiên. Áp dụng DDD cho ứng dụng CRUD đơn giản sẽ tạo ra code phức tạp không cần thiết. Hãy đánh giá độ phức tạp nghiệp vụ trước khi quyết định — nếu business logic vừa trong một Service class, bạn chưa cần DDD.</Callout>
+
+## Tổng kết
+
+Domain-Driven Design là một công cụ mạnh mẽ để đối mặt với sự phức tạp nghiệp vụ. Bằng cách đặt domain vào trung tâm, sử dụng Ubiquitous Language, và phân chia hệ thống thành các Bounded Context rõ ràng, DDD giúp xây dựng phần mềm phản ánh chính xác thế giới thực mà nó phục vụ. Kết hợp với microservices, DDD trở thành nền tảng kiến trúc cho các hệ thống enterprise hiện đại.

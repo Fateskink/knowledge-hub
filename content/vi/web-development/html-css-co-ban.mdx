@@ -1,0 +1,319 @@
+---
+title: "HTML và CSS Cơ bản"
+description: "Hướng dẫn toàn diện về HTML5 semantic tags, CSS3 Flexbox/Grid và responsive design cho người mới bắt đầu phát triển web."
+category: "web-development"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 10
+tags: ["html", "css", "web-development", "responsive-design", "flexbox", "grid", "nguoi-moi"]
+featured: true
+order: 1
+sources:
+  - title: "MDN Web Docs - HTML"
+    url: "https://developer.mozilla.org/en-US/docs/Web/HTML"
+  - title: "MDN Web Docs - CSS"
+    url: "https://developer.mozilla.org/en-US/docs/Web/CSS"
+  - title: "CSS-Tricks - A Complete Guide to Flexbox"
+    url: "https://css-tricks.com/snippets/css/a-guide-to-flexbox/"
+  - title: "CSS-Tricks - A Complete Guide to CSS Grid"
+    url: "https://css-tricks.com/snippets/css/complete-guide-grid/"
+---
+
+# HTML và CSS Cơ bản
+
+HTML và CSS là hai công nghệ nền tảng của mọi trang web. HTML (HyperText Markup Language) định nghĩa cấu trúc nội dung, trong khi CSS (Cascading Style Sheets) quyết định giao diện và bố cục. Bất kỳ ai muốn trở thành lập trình viên web đều cần nắm vững hai ngôn ngữ này trước khi học bất kỳ framework nào.
+
+## Cấu trúc cơ bản của một trang HTML5
+
+Mọi trang web đều bắt đầu từ một bộ khung HTML. HTML5 giới thiệu nhiều thẻ (tags) mới giúp cấu trúc trang web rõ ràng và có ngữ nghĩa hơn.
+
+```html
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trang web đầu tiên của tôi</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="/">Trang chủ</a>
+      <a href="/about">Giới thiệu</a>
+      <a href="/contact">Liên hệ</a>
+    </nav>
+  </header>
+
+  <main>
+    <article>
+      <h1>Chào mừng đến với web</h1>
+      <p>Đây là nội dung chính của trang.</p>
+    </article>
+    <aside>
+      <h2>Bài viết liên quan</h2>
+    </aside>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Website của tôi</p>
+  </footer>
+</body>
+</html>
+```
+
+<Callout type="info">Thẻ DOCTYPE html ở dòng đầu cho trình duyệt biết đây là tài liệu HTML5. Luôn khai báo nó để đảm bảo trang web hiển thị đúng.</Callout>
+
+## HTML5 Semantic Tags
+
+Semantic tags (thẻ có ngữ nghĩa) giúp trình duyệt và công cụ tìm kiếm hiểu nội dung trang web tốt hơn. Thay vì dùng `<div>` cho mọi thứ, HTML5 cung cấp các thẻ chuyên biệt.
+
+<Diagram chart="graph TD\n    A[html] --> B[head]\n    A --> C[body]\n    C --> D[header]\n    C --> E[nav]\n    C --> F[main]\n    C --> G[footer]\n    F --> H[article]\n    F --> I[section]\n    F --> J[aside]\n    D --> K[Logo + Menu]\n    H --> L[Nội dung chính]\n    I --> M[Các phần nội dung]\n    J --> N[Sidebar]" />
+
+### Các thẻ semantic quan trọng
+
+| Thẻ | Mục đích | Ví dụ sử dụng |
+|-----|----------|---------------|
+| `<header>` | Phần đầu trang | Logo, menu điều hướng |
+| `<nav>` | Thanh điều hướng | Menu chính, breadcrumbs |
+| `<main>` | Nội dung chính | Phần nội dung quan trọng nhất |
+| `<article>` | Bài viết độc lập | Blog post, tin tức |
+| `<section>` | Nhóm nội dung | Các phần trong trang |
+| `<aside>` | Nội dung phụ | Sidebar, quảng cáo |
+| `<footer>` | Phần cuối trang | Bản quyền, liên kết |
+| `<figure>` | Hình ảnh kèm chú thích | Ảnh, biểu đồ |
+
+<Callout type="tip">Sử dụng semantic tags không chỉ giúp SEO tốt hơn mà còn giúp người dùng screen reader (đọc màn hình) truy cập nội dung dễ dàng hơn. Đây là một phần quan trọng của web accessibility.</Callout>
+
+## CSS3 Flexbox
+
+Flexbox là hệ thống bố cục một chiều (1D) giúp sắp xếp các phần tử theo hàng hoặc cột một cách linh hoạt.
+
+### Các thuộc tính cơ bản của Flexbox
+
+```css
+/* Container (phần tử cha) */
+.container {
+  display: flex;
+  flex-direction: row;        /* row | column | row-reverse | column-reverse */
+  justify-content: center;    /* Canh theo trục chính */
+  align-items: center;        /* Canh theo trục phụ */
+  flex-wrap: wrap;            /* Cho phép xuống dòng */
+  gap: 16px;                  /* Khoảng cách giữa các phần tử */
+}
+
+/* Item (phần tử con) */
+.item {
+  flex: 1;                    /* Tỷ lệ co giãn */
+  flex-basis: 200px;          /* Kích thước cơ bản */
+  flex-grow: 1;               /* Khả năng mở rộng */
+  flex-shrink: 0;             /* Khả năng thu nhỏ */
+}
+```
+
+### Ví dụ thực tế: Thanh điều hướng
+
+```css
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: #1a1a2e;
+  color: white;
+}
+
+.navbar .logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.navbar .menu {
+  display: flex;
+  gap: 1.5rem;
+  list-style: none;
+}
+
+.navbar .menu a {
+  color: white;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.navbar .menu a:hover {
+  color: #e94560;
+}
+```
+
+## CSS3 Grid
+
+Grid là hệ thống bố cục hai chiều (2D) cho phép bạn tạo layout phức tạp với cả hàng và cột cùng lúc.
+
+```css
+/* Bố cục trang cơ bản với Grid */
+.page-layout {
+  display: grid;
+  grid-template-columns: 250px 1fr 250px;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "header header header"
+    "sidebar content aside"
+    "footer footer footer";
+  min-height: 100vh;
+  gap: 1rem;
+}
+
+.header  { grid-area: header; }
+.sidebar { grid-area: sidebar; }
+.content { grid-area: content; }
+.aside   { grid-area: aside; }
+.footer  { grid-area: footer; }
+```
+
+<Callout type="info">Flexbox phù hợp cho bố cục một chiều (navigation bar, danh sách card). Grid phù hợp cho bố cục hai chiều (toàn bộ layout trang). Bạn có thể kết hợp cả hai để tạo giao diện hoàn chỉnh.</Callout>
+
+### So sánh Flexbox và Grid
+
+<ComparisonTable headers={["Tiêu chí", "Flexbox", "Grid"]} rows={[["Chiều", "1 chiều (hàng HOẶC cột)", "2 chiều (hàng VÀ cột)"], ["Phù hợp cho", "Thành phần nhỏ, navigation", "Layout tổng thể trang"], ["Canh chỉnh", "Theo trục chính và trục phụ", "Theo hàng và cột tự do"], ["Nesting", "Thường cần nesting", "Ít cần nesting hơn"], ["Học", "Dễ học hơn", "Phức tạp hơn một chút"]]} />
+
+## Responsive Design
+
+Responsive design đảm bảo trang web hiển thị tốt trên mọi kích thước màn hình, từ điện thoại đến desktop.
+
+### Media Queries
+
+```css
+/* Mặc định: thiết kế cho mobile trước (Mobile First) */
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+/* Tablet: từ 768px trở lên */
+@media (min-width: 768px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 2rem;
+  }
+}
+
+/* Desktop: từ 1024px trở lên */
+@media (min-width: 1024px) {
+  .card-grid {
+    grid-template-columns: repeat(3, 1fr);
+    padding: 3rem;
+  }
+}
+
+/* Desktop lớn: từ 1440px trở lên */
+@media (min-width: 1440px) {
+  .card-grid {
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}
+```
+
+### Đơn vị tương đối
+
+```css
+/* Sử dụng đơn vị tương đối thay vì pixel cố định */
+.responsive-text {
+  font-size: clamp(1rem, 2.5vw, 2rem);  /* Min, ưu tiên, max */
+  padding: 2em;                          /* Tương đối với font-size */
+  max-width: 75ch;                       /* Độ rộng tối đa theo ký tự */
+  margin-inline: auto;                   /* Căn giữa theo chiều ngang */
+}
+
+.responsive-image {
+  width: 100%;
+  max-width: 800px;
+  height: auto;                          /* Giữ tỷ lệ khung hình */
+  object-fit: cover;
+}
+```
+
+<Callout type="warning">Luôn thêm thẻ meta viewport trong phần head của HTML để responsive design hoạt động đúng: `<meta name="viewport" content="width=device-width, initial-scale=1.0">`. Thiếu thẻ này, trang web sẽ hiển thị như phiên bản desktop thu nhỏ trên điện thoại.</Callout>
+
+## Ví dụ hoàn chỉnh: Card Component
+
+Kết hợp tất cả kiến thức đã học để tạo một card component responsive:
+
+```html
+<div class="card-grid">
+  <article class="card">
+    <img src="image.jpg" alt="Mô tả hình ảnh" class="card__image">
+    <div class="card__body">
+      <span class="card__tag">Web Development</span>
+      <h3 class="card__title">Học HTML và CSS</h3>
+      <p class="card__desc">Hướng dẫn cơ bản về HTML5 và CSS3 cho người mới.</p>
+    </div>
+    <footer class="card__footer">
+      <span>5 phút đọc</span>
+      <a href="/doc-them">Đọc thêm &rarr;</a>
+    </footer>
+  </article>
+</div>
+```
+
+```css
+.card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: white;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.card__image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.card__body {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+.card__tag {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #e94560;
+  font-weight: 600;
+}
+
+.card__title {
+  margin: 0.5rem 0;
+  font-size: 1.25rem;
+}
+
+.card__footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #eee;
+  font-size: 0.875rem;
+}
+```
+
+## Bước tiếp theo
+
+Sau khi nắm vững HTML và CSS, bạn nên:
+
+1. **Thực hành**: Xây dựng lại giao diện của các trang web nổi tiếng (clone UI).
+2. **Học JavaScript**: Để thêm tính tương tác cho trang web.
+3. **Tìm hiểu CSS Frameworks**: Như Tailwind CSS hoặc Bootstrap để tăng tốc độ phát triển.
+4. **Học về Accessibility**: Đảm bảo trang web thân thiện với tất cả người dùng.
+
+<Callout type="tip">Cách tốt nhất để học HTML và CSS là thực hành. Hãy chọn một trang web bạn thích và thử xây dựng lại giao diện của nó từ đầu. Bạn sẽ học được rất nhiều từ quá trình này.</Callout>

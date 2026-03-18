@@ -1,0 +1,321 @@
+---
+title: "Kubernetes Cơ bản"
+description: "Tìm hiểu các khái niệm cơ bản về Kubernetes: Pods, Services, Deployments, kubectl và cách điều phối container ở quy mô lớn."
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 13
+tags: ["kubernetes", "k8s", "devops", "container-orchestration", "pods", "kubectl"]
+featured: false
+order: 3
+sources:
+  - title: "Kubernetes Official Documentation"
+    url: "https://kubernetes.io/docs/home/"
+  - title: "Kubernetes Basics Tutorial"
+    url: "https://kubernetes.io/docs/tutorials/kubernetes-basics/"
+  - title: "The Illustrated Children's Guide to Kubernetes"
+    url: "https://www.cncf.io/phippy/the-childrens-illustrated-guide-to-kubernetes/"
+  - title: "Kubernetes the Hard Way - Kelsey Hightower"
+    url: "https://github.com/kelseyhightower/kubernetes-the-hard-way"
+---
+
+# Kubernetes Cơ bản
+
+Khi ứng dụng của bạn phát triển và cần chạy hàng chục, hàng trăm container, việc quản lý thủ công trở nên bất khả thi. Kubernetes (thường viết tắt là K8s) là nền tảng điều phối container (container orchestration) giúp bạn tự động hóa việc triển khai, mở rộng và quản lý các ứng dụng container hóa. Bài viết này sẽ giới thiệu các khái niệm cơ bản của Kubernetes và hướng dẫn bạn bắt đầu sử dụng nó.
+
+## Kubernetes là gì?
+
+Kubernetes là một hệ thống mã nguồn mở, được Google phát triển và hiện tại được CNCF (Cloud Native Computing Foundation) duy trì. Nó giúp bạn:
+
+- **Tự động triển khai** container lên nhiều máy chủ
+- **Tự động mở rộng** (scale) dựa trên tải hệ thống
+- **Tự động phục hồi** khi container gặp sự cố
+- **Quản lý cấu hình** và secrets
+- **Cân bằng tải** (load balancing) giữa các container
+
+<Callout type="info">Tên gọi "K8s" là viết tắt của Kubernetes -- số 8 đại diện cho 8 ký tự giữa chữ "K" và "s". Đây là quy ước viết tắt phổ biến trong cộng đồng.</Callout>
+
+## Kiến trúc Kubernetes
+
+<Diagram chart="graph TD\n    subgraph Control Plane\n    A[API Server] --> B[etcd]\n    A --> C[Scheduler]\n    A --> D[Controller Manager]\n    end\n    subgraph Worker Node 1\n    E[kubelet] --> F[Pod A]\n    E --> G[Pod B]\n    H[kube-proxy]\n    end\n    subgraph Worker Node 2\n    I[kubelet] --> J[Pod C]\n    I --> K[Pod D]\n    L[kube-proxy]\n    end\n    A --> E\n    A --> I" />
+
+### Control Plane (Master)
+
+- **API Server**: Điểm truy cập chính của cluster, tiếp nhận mọi yêu cầu từ kubectl và các thành phần khác
+- **etcd**: Cơ sở dữ liệu key-value lưu trữ toàn bộ trạng thái của cluster
+- **Scheduler**: Quyết định Pod sẽ được đặt trên Worker Node nào
+- **Controller Manager**: Quản lý các controller đảm bảo trạng thái mong muốn của hệ thống
+
+### Worker Node
+
+- **kubelet**: Agent chạy trên mỗi node, quản lý các Pod trên node đó
+- **kube-proxy**: Xử lý mạng và load balancing cho các Service
+- **Container Runtime**: Chạy container (Docker, containerd, CRI-O)
+
+## Các khái niệm cốt lõi
+
+### Pod
+
+Pod là đơn vị nhỏ nhất trong Kubernetes. Một Pod chứa một hoặc nhiều container chia sẻ mạng và storage.
+
+```yaml
+# pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-app-pod
+  labels:
+    app: my-app
+spec:
+  containers:
+    - name: my-app
+      image: my-app:1.0
+      ports:
+        - containerPort: 3000
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+```
+
+<Callout type="warning">Trong thực tế, bạn hầu như không bao giờ tạo Pod trực tiếp. Thay vào đó, sử dụng Deployment để quản lý Pod, vì Deployment cung cấp khả năng tự động phục hồi và scale.</Callout>
+
+### Deployment
+
+Deployment quản lý việc tạo và cập nhật các Pod. Nó đảm bảo số lượng Pod mong muốn luôn chạy và hỗ trợ rolling update.
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: my-app
+          image: my-app:1.0
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: database-url
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+```
+
+### Service
+
+Service cung cấp một địa chỉ mạng ổn định để truy cập các Pod. Vì Pod có thể bị tạo lại và thay đổi IP bất cứ lúc nào, Service đảm bảo traffic luôn được định tuyến đúng.
+
+```yaml
+# service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-service
+spec:
+  type: ClusterIP
+  selector:
+    app: my-app
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+```
+
+Các loại Service:
+
+- **ClusterIP** (mặc định): Chỉ truy cập được từ trong cluster
+- **NodePort**: Mở một port trên mỗi node để truy cập từ bên ngoài
+- **LoadBalancer**: Tạo một load balancer của cloud provider
+- **ExternalName**: Map service tới một DNS name bên ngoài
+
+### Namespace
+
+Namespace chia cluster thành các không gian logic, giúp tổ chức và cách ly tài nguyên:
+
+```bash
+# Tạo namespace
+kubectl create namespace staging
+kubectl create namespace production
+
+# Triển khai vào namespace cụ thể
+kubectl apply -f deployment.yaml -n staging
+```
+
+## Các lệnh kubectl cơ bản
+
+```bash
+# Xem thông tin cluster
+kubectl cluster-info
+kubectl get nodes
+
+# Quản lý Pods
+kubectl get pods                          # Liệt kê các pods
+kubectl get pods -o wide                  # Liệt kê với thông tin chi tiết
+kubectl describe pod my-app-pod           # Xem chi tiết một pod
+kubectl logs my-app-pod                   # Xem log của pod
+kubectl logs -f my-app-pod               # Theo dõi log realtime
+kubectl exec -it my-app-pod -- /bin/sh   # Truy cập vào pod
+
+# Quản lý Deployments
+kubectl get deployments                   # Liệt kê deployments
+kubectl apply -f deployment.yaml          # Tạo/cập nhật deployment
+kubectl rollout status deployment/my-app  # Xem trạng thái rollout
+kubectl rollout undo deployment/my-app    # Rollback về version trước
+kubectl scale deployment/my-app --replicas=5  # Scale lên 5 pods
+
+# Quản lý Services
+kubectl get services                      # Liệt kê services
+kubectl apply -f service.yaml             # Tạo/cập nhật service
+kubectl port-forward svc/my-app 8080:80   # Forward port để test local
+
+# Xem tất cả resources
+kubectl get all                           # Liệt kê tất cả resources
+kubectl get all -n staging                # Trong namespace cụ thể
+```
+
+<Callout type="tip">Sử dụng alias `alias k=kubectl` để tiết kiệm thời gian gõ lệnh. Bạn cũng có thể bật kubectl auto-completion trong shell để gõ lệnh nhanh hơn.</Callout>
+
+## So sánh Docker và Kubernetes
+
+<ComparisonTable headers={["Tiêu chí", "Docker", "Kubernetes"]} rows={[["Mục đích", "Đóng gói và chạy container đơn lẻ", "Điều phối nhiều container trên nhiều máy"], ["Quy mô", "Một máy (single host)", "Nhiều máy (cluster)"], ["Scaling", "Thủ công (docker-compose scale)", "Tự động (HPA, VPA)"], ["Load Balancing", "Cơ bản (Docker Compose)", "Tích hợp sẵn (Service, Ingress)"], ["Tự phục hồi", "Restart policy đơn giản", "Tự động thay thế Pod bị lỗi"], ["Rolling Update", "Không có sẵn", "Tích hợp sẵn trong Deployment"], ["Networking", "Bridge network đơn giản", "Overlay network phức tạp"], ["Độ phức tạp", "Dễ học, dễ sử dụng", "Phức tạp hơn, cần thời gian học"], ["Phù hợp với", "Phát triển local, dự án nhỏ", "Production, dự án lớn, microservices"]]} />
+
+<Callout type="info">Docker và Kubernetes không phải là đối thủ -- chúng bổ sung cho nhau. Docker đóng gói ứng dụng thành container, Kubernetes điều phối các container đó trên quy mô lớn. Bạn cần Docker để tạo image, và Kubernetes để chạy chúng trong production.</Callout>
+
+## Ví dụ: Triển khai ứng dụng hoàn chỉnh
+
+Dưới đây là ví dụ triển khai một ứng dụng web với database trên Kubernetes:
+
+```yaml
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+---
+# secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+type: Opaque
+data:
+  database-url: cG9zdGdyZXM6Ly91c2VyOnBhc3NAZGI6NTQzMi9teWFwcA==
+---
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+        - name: web-app
+          image: myregistry/web-app:1.0
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: database-url
+---
+# service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: web-app
+  ports:
+    - port: 80
+      targetPort: 3000
+```
+
+```bash
+# Triển khai toàn bộ
+kubectl apply -f configmap.yaml
+kubectl apply -f secret.yaml
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+
+# Kiểm tra trạng thái
+kubectl get all
+kubectl get pods -w  # Theo dõi thời gian thực
+```
+
+## Các công cụ hỗ trợ
+
+- **minikube**: Chạy Kubernetes trên máy local để học và test
+- **kind** (Kubernetes in Docker): Chạy K8s cluster bằng Docker containers
+- **Helm**: Package manager cho Kubernetes, quản lý ứng dụng bằng charts
+- **Lens / k9s**: Giao diện đồ họa / terminal để quản lý cluster
+- **kubectl krew**: Plugin manager cho kubectl
+
+```bash
+# Cài đặt minikube để thực hành
+# macOS
+brew install minikube
+
+# Khởi động cluster
+minikube start
+
+# Mở dashboard
+minikube dashboard
+```
+
+<Callout type="tip">Nếu bạn mới bắt đầu, hãy cài đặt minikube và thực hành trên máy local trước khi làm việc với cluster thật. Đây là cách an toàn và hiệu quả nhất để học Kubernetes.</Callout>
+
+## Kết luận
+
+Kubernetes là công cụ mạnh mẽ cho việc điều phối container nhưng cũng có độ phức tạp tương đối cao. Hãy bắt đầu với các khái niệm cơ bản (Pod, Deployment, Service), thực hành với minikube, và dần dần khám phá các tính năng nâng cao. Khi đã nắm vững Kubernetes, bạn sẽ có khả năng quản lý bất kỳ hệ thống nào từ nhỏ đến lớn.

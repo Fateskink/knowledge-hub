@@ -1,0 +1,278 @@
+---
+title: "MQTT - The IoT Protocol"
+description: "Learn about MQTT, the lightweight messaging protocol for IoT. Understand publish/subscribe pattern, QoS levels, retained messages, and smart home applications."
+category: "automation"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["mqtt", "iot", "protocol", "publish-subscribe", "broker", "smart-home", "sensor", "mosquitto"]
+featured: false
+order: 4
+sources:
+  - title: "MQTT.org - Official Specification"
+    url: "https://mqtt.org/"
+  - title: "HiveMQ MQTT Essentials"
+    url: "https://www.hivemq.com/mqtt-essentials/"
+  - title: "Eclipse Mosquitto"
+    url: "https://mosquitto.org/"
+  - title: "MQTT v5.0 Specification - OASIS"
+    url: "https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html"
+---
+
+# MQTT - The IoT Protocol
+
+MQTT (Message Queuing Telemetry Transport) is a lightweight messaging protocol designed for devices with limited resources and networks with low bandwidth and high latency. It is the most popular protocol in the world of IoT (Internet of Things), from temperature sensors to complex smart home systems.
+
+## What is MQTT?
+
+MQTT is a messaging protocol based on the **publish/subscribe** model. Instead of clients communicating directly with each other (like HTTP), all communication goes through an intermediary called a **broker**. Clients can publish messages to a topic, and other clients subscribe to that topic to receive messages.
+
+<Callout type="info">MQTT was invented by Andy Stanford-Clark (IBM) and Arlen Nipper in 1999, originally for monitoring oil pipelines via satellite. The current version is MQTT 5.0, standardized by OASIS.</Callout>
+
+### Key Characteristics
+
+- **Lightweight**: Minimum header of just 2 bytes
+- **Bi-directional**: Two-way communication between client and broker
+- **Publish/Subscribe**: Decouples message senders from receivers
+- **QoS levels**: Three levels of message delivery guarantee
+- **Retained messages**: Store the last message of a topic
+- **Last Will & Testament**: Notification when a client disconnects unexpectedly
+- **Session persistence**: Maintain connection sessions
+
+## The Publish/Subscribe Model
+
+<Diagram chart="graph TD\n    subgraph Publishers\n    A[Temperature Sensor] -->|publish: home/temp = 25C| D[MQTT Broker]\n    B[Humidity Sensor] -->|publish: home/humidity = 60%| D\n    C[Camera] -->|publish: home/camera/status = ON| D\n    end\n    subgraph Broker\n    D --> E{Topic Matching}\n    end\n    subgraph Subscribers\n    E -->|home/temp| F[Dashboard App]\n    E -->|home/#| G[Mobile App]\n    E -->|home/camera/status| H[Security System]\n    end" />
+
+### How It Works
+
+1. A **publisher** sends a message to a **topic** on the broker
+2. The **broker** receives the message and forwards it to all **subscribers** of that topic
+3. **Subscribers** receive messages without needing to know who the publisher is
+
+### Topic Structure
+
+MQTT topics have a hierarchical structure, separated by `/`:
+
+```
+home/living-room/temperature
+home/living-room/humidity
+home/bedroom/temperature
+office/server-room/temperature
+```
+
+**Wildcard patterns:**
+- `+` : Replaces a single level -- `home/+/temperature` matches `home/living-room/temperature` and `home/bedroom/temperature`
+- `#` : Replaces multiple levels -- `home/#` matches all topics starting with `home/`
+
+<Callout type="warning">Avoid subscribing to the `#` topic (all topics) in production as it will receive every message passing through the broker, potentially overloading the client.</Callout>
+
+## QoS (Quality of Service) Levels
+
+MQTT provides three levels of message delivery guarantee:
+
+<ComparisonTable headers={["QoS Level", "Name", "Guarantee", "Performance", "Use Case"]} rows={[["QoS 0", "At most once (Fire & Forget)", "Message may be lost", "Fastest", "Non-critical sensor data"], ["QoS 1", "At least once", "Message arrives at least once (may duplicate)", "Medium", "Alerts, notifications"], ["QoS 2", "Exactly once", "Message arrives exactly once", "Slowest", "Payments, control commands"]]} />
+
+<Diagram chart="graph LR\n    subgraph QoS 0\n    A1[Publisher] -->|PUBLISH| B1[Broker]\n    end\n    subgraph QoS 1\n    A2[Publisher] -->|PUBLISH| B2[Broker]\n    B2 -->|PUBACK| A2\n    end\n    subgraph QoS 2\n    A3[Publisher] -->|PUBLISH| B3[Broker]\n    B3 -->|PUBREC| A3\n    A3 -->|PUBREL| B3\n    B3 -->|PUBCOMP| A3\n    end" />
+
+## Retained Messages and Last Will
+
+### Retained Messages
+
+When publishing a message with the `retain=True` flag, the broker stores the last message of that topic. Any client subscribing to the topic later will immediately receive the stored message without waiting for the publisher to send again.
+
+### Last Will & Testament (LWT)
+
+A client can configure a "last will" upon connection. If the client disconnects unexpectedly (without sending a DISCONNECT packet), the broker automatically publishes the LWT message, allowing other clients to know the device has gone offline.
+
+## Code Example: Python MQTT Client
+
+### Install the Library
+
+```bash
+pip install paho-mqtt
+```
+
+### Publisher - Send Sensor Data
+
+```python
+import paho.mqtt.client as mqtt
+import json
+import time
+import random
+
+# Connection configuration
+BROKER_HOST = "localhost"
+BROKER_PORT = 1883
+CLIENT_ID = "sensor-living-room-01"
+
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        print("Successfully connected to MQTT Broker!")
+    else:
+        print(f"Connection failed with code: {rc}")
+
+def on_publish(client, userdata, mid):
+    print(f"Message {mid} published successfully")
+
+# Create client and configure
+client = mqtt.Client(client_id=CLIENT_ID)
+client.on_connect = on_connect
+client.on_publish = on_publish
+
+# Configure Last Will & Testament
+client.will_set(
+    topic="home/living-room/status",
+    payload=json.dumps({"status": "offline", "device": CLIENT_ID}),
+    qos=1,
+    retain=True
+)
+
+# Authentication (if broker requires it)
+client.username_pw_set("mqtt_user", "mqtt_password")
+
+# Connect
+client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
+client.loop_start()
+
+# Continuously send sensor data
+try:
+    while True:
+        # Simulate sensor readings
+        temperature = round(random.uniform(20, 35), 1)
+        humidity = round(random.uniform(40, 80), 1)
+
+        # Publish temperature (QoS 0 - sensor data)
+        temp_payload = json.dumps({
+            "value": temperature,
+            "unit": "celsius",
+            "device": CLIENT_ID,
+            "timestamp": time.time()
+        })
+        client.publish(
+            topic="home/living-room/temperature",
+            payload=temp_payload,
+            qos=0,
+            retain=True
+        )
+
+        # Publish humidity (QoS 1 - more important)
+        humidity_payload = json.dumps({
+            "value": humidity,
+            "unit": "percent",
+            "device": CLIENT_ID,
+            "timestamp": time.time()
+        })
+        client.publish(
+            topic="home/living-room/humidity",
+            payload=humidity_payload,
+            qos=1,
+            retain=True
+        )
+
+        print(f"Sent: temp={temperature}C, humidity={humidity}%")
+        time.sleep(5)  # Send every 5 seconds
+
+except KeyboardInterrupt:
+    print("Stopping data transmission")
+    client.publish(
+        "home/living-room/status",
+        json.dumps({"status": "offline", "device": CLIENT_ID}),
+        qos=1, retain=True
+    )
+    client.loop_stop()
+    client.disconnect()
+```
+
+### Subscriber - Receive and Process Data
+
+```python
+import paho.mqtt.client as mqtt
+import json
+
+BROKER_HOST = "localhost"
+BROKER_PORT = 1883
+
+def on_connect(client, userdata, flags, rc):
+    print("Connected, subscribing to topics...")
+    # Subscribe to all home topics
+    client.subscribe("home/#", qos=1)
+
+def on_message(client, userdata, msg):
+    topic = msg.topic
+    try:
+        payload = json.loads(msg.payload.decode())
+    except json.JSONDecodeError:
+        payload = msg.payload.decode()
+
+    print(f"Topic: {topic}")
+    print(f"Payload: {payload}")
+    print(f"QoS: {msg.qos}, Retain: {msg.retain}")
+    print("---")
+
+    # Handle high temperature alerts
+    if "temperature" in topic:
+        temp = payload.get("value", 0)
+        if temp > 30:
+            print(f"ALERT: High temperature {temp}C at {topic}!")
+            client.publish(
+                "home/alerts",
+                json.dumps({
+                    "type": "high_temperature",
+                    "value": temp,
+                    "source": topic
+                }),
+                qos=2  # Ensure alert is delivered exactly once
+            )
+
+# Create and configure client
+client = mqtt.Client(client_id="dashboard-app")
+client.on_connect = on_connect
+client.on_message = on_message
+client.username_pw_set("mqtt_user", "mqtt_password")
+
+client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
+client.loop_forever()  # Run continuously
+```
+
+## Real-World IoT Applications
+
+### Smart Home
+
+<Diagram chart="graph TD\n    A[Temperature Sensor] -->|MQTT| E[Mosquitto Broker]\n    B[Door Sensor] -->|MQTT| E\n    C[IP Camera] -->|MQTT| E\n    D[Smart Switch] -->|MQTT| E\n    E --> F[Home Assistant]\n    E --> G[Mobile App]\n    E --> H[Node-RED Dashboard]\n    F --> D" />
+
+### Industrial Monitoring
+
+- Temperature, pressure, and vibration sensors in factories
+- Real-time machine status monitoring
+- Automatic alerting when thresholds are exceeded
+
+### Smart Agriculture
+
+- Measure soil moisture and air temperature
+- Automated irrigation based on sensor data
+- Crop health monitoring
+
+<Callout type="tip">Eclipse Mosquitto is the most popular open-source MQTT broker, suitable for environments from development to small-scale production. For larger deployments, consider HiveMQ, EMQX, or VerneMQ.</Callout>
+
+## MQTT Security
+
+```python
+# Connect to MQTT with TLS/SSL
+client = mqtt.Client(client_id="secure-client")
+
+# Configure TLS
+client.tls_set(
+    ca_certs="/path/to/ca.crt",
+    certfile="/path/to/client.crt",
+    keyfile="/path/to/client.key"
+)
+
+# Connect via TLS port (8883)
+client.connect("broker.example.com", 8883, keepalive=60)
+```
+
+<Callout type="danger">Never use unencrypted MQTT (port 1883) on public networks. Always use TLS (port 8883) and authenticate with username/password or certificates in production.</Callout>
+
+## Conclusion
+
+MQTT is the ideal protocol for IoT applications thanks to its simplicity, efficiency, and reliability. With its publish/subscribe model, multiple QoS levels, and ability to operate over unstable networks, MQTT has become a core pillar of the IoT ecosystem. Whether you are building a smart home system or industrial monitoring solution, MQTT is the top choice.

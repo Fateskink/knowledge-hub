@@ -1,0 +1,272 @@
+---
+title: "Apache Airflow - Data Pipeline Orchestration"
+description: "Learn Apache Airflow, the workflow orchestration tool for data pipelines. Understand DAGs, tasks, operators, and build ETL pipelines with Python."
+category: "automation"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["apache-airflow", "data-pipeline", "etl", "dag", "workflow", "orchestration", "python", "data-engineering"]
+featured: true
+order: 2
+sources:
+  - title: "Apache Airflow Official Documentation"
+    url: "https://airflow.apache.org/docs/"
+  - title: "Apache Airflow GitHub"
+    url: "https://github.com/apache/airflow"
+  - title: "Airflow Tutorial - Astronomer"
+    url: "https://www.astronomer.io/docs/learn/"
+  - title: "Apache Airflow - Wikipedia"
+    url: "https://en.wikipedia.org/wiki/Apache_Airflow"
+---
+
+# Apache Airflow - Data Pipeline Orchestration
+
+Apache Airflow is an open-source platform for programmatically authoring, scheduling, and monitoring workflows. Originally developed at Airbnb in 2014 and graduating as a top-level Apache project in 2019, Airflow has become the most popular data pipeline orchestration tool in the data engineering ecosystem.
+
+## What is Apache Airflow?
+
+Airflow allows you to define complex workflows as **DAGs (Directed Acyclic Graphs)** using Python. Instead of using drag-and-drop interfaces, you write code to describe the steps in your pipeline, their execution order, and dependencies between them.
+
+<Callout type="info">Airflow is not a data processing tool. It is an orchestrator -- it manages when and where tasks are executed, but it does not process data itself.</Callout>
+
+### Why Use Airflow?
+
+- **Workflow as code**: Define pipelines in Python, easy to version control
+- **Flexible scheduling**: Cron expressions, data-aware scheduling
+- **Web interface**: Intuitive UI for monitoring and debugging
+- **Scalability**: Run on a single machine or a cluster of thousands of workers
+- **Rich ecosystem**: Hundreds of operators and providers
+- **Large community**: Backed by the Apache Foundation and a vast community
+
+## Core Concepts
+
+<Diagram chart="graph TD\n    A[DAG - Directed Acyclic Graph] --> B[Task 1: Extract]\n    A --> C[Task 2: Transform]\n    A --> D[Task 3: Load]\n    B --> C\n    C --> D\n    subgraph Executor\n    E[Scheduler] --> F[Worker Pool]\n    F --> G[Worker 1]\n    F --> H[Worker 2]\n    F --> I[Worker 3]\n    end\n    E -->|Trigger| A" />
+
+### DAG (Directed Acyclic Graph)
+
+A DAG is the fundamental unit of Airflow. It is a collection of tasks organized by dependencies and execution order. "Directed" means there is a direction (task A runs before task B), and "Acyclic" means there are no cycles (no infinite loops).
+
+### Task
+
+A task is a unit of work within a DAG. Each task performs a specific action such as querying a database, calling an API, transforming data, or sending an email.
+
+### Operator
+
+An operator is a template for creating tasks. Airflow provides many built-in operators:
+
+- **BashOperator**: Run bash commands
+- **PythonOperator**: Run Python functions
+- **EmailOperator**: Send emails
+- **HttpOperator**: Make HTTP requests
+- **SqlOperator**: Execute SQL statements
+- **S3/GCS Operators**: Interact with cloud storage
+
+### Sensor
+
+A sensor is a special type of operator that waits for a condition to be met before proceeding:
+
+- **FileSensor**: Wait for a file to appear
+- **HttpSensor**: Wait for an API to return expected results
+- **SqlSensor**: Wait for data in a database
+
+## Apache Airflow Architecture
+
+<Diagram chart="graph LR\n    subgraph Airflow Architecture\n    A[Web Server - Flask UI] --> B[Metadata DB - PostgreSQL]\n    C[Scheduler] --> B\n    C --> D[Executor]\n    D --> E[Worker 1]\n    D --> F[Worker 2]\n    D --> G[Worker 3]\n    H[DAG Files - Python] --> C\n    H --> A\n    end" />
+
+| Component | Function |
+|-----------|----------|
+| Web Server | Web interface for monitoring and managing DAGs |
+| Scheduler | Schedules and triggers tasks in order |
+| Executor | Executes tasks (Local, Celery, Kubernetes) |
+| Metadata DB | Stores state of DAGs, tasks, and connections |
+| Worker | Machines that execute tasks (with Celery/K8s Executor) |
+
+## Example: Building an ETL Pipeline
+
+Here is a complete ETL (Extract - Transform - Load) DAG example:
+
+```python
+from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
+from airflow.providers.postgres.operators.postgres import PostgresOperator
+from airflow.sensors.filesystem import FileSensor
+
+# Define default arguments for the DAG
+default_args = {
+    'owner': 'data-team',
+    'depends_on_past': False,
+    'email': ['data-team@company.com'],
+    'email_on_failure': True,
+    'email_on_retry': False,
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+}
+
+# Create the DAG
+dag = DAG(
+    dag_id='etl_sales_pipeline',
+    default_args=default_args,
+    description='Daily ETL pipeline for sales data',
+    schedule_interval='0 6 * * *',  # Run at 6 AM daily
+    start_date=datetime(2026, 1, 1),
+    catchup=False,
+    tags=['etl', 'sales', 'production'],
+)
+
+# Task 1: Check if source file exists
+check_file = FileSensor(
+    task_id='check_source_file',
+    filepath='/data/raw/sales_{{ ds }}.csv',
+    poke_interval=300,  # Check every 5 minutes
+    timeout=3600,       # Timeout after 1 hour
+    dag=dag,
+)
+
+# Task 2: Extract - Read data from source
+def extract_data(**context):
+    import pandas as pd
+    execution_date = context['ds']
+    filepath = f'/data/raw/sales_{execution_date}.csv'
+
+    df = pd.read_csv(filepath)
+    print(f'Extracted {len(df)} records from {filepath}')
+
+    # Push data to XCom for sharing between tasks
+    context['ti'].xcom_push(key='record_count', value=len(df))
+    df.to_parquet(f'/data/staging/sales_{execution_date}.parquet')
+
+extract = PythonOperator(
+    task_id='extract_data',
+    python_callable=extract_data,
+    dag=dag,
+)
+
+# Task 3: Transform - Clean and transform data
+def transform_data(**context):
+    import pandas as pd
+    execution_date = context['ds']
+
+    df = pd.read_parquet(f'/data/staging/sales_{execution_date}.parquet')
+
+    # Clean data
+    df = df.dropna(subset=['product_id', 'amount'])
+    df['amount'] = df['amount'].astype(float)
+    df['sale_date'] = pd.to_datetime(df['sale_date'])
+
+    # Compute metrics
+    df['revenue'] = df['amount'] * df['quantity']
+    df['category_upper'] = df['category'].str.upper()
+
+    df.to_parquet(f'/data/processed/sales_{execution_date}.parquet')
+    print(f'Transformed {len(df)} records')
+
+transform = PythonOperator(
+    task_id='transform_data',
+    python_callable=transform_data,
+    dag=dag,
+)
+
+# Task 4: Load - Write data to Data Warehouse
+load_to_warehouse = PostgresOperator(
+    task_id='load_to_warehouse',
+    postgres_conn_id='warehouse_db',
+    sql="""
+        COPY sales_fact
+        FROM '/data/processed/sales_{{ ds }}.parquet'
+        WITH (FORMAT 'parquet');
+    """,
+    dag=dag,
+)
+
+# Task 5: Send completion notification
+notify = BashOperator(
+    task_id='send_notification',
+    bash_command="""
+        curl -X POST https://hooks.slack.com/services/xxx \
+        -H 'Content-Type: application/json' \
+        -d '{"text": "ETL Pipeline completed for {{ ds }}"}'
+    """,
+    dag=dag,
+)
+
+# Define execution order
+check_file >> extract >> transform >> load_to_warehouse >> notify
+```
+
+<Diagram chart="graph LR\n    A[FileSensor: Wait for file] --> B[Extract: Read CSV]\n    B --> C[Transform: Clean data]\n    C --> D[Load: Write to DB]\n    D --> E[Notify: Send Slack]" />
+
+<Callout type="tip">Use the TaskFlow API (the @task decorator) from Airflow 2.0 onwards to write cleaner DAGs. TaskFlow automatically handles XCom and task dependencies.</Callout>
+
+## TaskFlow API (Airflow 2.0+)
+
+A more modern version of the example above using TaskFlow:
+
+```python
+from airflow.decorators import dag, task
+from datetime import datetime
+
+@dag(
+    schedule_interval='0 6 * * *',
+    start_date=datetime(2026, 1, 1),
+    catchup=False,
+    tags=['etl', 'sales'],
+)
+def etl_sales_pipeline_v2():
+
+    @task()
+    def extract(ds=None):
+        import pandas as pd
+        df = pd.read_csv(f'/data/raw/sales_{ds}.csv')
+        return df.to_dict()
+
+    @task()
+    def transform(raw_data: dict):
+        import pandas as pd
+        df = pd.DataFrame(raw_data)
+        df = df.dropna(subset=['product_id', 'amount'])
+        df['revenue'] = df['amount'] * df['quantity']
+        return df.to_dict()
+
+    @task()
+    def load(processed_data: dict):
+        import pandas as pd
+        df = pd.DataFrame(processed_data)
+        # Write to database
+        print(f'Loaded {len(df)} records to warehouse')
+
+    # Pipeline flow
+    raw = extract()
+    processed = transform(raw)
+    load(processed)
+
+# Instantiate the DAG
+etl_sales_pipeline_v2()
+```
+
+## Executors in Airflow
+
+| Executor | Description | Best For |
+|----------|-------------|----------|
+| SequentialExecutor | Runs one task at a time | Development, testing |
+| LocalExecutor | Runs tasks in parallel on one machine | Small scale |
+| CeleryExecutor | Distributes tasks via Celery workers | Large scale |
+| KubernetesExecutor | Each task runs in a separate pod | Cloud-native, large scale |
+
+<Callout type="warning">SequentialExecutor should only be used for development environments. In production, use CeleryExecutor or KubernetesExecutor to ensure performance and reliability.</Callout>
+
+## Best Practices
+
+1. **Keep DAGs simple**: Each DAG should perform one specific job
+2. **Idempotent tasks**: Tasks should be re-runnable without causing errors or duplicate data
+3. **Use connections**: Manage connection credentials through the Airflow UI, never hardcode
+4. **Testing**: Write unit tests for Python functions before putting them in DAGs
+5. **Monitoring**: Set up alerting for critical DAGs
+6. **Version control**: Store DAG files in a Git repository
+
+<Callout type="info">Apache Airflow is the most popular workflow orchestration platform for data engineering. Companies like Airbnb, Spotify, Twitter, Square, and thousands of other organizations use Airflow in production every day.</Callout>
+
+## Conclusion
+
+Apache Airflow is an indispensable tool for any data engineer. With the ability to define workflows in Python, a powerful scheduling system, and an intuitive monitoring interface, Airflow helps you build and operate complex data pipelines with ease and reliability.

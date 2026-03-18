@@ -1,0 +1,254 @@
+---
+title: "Vectorization and Embeddings: How Computers Understand Natural Language"
+description: "Learn about vectorization, word embeddings, sentence embeddings, cosine similarity, and how to create embeddings with OpenAI API and Sentence-Transformers for semantic search and RAG."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 14
+tags: ["vectorization", "embeddings", "word2vec", "nlp", "cosine-similarity", "openai", "semantic-search", "rag"]
+featured: true
+order: 7
+sources:
+  - title: "OpenAI Embeddings Documentation"
+    url: "https://platform.openai.com/docs/guides/embeddings"
+  - title: "Sentence-Transformers Documentation"
+    url: "https://www.sbert.net/"
+  - title: "Word2Vec Paper - Mikolov et al."
+    url: "https://arxiv.org/abs/1301.3781"
+  - title: "Pinecone - What are Vector Embeddings?"
+    url: "https://www.pinecone.io/learn/vector-embeddings/"
+---
+
+# Vectorization and Embeddings: How Computers Understand Natural Language
+
+Humans read a sentence and instantly grasp its meaning. But computers only understand numbers. So how does a machine know that "dog" and "puppy" are semantically close, while "dog" and "automobile" are worlds apart? The answer lies in **vectorization** and **embeddings** — techniques that transform natural language into numerical vectors that machines can compute, compare, and reason over.
+
+## What Is Vectorization?
+
+Vectorization is the process of converting unstructured data (text, images, audio) into fixed-size numerical vectors. Each vector represents the "meaning" of the data in a high-dimensional mathematical space.
+
+<Callout type="info">
+A vector embedding is not just a simple encoding — it captures **semantic meaning**. Words or sentences with similar meanings will have vectors that are close together in high-dimensional space.
+</Callout>
+
+<Diagram chart="graph LR\n    A[Raw Text] --> B[Embedding Model]\n    B --> C[Numerical Vector]\n    C --> D[Compare / Search]\n    style A fill:#f9f,stroke:#333\n    style C fill:#bbf,stroke:#333" />
+
+## From One-Hot Encoding to Word Embeddings
+
+### One-Hot Encoding: The Crude Beginning
+
+The simplest way to represent words is one-hot encoding: each word is a vector with exactly one position set to 1 and all others set to 0.
+
+```python
+# Vocabulary of 5 words: ["dog", "cat", "fish", "car", "house"]
+dog   = [1, 0, 0, 0, 0]
+cat   = [0, 1, 0, 0, 0]
+fish  = [0, 0, 1, 0, 0]
+car   = [0, 0, 0, 1, 0]
+house = [0, 0, 0, 0, 1]
+```
+
+<Callout type="warning">
+One-hot encoding has two critical flaws: (1) Vectors are extremely sparse — with a 100,000-word vocabulary, each vector has 99,999 zeros. (2) It cannot capture semantic relationships — the distance between "dog" and "cat" equals the distance between "dog" and "car".
+</Callout>
+
+<Diagram chart="graph TD\n    subgraph One-Hot Encoding\n    A[dog = 1,0,0,0,0]\n    B[cat = 0,1,0,0,0]\n    C[fish = 0,0,1,0,0]\n    end\n    subgraph Dense Embedding\n    D[dog = 0.8, 0.3, 0.1]\n    E[cat = 0.7, 0.4, 0.1]\n    F[fish = 0.2, 0.1, 0.9]\n    end\n    A -.->|evolution| D\n    B -.->|evolution| E\n    C -.->|evolution| F" />
+
+### Word2Vec: The First Revolution
+
+In 2013, Tomas Mikolov's team at Google published **Word2Vec** — a model that learns dense vector representations of words from context. The core idea: "A word is defined by the company it keeps" (the distributional hypothesis).
+
+Word2Vec has two architectures:
+- **CBOW** (Continuous Bag of Words): Predicts the center word from surrounding context words
+- **Skip-gram**: Predicts surrounding context words from the center word
+
+The results were stunning: `vector("king") - vector("man") + vector("woman") ≈ vector("queen")`.
+
+### GloVe: Combining Global Statistics
+
+**GloVe** (Global Vectors for Word Representation) from Stanford combines the strengths of co-occurrence matrix factorization with Word2Vec's learning approach, producing high-quality embeddings by leveraging global corpus statistics.
+
+## Sentence Embeddings and Document Embeddings
+
+Word embeddings only represent individual words. In practice, we need to represent entire sentences and documents.
+
+### Approaches to Sentence Embeddings
+
+| Method | Description | Quality |
+|---|---|---|
+| Average word vectors | Mean of all word embeddings | Low |
+| TF-IDF weighted average | TF-IDF weighted mean | Medium |
+| Sentence-BERT (SBERT) | Specialized transformer model | High |
+| OpenAI text-embedding | Commercial model | Very High |
+
+<Callout type="tip">
+**Sentence-Transformers** (SBERT) is the best open-source library for sentence embeddings. It offers many pre-trained models with multilingual support, completely free.
+</Callout>
+
+## Creating Embeddings in Practice
+
+### With OpenAI API
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="your-api-key")
+
+def get_embedding(text: str, model: str = "text-embedding-3-small") -> list[float]:
+    """Create an embedding from text using OpenAI API."""
+    response = client.embeddings.create(
+        input=text,
+        model=model
+    )
+    return response.data[0].embedding
+
+# Create an embedding for a sentence
+embedding = get_embedding("Vectorization helps computers understand language")
+print(f"Dimensions: {len(embedding)}")  # 1536 for text-embedding-3-small
+print(f"First 5 values: {embedding[:5]}")
+```
+
+### With Sentence-Transformers (Free, Runs Locally)
+
+```python
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
+# Load a multilingual model
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Create embeddings for multiple sentences at once
+sentences = [
+    "Databases store information persistently",
+    "A database is used to hold data",
+    "The weather is beautiful today",
+    "Cats are adorable animals"
+]
+
+embeddings = model.encode(sentences)
+print(f"Shape: {embeddings.shape}")  # (4, 384) - 4 sentences, 384 dimensions each
+```
+
+## Cosine Similarity: Measuring Resemblance
+
+Once you have vectors, how do you know if two are "similar"? The most common method is **cosine similarity** — it measures the angle between two vectors.
+
+Formula: `cos(theta) = (A . B) / (||A|| x ||B||)`
+
+- Value 1.0: identical meaning
+- Value 0.0: unrelated
+- Value -1.0: opposite meaning
+
+```python
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Sentences to compare
+sentences = [
+    "Databases store information persistently",   # Source sentence
+    "A database is used to hold data",             # Similar meaning
+    "The weather is beautiful today",               # Unrelated
+]
+
+embeddings = model.encode(sentences)
+
+# Compute cosine similarity between the first sentence and the rest
+for i in range(1, len(sentences)):
+    sim = cosine_similarity([embeddings[0]], [embeddings[i]])[0][0]
+    print(f"'{sentences[0]}' vs '{sentences[i]}'")
+    print(f"  -> Similarity: {sim:.4f}\n")
+
+# Expected results:
+# "Databases store..." vs "A database is used..." -> ~0.85 (very similar)
+# "Databases store..." vs "The weather is..."     -> ~0.10 (unrelated)
+```
+
+<Callout type="info">
+Cosine similarity measures direction, not magnitude. Two sentences expressing the same idea but with different lengths will still have a high cosine similarity, making it more suitable than Euclidean distance for comparing semantic content.
+</Callout>
+
+## High-Dimensional Vector Spaces
+
+Why do embeddings typically have 768 or 1536 dimensions? Each dimension captures a "facet" of meaning — it might represent topic, sentiment, formality, domain, and so on. More dimensions mean more nuanced representations, but also more memory and computation.
+
+<ComparisonTable headers={["Model", "Dimensions", "Size", "Quality"]} rows={[["Word2Vec", "300", "~1.5 GB", "Basic"], ["GloVe", "50-300", "~1 GB", "Good for single words"], ["SBERT MiniLM", "384", "~120 MB", "Good, fast"], ["OpenAI text-embedding-3-small", "1536", "Cloud API", "Very good"], ["OpenAI text-embedding-3-large", "3072", "Cloud API", "Excellent"]]} />
+
+## Real-World Applications
+
+### 1. Semantic Search
+
+Instead of matching exact keywords, semantic search finds results by **meaning**. A user searching "how to secure web applications" can find articles about "preventing SQL injection" even when no keywords overlap.
+
+### 2. Retrieval-Augmented Generation (RAG)
+
+RAG combines vector search with LLMs: find relevant documents via embeddings, then feed them as context for the LLM to generate answers. This is the most common architecture for enterprise chatbots today.
+
+<Diagram chart="graph LR\n    A[Question] --> B[Create Embedding]\n    B --> C[Search Vector DB]\n    C --> D[Top-K Documents]\n    D --> E[LLM + Context]\n    E --> F[Answer]\n    style E fill:#f96,stroke:#333" />
+
+### 3. Recommendation Systems
+
+Represent products and users as vectors, then find products whose vectors are closest to a user's preference vector.
+
+### 4. Clustering and Classification
+
+Group similar documents, detect duplicates, classify spam emails based on vector distances.
+
+## Complete Example: Building a Simple Semantic Search
+
+```python
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+class SimpleSemanticSearch:
+    def __init__(self, model_name='all-MiniLM-L6-v2'):
+        self.model = SentenceTransformer(model_name)
+        self.documents = []
+        self.embeddings = None
+
+    def add_documents(self, docs: list[str]):
+        """Add documents and create embeddings."""
+        self.documents = docs
+        self.embeddings = self.model.encode(docs)
+
+    def search(self, query: str, top_k: int = 3) -> list[dict]:
+        """Search documents by semantic similarity."""
+        query_embedding = self.model.encode([query])
+        similarities = cosine_similarity(query_embedding, self.embeddings)[0]
+
+        # Sort by descending similarity
+        top_indices = np.argsort(similarities)[::-1][:top_k]
+
+        results = []
+        for idx in top_indices:
+            results.append({
+                "document": self.documents[idx],
+                "score": float(similarities[idx])
+            })
+        return results
+
+# Usage
+search_engine = SimpleSemanticSearch()
+search_engine.add_documents([
+    "PostgreSQL is an open-source relational database management system",
+    "Redis is an in-memory data store commonly used for caching",
+    "Docker packages applications into containers for easy deployment",
+    "Kubernetes orchestrates containers at scale",
+    "MongoDB is a NoSQL document-based database",
+])
+
+results = search_engine.search("fastest way to store data in memory")
+for r in results:
+    print(f"[{r['score']:.3f}] {r['document']}")
+```
+
+<Callout type="tip">
+This is a demonstration only. With large datasets (millions of documents), you need a dedicated vector database instead of brute-force cosine similarity. See the next article on Vector Databases.
+</Callout>
+
+## Summary
+
+Vectorization and embeddings are the foundation for most modern AI applications — from chatbots and intelligent search to recommendation systems. Understanding how they work helps you design better systems and choose the right tools for your problem. Start with Sentence-Transformers for free local experimentation, then scale up to OpenAI API when you need higher quality.

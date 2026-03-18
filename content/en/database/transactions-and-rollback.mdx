@@ -1,0 +1,185 @@
+---
+title: "Transactions and Rollback: MySQL InnoDB vs PostgreSQL MVCC"
+description: "Deep dive into transaction and rollback internals of MySQL InnoDB (Undo Log, Redo Log) and PostgreSQL (Dead Tuples, VACUUM), with a detailed comparison of both approaches."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["transaction", "rollback", "mysql", "postgresql", "innodb", "mvcc", "undo-log", "vacuum", "acid", "database"]
+featured: true
+order: 11
+sources:
+  - title: "InnoDB Multi-Versioning - MySQL Documentation"
+    url: "https://dev.mysql.com/doc/refman/8.4/en/innodb-multi-versioning.html"
+  - title: "InnoDB Undo Logging - Jeremy Cole"
+    url: "https://blog.jcole.us/2014/04/16/the-basics-of-the-innodb-undo-logging-and-history-system/"
+  - title: "PostgreSQL VACUUM - Official Documentation"
+    url: "https://www.postgresql.org/docs/current/routine-vacuuming.html"
+  - title: "PostgreSQL MVCC Vacuum - Postgres Professional"
+    url: "https://postgrespro.com/blog/pgsql/5967918"
+  - title: "Deep Dive PostgreSQL VACUUM - Google Cloud"
+    url: "https://cloud.google.com/blog/products/databases/deep-dive-into-postgresql-vacuum-garbage-collector"
+---
+
+# Transactions and Rollback: MySQL InnoDB vs PostgreSQL MVCC
+
+When you perform a write operation (INSERT, UPDATE, DELETE), what actually happens inside the database? How can a database "undo" an operation that has already been executed? This article takes a deep dive into the internals of MySQL InnoDB and PostgreSQL — the two most popular relational database systems — to understand how they handle transactions and rollback.
+
+## What is ACID?
+
+Every relational database system follows ACID principles to guarantee data integrity:
+
+- **Atomicity**: An entire transaction must either succeed or fail completely. There is no partial state.
+- **Consistency**: Data always transitions from one valid state to another valid state.
+- **Isolation**: Concurrent transactions do not interfere with each other.
+- **Durability**: Once a transaction has committed, data is permanently stored even if the system crashes.
+
+<Callout type="info" title="Bank Transfer Example">
+When you transfer 1,000 USD from Account A to Account B, two operations must occur together: debit A and credit B. If the system crashes after debiting A but before crediting B, ACID guarantees the entire transaction will be rolled back — the money returns to Account A.
+</Callout>
+
+So how does each database engine implement ACID? MySQL InnoDB and PostgreSQL take two fundamentally different approaches.
+
+## MySQL InnoDB: Undo Log and Version Chain
+
+### How the Undo Log Works
+
+When InnoDB performs an UPDATE or DELETE on a row, it does not overwrite the old data immediately. Instead, the old version of the row is saved into the **Undo Log** (also known as the rollback segment).
+
+Every row in InnoDB has two important hidden columns:
+- **db_trx_id**: The ID of the last transaction that modified this row
+- **db_roll_pointer**: A pointer to the undo record — the old version of the row in the undo log
+
+When a row is updated multiple times, the undo records form a **version chain** — a linked list of old row versions.
+
+<Diagram chart="graph LR\n    A[Current Row\ndb_trx_id=105\ndb_roll_pointer] -->|points to| B[Undo Record\nTrx 103\nOld Value 2]\n    B -->|points to| C[Undo Record\nTrx 100\nOld Value 1]\n    C -->|points to| D[Undo Record\nTrx 95\nOriginal Value]" />
+
+### Two Types of Undo Log
+
+InnoDB distinguishes between two types of undo logs:
+
+1. **Insert Undo Log**: Created when a new row is INSERTed. Only needed for rollback, so it is discarded immediately after the transaction commits (no other transaction needs to see a row that did not yet exist).
+2. **Update Undo Log**: Created when a row is UPDATEd or DELETEd. Must be retained longer because other transactions may need to read older versions through MVCC.
+
+### How Rollback Works
+
+When you call `ROLLBACK`, InnoDB **replays the undo log in reverse**: it reads each undo record along the version chain and restores the row to its previous value. This is exactly why it is called "undo" — it reverses each change one by one.
+
+```sql
+BEGIN;
+UPDATE accounts SET balance = balance - 1000 WHERE id = 1;
+UPDATE accounts SET balance = balance + 1000 WHERE id = 2;
+-- An error occurs!
+ROLLBACK;
+-- InnoDB replays the undo log: restores the old balance for both accounts
+```
+
+### MVCC via Read View
+
+**Multi-Version Concurrency Control (MVCC)** allows multiple transactions to read data concurrently without locking. When a transaction starts reading, InnoDB creates a **Read View** containing a list of currently active transactions.
+
+For each row, InnoDB checks the `db_trx_id`:
+- If the transaction that created the row committed before the Read View was taken, the row is visible
+- If the creating transaction is still active, InnoDB follows the version chain through the undo log to find an appropriate older version
+
+<Callout type="tip" title="Isolation Level Affects Read View">
+At **REPEATABLE READ** (MySQL default): the Read View is created once when the transaction first reads. At **READ COMMITTED**: a new Read View is created for every query. This is why the two isolation levels see different data.
+</Callout>
+
+### Purge Thread
+
+Undo logs are not kept forever. The **purge thread** runs in the background, cleaning up old undo records when no active transaction needs to read them anymore. If a long-running transaction exists, undo logs accumulate and the **history list length** grows — impacting performance.
+
+## PostgreSQL: Dead Tuples and VACUUM
+
+### A Fundamentally Different Approach
+
+PostgreSQL takes a completely different approach: it **does not use a separate undo log**. Instead, PostgreSQL stores all versions of the data directly in the table (heap).
+
+When you UPDATE a row in PostgreSQL, two things actually happen:
+1. The old tuple is marked as "dead" (by writing `xmax`)
+2. A new tuple is INSERTed with the updated data
+
+Every tuple in PostgreSQL has two important system fields:
+- **xmin**: The ID of the transaction that created (INSERTed) this tuple
+- **xmax**: The ID of the transaction that deleted/updated this tuple (0 if the tuple is still "live")
+
+<Diagram chart="graph TD\n    subgraph Table: accounts\n    A[Tuple 1 - DEAD\nxmin=100, xmax=105\nbalance=5000] \n    B[Tuple 2 - LIVE\nxmin=105, xmax=0\nbalance=4000]\n    end\n    A -.->|UPDATE creates new version| B\n    C[Transaction 105:\nUPDATE balance] -->|sets xmax=105| A\n    C -->|creates new tuple xmin=105| B" />
+
+### Rollback in PostgreSQL
+
+When a transaction calls `ROLLBACK`, PostgreSQL does not need to literally "undo" anything. The new tuple is marked as invisible (the transaction that created it is aborted), and the old tuple remains in the table with its `xmax` pointing to the aborted transaction — other transactions ignore this `xmax` and continue to see the old tuple.
+
+This is a major difference: InnoDB must **replay the undo log** on rollback, while PostgreSQL simply **marks the transaction as aborted** in the commit log (CLOG).
+
+### The Dead Tuples Problem and Table Bloat
+
+The downside of this approach: dead tuples accumulate in the table over time. They consume disk space, slow down sequential scans, and cause **table bloat** — the table grows continuously even though the actual amount of live data remains the same.
+
+<Callout type="warning" title="Table bloat can become severe">
+A table with 1 million active rows but 10 million dead tuples will be 10 times larger than necessary. Sequential scans must read through all dead tuples, causing significant slowdowns.
+</Callout>
+
+### VACUUM: PostgreSQL's Garbage Collector
+
+**VACUUM** is the process that cleans up dead tuples, reclaims space, and updates the **visibility map** (a map indicating which pages contain only tuples visible to all transactions).
+
+There are two types of VACUUM:
+- **VACUUM** (lazy): Marks the space occupied by dead tuples as reusable, but does not return it to the OS
+- **VACUUM FULL**: Rewrites the entire table, returns space to the OS, but requires an exclusive lock on the table
+
+**Autovacuum** is a daemon that runs in the background, automatically triggering VACUUM when the number of dead tuples exceeds a threshold. Key configuration parameters:
+
+```sql
+-- View autovacuum configuration
+SHOW autovacuum_vacuum_threshold;        -- default: 50
+SHOW autovacuum_vacuum_scale_factor;     -- default: 0.2
+-- Triggers when: dead_tuples > threshold + scale_factor * total_tuples
+```
+
+<Callout type="danger" title="Transaction ID Wraparound — A Real Danger!">
+PostgreSQL uses 32-bit transaction IDs, meaning roughly 4 billion IDs. When IDs are about to wrap around, PostgreSQL must run an "aggressive VACUUM" to freeze old tuples. If VACUUM cannot keep up, PostgreSQL will **automatically shut down** to protect data integrity. This is why you should NEVER disable autovacuum in production.
+</Callout>
+
+## Comparing MySQL Undo Log vs PostgreSQL Dead Tuples
+
+<ComparisonTable
+  headers={["Criteria", "MySQL InnoDB", "PostgreSQL"]}
+  rows={[
+    ["Versioning mechanism", "Separate Undo Log", "New tuple in the same table"],
+    ["UPDATE behavior", "In-place overwrite + save old version to undo log", "Mark old tuple dead + INSERT new tuple"],
+    ["Rollback", "Replay undo log in reverse", "Mark transaction as aborted in CLOG"],
+    ["Rollback speed", "Slower (must replay)", "Faster (just mark aborted)"],
+    ["Cleanup", "Purge thread cleans undo log", "VACUUM cleans dead tuples"],
+    ["Table bloat", "Less bloat (old data in undo log)", "Prone to bloat (dead tuples in table)"],
+    ["Index on UPDATE", "In-place index update if same page", "Must create new index entry for new tuple"],
+    ["MVCC reads", "Follow version chain in undo log", "Check xmin/xmax visibility"]
+  ]}
+/>
+
+## Redo Log / Write-Ahead Log (WAL)
+
+Both MySQL InnoDB and PostgreSQL use **Write-Ahead Logging** to ensure Durability — the "D" in ACID.
+
+The core principle: **Write the log BEFORE writing data to disk**. If the system crashes, the database can read the log to recover (crash recovery).
+
+<Diagram chart="graph LR\n    A[Transaction\nCOMMIT] -->|1. Write Redo/WAL| B[Redo Log / WAL\nSequential - Fast]\n    B -->|2. Return OK| A\n    B -->|3. Background\nCheckpoint| C[Data Files\nRandom I/O - Slow]" />
+
+### MySQL: InnoDB Redo Log
+- Files: `ib_logfile0`, `ib_logfile1` (circular buffer)
+- Sequential writes — very fast
+- **Checkpoint**: a background process flushes data from the buffer pool to data files, then marks the redo log space as reusable
+
+### PostgreSQL: Write-Ahead Log
+- Directory: `pg_wal/`
+- Split into 16MB segment files (by default)
+- Supports **Point-in-Time Recovery (PITR)**: combine a base backup with WAL replay to restore the database to any point in time
+- **Streaming Replication**: WAL is sent to replica servers in real time
+
+### The Key Commonality
+
+Both systems guarantee that when `COMMIT` returns successfully, the changes have been written to the redo log/WAL on disk. Even if the server crashes immediately after, the data is safe and can be recovered through crash recovery — reading the log and replaying changes that were not yet written to data files.
+
+## Summary
+
+MySQL InnoDB and PostgreSQL take two different paths to achieve the same goal: safe and consistent transactions. InnoDB uses a separate undo log, keeping the main table clean but requiring undo replay for rollback. PostgreSQL stores all versions in the same table, making rollback nearly instant but requiring VACUUM for cleanup. Understanding these internals helps you optimize performance, troubleshoot issues, and make informed architectural decisions for your applications.

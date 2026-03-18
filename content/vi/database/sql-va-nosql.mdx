@@ -1,0 +1,224 @@
+---
+title: "SQL và NoSQL"
+description: "Tìm hiểu sự khác biệt giữa SQL và NoSQL, khi nào nên dùng loại nào, và các hệ quản trị cơ sở dữ liệu phổ biến như PostgreSQL, MySQL, MongoDB, Redis."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["sql", "nosql", "postgresql", "mysql", "mongodb", "redis", "database"]
+featured: true
+order: 1
+sources:
+  - title: "PostgreSQL Official Documentation"
+    url: "https://www.postgresql.org/docs/"
+  - title: "MongoDB Official Documentation"
+    url: "https://www.mongodb.com/docs/"
+  - title: "MySQL Reference Manual"
+    url: "https://dev.mysql.com/doc/refman/8.0/en/"
+  - title: "Redis Documentation"
+    url: "https://redis.io/docs/"
+---
+
+# SQL và NoSQL
+
+Cơ sở dữ liệu (database) là thành phần không thể thiếu trong bất kỳ ứng dụng phần mềm nào. Hai loại cơ sở dữ liệu phổ biến nhất hiện nay là SQL (Relational) và NoSQL (Non-Relational). Mỗi loại có những ưu điểm, nhược điểm và trường hợp sử dụng riêng. Bài viết này sẽ giúp bạn hiểu rõ sự khác biệt, để đưa ra lựa chọn phù hợp cho dự án của mình.
+
+## SQL là gì?
+
+SQL (Structured Query Language) là ngôn ngữ truy vấn có cấu trúc, được sử dụng để quản lý các cơ sở dữ liệu quan hệ (relational database). Dữ liệu được tổ chức trong các bảng (table) với các hàng (row) và cột (column), có mối quan hệ rõ ràng với nhau thông qua khóa chính (primary key) và khóa ngoại (foreign key).
+
+<Diagram chart="graph TD\n    subgraph Relational Database\n    A[Table: Users] -->|foreign key| B[Table: Orders]\n    B -->|foreign key| C[Table: Products]\n    A -->|foreign key| D[Table: Addresses]\n    end" />
+
+### Đặc điểm của SQL
+
+- **Schema cố định**: Cấu trúc bảng phải được định nghĩa trước khi thêm dữ liệu
+- **ACID compliance**: Đảm bảo tính nhất quán của giao dịch (Atomicity, Consistency, Isolation, Durability)
+- **Quan hệ giữa các bảng**: Sử dụng JOIN để kết hợp dữ liệu từ nhiều bảng
+- **Ngôn ngữ chuẩn**: Cú pháp SQL tương đối giống nhau giữa các hệ thống
+
+### Ví dụ tạo bảng và truy vấn SQL
+
+```sql
+-- Tạo bảng users
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tạo bảng orders với khóa ngoại
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    total DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Truy vấn JOIN
+SELECT u.name, o.total, o.status
+FROM users u
+JOIN orders o ON u.id = o.user_id
+WHERE o.status = 'completed'
+ORDER BY o.created_at DESC;
+```
+
+## NoSQL là gì?
+
+NoSQL (Not Only SQL) là các hệ thống cơ sở dữ liệu không sử dụng mô hình quan hệ truyền thống. Thay vì bảng và cột, NoSQL sử dụng nhiều mô hình dữ liệu linh hoạt hơn như document, key-value, column-family hoặc graph.
+
+<Diagram chart="graph LR\n    subgraph NoSQL Types\n    A[NoSQL] --> B[Document Store\nMongoDB, CouchDB]\n    A --> C[Key-Value Store\nRedis, DynamoDB]\n    A --> D[Column-Family\nCassandra, HBase]\n    A --> E[Graph Database\nNeo4j, ArangoDB]\n    end" />
+
+### Đặc điểm của NoSQL
+
+- **Schema linh hoạt**: Dữ liệu có thể có cấu trúc khác nhau trong cùng một collection
+- **Mở rộng ngang dễ dàng**: Thiết kế cho việc phân tán dữ liệu trên nhiều server
+- **Hiệu suất cao**: Tối ưu cho các thao tác đọc/ghi đơn giản
+- **Phù hợp dữ liệu phi cấu trúc**: JSON, XML, binary data
+
+### Ví dụ với MongoDB
+
+```javascript
+// Kết nối và thêm dữ liệu vào MongoDB
+const { MongoClient } = require('mongodb');
+
+const client = new MongoClient('mongodb://localhost:27017');
+await client.connect();
+
+const db = client.db('myapp');
+const users = db.collection('users');
+
+// Thêm một document -- không cần định nghĩa schema trước
+await users.insertOne({
+  name: 'Nguyen Van A',
+  email: 'a@example.com',
+  profile: {
+    age: 28,
+    skills: ['JavaScript', 'Python', 'Docker'],
+    address: {
+      city: 'Ho Chi Minh',
+      country: 'Vietnam'
+    }
+  },
+  createdAt: new Date()
+});
+
+// Truy vấn dữ liệu
+const result = await users.find({
+  'profile.skills': 'JavaScript',
+  'profile.age': { $gte: 25 }
+}).toArray();
+```
+
+<Callout type="info">MongoDB lưu dữ liệu dưới dạng BSON (Binary JSON), cho phép lưu trữ các kiểu dữ liệu phong phú hơn JSON thuần như Date, Binary, Decimal128.</Callout>
+
+## So sánh SQL vs NoSQL
+
+<ComparisonTable
+  headers={["Tiêu chí", "SQL", "NoSQL"]}
+  rows={[
+    ["Mô hình dữ liệu", "Bảng với hàng và cột", "Document, Key-Value, Graph, Column"],
+    ["Schema", "Cố định, nghiêm ngặt", "Linh hoạt, động"],
+    ["Mở rộng", "Chiều dọc (Vertical)", "Chiều ngang (Horizontal)"],
+    ["ACID", "Hỗ trợ đầy đủ", "Tùy thuộc hệ thống"],
+    ["Truy vấn", "SQL chuẩn hóa", "API/Query riêng từng hệ thống"],
+    ["Quan hệ dữ liệu", "JOIN mạnh mẽ", "Thường không hỗ trợ JOIN"],
+    ["Phù hợp cho", "Dữ liệu có cấu trúc, giao dịch", "Dữ liệu linh hoạt, big data, realtime"],
+    ["Ví dụ", "PostgreSQL, MySQL", "MongoDB, Redis, Cassandra"]
+  ]}
+/>
+
+## Các hệ quản trị cơ sở dữ liệu phổ biến
+
+### PostgreSQL
+
+PostgreSQL là hệ quản trị cơ sở dữ liệu mã nguồn mở mạnh mẽ nhất hiện nay, hỗ trợ cả SQL và JSON, full-text search, và nhiều tính năng nâng cao.
+
+```sql
+-- PostgreSQL hỗ trợ JSONB -- kết hợp SQL và NoSQL
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    metadata JSONB
+);
+
+INSERT INTO products (name, metadata) VALUES
+('Laptop', '{"brand": "Dell", "specs": {"ram": "16GB", "cpu": "i7"}}');
+
+-- Truy vấn dữ liệu JSON
+SELECT name, metadata->>'brand' AS brand,
+       metadata->'specs'->>'ram' AS ram
+FROM products
+WHERE metadata->'specs'->>'ram' = '16GB';
+```
+
+### MySQL
+
+MySQL là hệ quản trị cơ sở dữ liệu phổ biến nhất thế giới, nổi tiếng với tính đơn giản và hiệu suất cao. Được sử dụng rộng rãi trong các ứng dụng web như WordPress, Drupal.
+
+### MongoDB
+
+MongoDB là cơ sở dữ liệu document-oriented phổ biến nhất, lưu trữ dữ liệu dạng JSON-like documents. Phù hợp cho các ứng dụng cần schema linh hoạt và mở rộng ngang.
+
+### Redis
+
+Redis là cơ sở dữ liệu in-memory, hỗ trợ nhiều cấu trúc dữ liệu như string, hash, list, set, sorted set. Thường được dùng làm cache, message broker, hoặc session store.
+
+```javascript
+// Sử dụng Redis làm cache
+const Redis = require('ioredis');
+const redis = new Redis();
+
+// Cache kết quả truy vấn
+async function getUserWithCache(userId) {
+  const cacheKey = `user:${userId}`;
+
+  // Kiểm tra cache trước
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  // Nếu không có trong cache, truy vấn database
+  const user = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
+
+  // Lưu vào cache với TTL 1 giờ
+  await redis.set(cacheKey, JSON.stringify(user), 'EX', 3600);
+
+  return user;
+}
+```
+
+## Khi nào chọn SQL, khi nào chọn NoSQL?
+
+<Diagram chart="graph TD\n    A[Bạn cần gì?] --> B{Dữ liệu có\ncấu trúc rõ ràng?}\n    B -->|Có| C{Cần giao dịch\nphức tạp ACID?}\n    B -->|Không| F[Chọn NoSQL]\n    C -->|Có| D[Chọn SQL\nPostgreSQL/MySQL]\n    C -->|Không| E{Cần mở rộng\nngang lớn?}\n    E -->|Có| F\n    E -->|Không| D" />
+
+### Chọn SQL khi:
+- Dữ liệu có cấu trúc rõ ràng và ổn định
+- Cần đảm bảo tính nhất quán của giao dịch (banking, e-commerce)
+- Cần các truy vấn phức tạp với JOIN nhiều bảng
+- Dữ liệu có mối quan hệ phức tạp
+
+### Chọn NoSQL khi:
+- Dữ liệu không có cấu trúc cố định hoặc thay đổi thường xuyên
+- Cần mở rộng ngang để xử lý lượng dữ liệu lớn
+- Ưu tiên tốc độ đọc/ghi hơn tính nhất quán tuyệt đối
+- Xây dựng ứng dụng realtime, IoT, hoặc content management
+
+<Callout type="tip">Nhiều ứng dụng hiện đại sử dụng cả SQL và NoSQL cùng lúc (Polyglot Persistence). Ví dụ: PostgreSQL cho dữ liệu giao dịch, Redis cho cache, và MongoDB cho logging. Đừng giới hạn bản thân chỉ dùng một loại.</Callout>
+
+## Xu hướng hiện đại: NewSQL và Multi-Model
+
+Các hệ thống hiện đại đang xóa nhòa ranh giới giữa SQL và NoSQL:
+
+- **PostgreSQL** hỗ trợ JSONB, cho phép làm việc với dữ liệu bán cấu trúc
+- **MongoDB** đã hỗ trợ ACID transactions từ version 4.0
+- **CockroachDB, TiDB** (NewSQL): Kết hợp khả năng mở rộng của NoSQL với tính nhất quán của SQL
+- **Supabase** xây dựng trên PostgreSQL nhưng cung cấp API realtime giống NoSQL
+
+<Callout type="warning">Đừng chọn database chỉ vì nó là xu hướng. Hãy xem xét yêu cầu cụ thể của dự án: khối lượng dữ liệu, kiểu truy vấn, yêu cầu về tính nhất quán, và khả năng mở rộng trong tương lai.</Callout>
+
+## Kết luận
+
+Không có lời giải duy nhất đúng cho mọi bài toán. SQL phù hợp khi dữ liệu có cấu trúc và cần tính nhất quán cao. NoSQL linh hoạt hơn khi xử lý dữ liệu phi cấu trúc và cần mở rộng lớn. Hiểu rõ đặc điểm của từng loại sẽ giúp bạn đưa ra quyết định thiết kế tốt hơn cho dự án của mình.

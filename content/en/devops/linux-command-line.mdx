@@ -1,0 +1,352 @@
+---
+title: "Linux Command Line"
+description: "Learn essential Linux commands: file management, permissions, piping, grep, sed, and shell scripting to work effectively in the terminal."
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["linux", "command-line", "bash", "shell-scripting", "terminal", "devops"]
+featured: false
+order: 4
+sources:
+  - title: "Linux Command Line Basics - Ubuntu"
+    url: "https://ubuntu.com/tutorials/command-line-for-beginners"
+  - title: "The Linux Command Line - William Shotts"
+    url: "https://linuxcommand.org/tlcl.php"
+  - title: "Bash Reference Manual - GNU"
+    url: "https://www.gnu.org/software/bash/manual/"
+  - title: "explainshell.com"
+    url: "https://explainshell.com/"
+---
+
+# Linux Command Line
+
+Proficiency with the Linux command line is an essential skill for anyone working in DevOps, backend development, or system administration. The terminal allows you to work faster, automate tasks, and control systems at a deeper level than any graphical interface. This article covers essential Linux commands and introduces basic shell scripting.
+
+## Navigation and File Management
+
+### Moving Around the Filesystem
+
+```bash
+# Print current directory
+pwd
+# Output: /home/user
+
+# Change directory
+cd /var/log              # Navigate using an absolute path
+cd ~                     # Go to home directory
+cd ..                    # Go up to parent directory
+cd -                     # Return to previous directory
+
+# List directory contents
+ls                       # Basic listing
+ls -la                   # Detailed listing including hidden files
+ls -lh                   # Human-readable sizes (KB, MB, GB)
+ls -lt                   # Sort by modification time
+ls -R                    # Recursive listing (includes subdirectories)
+```
+
+### Creating, Copying, Moving, and Deleting
+
+```bash
+# Create files and directories
+touch myfile.txt                  # Create an empty file
+mkdir mydir                       # Create a directory
+mkdir -p parent/child/grandchild  # Create nested directories
+
+# Copy
+cp file.txt backup.txt            # Copy a file
+cp -r mydir/ mydir_backup/        # Copy a directory recursively
+
+# Move and rename
+mv file.txt newname.txt           # Rename a file
+mv file.txt /tmp/                 # Move a file to another directory
+
+# Delete
+rm file.txt                       # Delete a file
+rm -r mydir/                      # Delete a directory and its contents
+rm -rf mydir/                     # Force delete without confirmation (use with caution!)
+```
+
+<Callout type="danger">The `rm -rf` command is the most dangerous command in Linux. It deletes everything without confirmation and cannot be undone. In particular, NEVER run `rm -rf /` or `rm -rf *` while in the root directory.</Callout>
+
+### Reading File Contents
+
+```bash
+# View entire file
+cat file.txt
+
+# View the beginning of a file (first 10 lines)
+head file.txt
+head -n 20 file.txt               # First 20 lines
+
+# View the end of a file (last 10 lines)
+tail file.txt
+tail -n 20 file.txt               # Last 20 lines
+tail -f /var/log/syslog           # Follow file in real-time (very useful for logs)
+
+# View file with pagination
+less file.txt                      # Press Space to scroll, q to quit
+
+# Count lines, words, and characters
+wc file.txt                       # Lines, words, characters
+wc -l file.txt                    # Count only lines
+```
+
+## File Permissions
+
+Every file and directory in Linux has three permission levels: **Owner**, **Group**, and **Others**.
+
+```bash
+# View permissions
+ls -la
+# -rw-r--r--  1 user group  1024 Mar 18 10:00 file.txt
+# drwxr-xr-x  2 user group  4096 Mar 18 10:00 mydir/
+#
+# r = read     = 4
+# w = write    = 2
+# x = execute  = 1
+
+# Change permissions using numbers
+chmod 755 script.sh    # rwxr-xr-x (owner: rwx, group: r-x, others: r-x)
+chmod 644 file.txt     # rw-r--r-- (owner: rw, group: r, others: r)
+chmod 600 secret.key   # rw------- (owner only can read and write)
+
+# Change permissions using letters
+chmod +x script.sh     # Add execute permission for everyone
+chmod u+w file.txt     # Add write permission for the owner
+chmod go-r file.txt    # Remove read permission from group and others
+
+# Change ownership
+chown user:group file.txt         # Change owner and group
+chown -R user:group mydir/        # Change recursively for a directory
+```
+
+<Callout type="tip">Quick reference: 7 = rwx, 6 = rw-, 5 = r-x, 4 = r--, 0 = ---. Common configurations: 755 for scripts, 644 for regular files, 600 for sensitive files.</Callout>
+
+## Searching with grep
+
+`grep` is an extremely powerful text search tool in Linux.
+
+```bash
+# Basic search
+grep "error" logfile.txt                  # Find lines containing "error"
+grep -i "error" logfile.txt               # Case-insensitive search
+grep -n "error" logfile.txt               # Show line numbers
+grep -c "error" logfile.txt               # Count matching lines
+grep -r "TODO" ./src/                     # Search recursively in a directory
+
+# Advanced search with regex
+grep -E "error|warning|fatal" logfile.txt # Search multiple patterns (OR)
+grep -E "^[0-9]{4}-" logfile.txt          # Lines starting with 4 digits and a dash
+grep -v "debug" logfile.txt               # Exclude lines containing "debug"
+grep -l "password" *.conf                 # Show only filenames containing the pattern
+
+# Combining with other commands
+ps aux | grep nginx                       # Find nginx processes
+cat /etc/passwd | grep "/bin/bash"        # Find users using bash
+history | grep "docker"                   # Find docker commands in history
+```
+
+## Piping and Redirection
+
+Piping (`|`) and redirection (`>`, `>>`, `<`) are among the most powerful features of the Linux command line.
+
+```bash
+# Piping: pass the output of one command as input to another
+ls -la | sort -k5 -n              # List files sorted by size
+cat access.log | grep "404" | wc -l   # Count requests that returned 404
+ps aux | sort -k3 -rn | head -10      # Top 10 CPU-consuming processes
+
+# Redirect output to a file
+echo "Hello" > file.txt           # Write (overwrite) to file
+echo "World" >> file.txt          # Append to file
+ls /nonexistent 2> error.log      # Redirect stderr to file
+ls /tmp > output.txt 2>&1         # Redirect both stdout and stderr
+
+# Complex combination
+cat server.log | grep "ERROR" | awk '{print $1, $2, $NF}' | sort | uniq -c | sort -rn | head -20
+# Explanation:
+# 1. Read the log file
+# 2. Filter lines containing "ERROR"
+# 3. Extract columns 1, 2, and the last column
+# 4. Sort alphabetically
+# 5. Count occurrences
+# 6. Sort in descending order by count
+# 7. Take the top 20 results
+```
+
+<Callout type="info">Piping embodies the core Unix philosophy: each tool does one thing well, and tools can be combined through pipes. Instead of one tool that does everything, you chain multiple small tools together.</Callout>
+
+## Find and Replace with sed
+
+`sed` (stream editor) is a line-oriented text processing tool commonly used for find and replace operations.
+
+```bash
+# Basic replacement
+sed 's/old/new/' file.txt              # Replace first occurrence on each line
+sed 's/old/new/g' file.txt             # Replace all occurrences (global)
+sed -i 's/old/new/g' file.txt          # Replace in-place (modifies the file)
+
+# Practical examples
+sed 's/http:/https:/g' urls.txt        # Convert HTTP to HTTPS
+sed '/^#/d' config.conf                # Delete comment lines
+sed '/^$/d' file.txt                   # Delete blank lines
+sed -n '10,20p' file.txt               # Print lines 10 through 20
+sed 's/  */ /g' file.txt               # Replace multiple spaces with one
+
+# Combining with pipe
+cat config.yaml | sed 's/localhost/production-server/g'
+```
+
+## Other Useful Commands
+
+```bash
+# Find files
+find / -name "*.log" -mtime -7         # Find .log files modified in the last 7 days
+find . -size +100M                      # Find files larger than 100MB
+find . -type f -name "*.tmp" -delete    # Find and delete .tmp files
+
+# Process management
+ps aux                                  # List all processes
+top                                     # Monitor processes in real-time
+htop                                    # A better version of top (needs installation)
+kill PID                                # Stop a process by PID
+kill -9 PID                             # Force kill a process
+
+# Disk and network
+df -h                                   # Check available disk space
+du -sh *                                # Size of directories
+free -h                                 # Available RAM
+curl -I https://example.com             # Check HTTP headers
+wget https://example.com/file.zip       # Download a file
+```
+
+## Basic Shell Scripting
+
+Shell scripts let you automate repetitive tasks.
+
+```bash
+#!/bin/bash
+# deploy.sh - Automated application deployment script
+
+set -euo pipefail  # Exit on error, error on undefined variables
+
+# Variables
+APP_NAME="my-app"
+DEPLOY_DIR="/var/www/$APP_NAME"
+LOG_FILE="/var/log/deploy-$APP_NAME.log"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+# Logging function
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+# Command existence check
+check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        log "ERROR: $1 is not installed"
+        exit 1
+    fi
+}
+
+# Verify prerequisites
+check_command "git"
+check_command "node"
+check_command "npm"
+
+log "=== Starting deployment of $APP_NAME ==="
+
+# Backup
+log "Creating backup..."
+if [ -d "$DEPLOY_DIR" ]; then
+    cp -r "$DEPLOY_DIR" "${DEPLOY_DIR}_backup_${TIMESTAMP}"
+    log "Backup created: ${DEPLOY_DIR}_backup_${TIMESTAMP}"
+fi
+
+# Pull latest code
+log "Pulling latest code from git..."
+cd "$DEPLOY_DIR"
+git pull origin main
+
+# Install dependencies
+log "Installing dependencies..."
+npm ci --only=production
+
+# Build
+log "Building application..."
+npm run build
+
+# Restart service
+log "Restarting service..."
+sudo systemctl restart "$APP_NAME"
+
+# Verify
+sleep 3
+if systemctl is-active --quiet "$APP_NAME"; then
+    log "Deployment successful! $APP_NAME is running."
+else
+    log "ERROR: Deployment failed! Rolling back..."
+    rm -rf "$DEPLOY_DIR"
+    mv "${DEPLOY_DIR}_backup_${TIMESTAMP}" "$DEPLOY_DIR"
+    sudo systemctl restart "$APP_NAME"
+    log "Rollback complete."
+    exit 1
+fi
+
+log "=== Deployment finished ==="
+```
+
+```bash
+# Make the script executable
+chmod +x deploy.sh
+
+# Run the script
+./deploy.sh
+```
+
+<Callout type="warning">Always start shell scripts with `set -euo pipefail` to ensure the script stops on errors, reports undefined variable usage, and handles pipeline failures correctly.</Callout>
+
+### Loops and Conditionals
+
+```bash
+#!/bin/bash
+
+# For loop
+for file in *.log; do
+    echo "Compressing: $file"
+    gzip "$file"
+done
+
+# While loop reading a file
+while IFS= read -r line; do
+    echo "Processing: $line"
+done < servers.txt
+
+# If/else conditional
+DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%')
+if [ "$DISK_USAGE" -gt 90 ]; then
+    echo "WARNING: Disk nearly full! ($DISK_USAGE%)"
+elif [ "$DISK_USAGE" -gt 70 ]; then
+    echo "Notice: Disk usage at $DISK_USAGE%"
+else
+    echo "Disk space OK: $DISK_USAGE% used"
+fi
+```
+
+## Practical Tips
+
+- Press **Tab** to auto-complete commands and filenames
+- Use **Up/Down** arrows or `history` to browse previous commands
+- Press **Ctrl+R** to search command history
+- Press **Ctrl+C** to cancel a running command
+- Press **Ctrl+Z** to suspend a process, then use `bg`/`fg` to resume
+- Use `man command` or `command --help` to view documentation
+- Create shortcuts with `alias`: `alias ll='ls -la'`
+
+<Callout type="tip">The website explainshell.com lets you paste any Linux command and it will explain each part of that command. This is invaluable when you encounter a complex command you do not understand.</Callout>
+
+## Conclusion
+
+Mastering the Linux command line is a long journey, but with the foundational commands covered in this article, you have a solid starting point. Practice daily, starting with simple tasks and gradually building more complex shell scripts. Effective terminal usage will make you a better developer and DevOps engineer.

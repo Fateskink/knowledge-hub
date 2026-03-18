@@ -1,0 +1,216 @@
+---
+title: "Introduction to Claude Code: The AI-Powered CLI for Developers"
+description: "A comprehensive guide to getting started with Claude Code, Anthropic's agentic coding tool that lives in your terminal. Learn installation, first use, and how it compares to other AI coding assistants."
+category: "claude-code"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 8
+tags: ["claude-code", "cli", "installation", "getting-started", "ai-coding"]
+featured: true
+order: 1
+sources:
+  - title: "Claude Code Overview - Anthropic Docs"
+    url: "https://docs.anthropic.com/en/docs/claude-code/overview"
+  - title: "Claude Code Getting Started"
+    url: "https://docs.anthropic.com/en/docs/claude-code/getting-started"
+---
+
+## What is Claude Code?
+
+Claude Code is an **agentic coding tool** developed by Anthropic that operates directly in your terminal. Unlike traditional IDE extensions that work alongside your editor, Claude Code is a full-fledged command-line interface that understands your entire codebase, can edit files, run commands, search through code, and manage complex multi-step development tasks autonomously.
+
+Think of it as having a senior developer sitting beside you in the terminal, one who can read your entire project, understand the context, and take action on your behalf.
+
+<Callout type="tip">
+Claude Code is not just an autocomplete tool. It is an autonomous agent that can plan, execute, and iterate on complex development tasks across your entire codebase.
+</Callout>
+
+### How Claude Code Works
+
+At its core, Claude Code creates an interactive session between you and one of Anthropic's Claude models. When you give it a task, it can read files, search for patterns, edit code, run shell commands, and even create entirely new files, all while maintaining context about your project.
+
+<Diagram chart="graph TD\n    A[Developer] -->|Natural language prompt| B[Claude Code CLI]\n    B --> C{Analyze Task}\n    C --> D[Read Files]\n    C --> E[Search Codebase]\n    C --> F[Run Commands]\n    D --> G[Plan Changes]\n    E --> G\n    F --> G\n    G --> H[Edit/Create Files]\n    H --> I[Verify Changes]\n    I -->|Iterate if needed| C\n    I -->|Done| J[Report Results]" />
+
+## Installation
+
+Getting started with Claude Code requires Node.js 18 or later. The installation process is straightforward.
+
+### Prerequisites
+
+- **Node.js** version 18 or higher
+- **npm** (comes with Node.js)
+- An **Anthropic API key** or a **Claude Pro/Team/Enterprise subscription**
+
+### Install via npm
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+### Verify the Installation
+
+```bash
+claude --version
+```
+
+### Authenticate
+
+On first launch, Claude Code will prompt you to authenticate. You have two options:
+
+```bash
+# Option 1: Use your Anthropic API key
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Option 2: Launch and follow the OAuth flow
+claude
+```
+
+<Callout type="info">
+If you have a Claude Pro, Team, or Enterprise subscription, you can authenticate via OAuth without needing a separate API key. This is the recommended approach for individual developers.
+</Callout>
+
+## Your First Session
+
+Once installed, navigate to your project directory and simply type:
+
+```bash
+cd your-project
+claude
+```
+
+This opens an interactive REPL session. You can now start giving Claude Code instructions in natural language:
+
+```
+> Explain the architecture of this project
+
+> Find all API routes that don't have authentication middleware
+
+> Add input validation to the user registration endpoint
+
+> Write tests for the PaymentService class
+```
+
+### One-Shot Mode
+
+For quick tasks, you can pass a prompt directly without entering the interactive mode:
+
+```bash
+claude -p "What does the main function in src/index.ts do?"
+```
+
+This is especially useful for scripting and CI/CD pipelines where you need a single answer or action.
+
+### Print Mode
+
+If you only want Claude to analyze without making changes:
+
+```bash
+claude -p "Review this codebase for security vulnerabilities" --no-edit
+```
+
+## Key Features
+
+### Codebase Understanding
+
+Claude Code indexes and understands your project structure. It reads files on demand, searches for patterns using grep-like tools, and builds context as it works.
+
+### File Editing
+
+Claude Code can create, modify, and delete files. It shows you exactly what changes it plans to make and asks for confirmation before applying them.
+
+### Shell Command Execution
+
+Need to run tests, install packages, or check git status? Claude Code can execute shell commands and use the output to inform its next steps.
+
+### Multi-Step Reasoning
+
+Complex tasks are broken down into steps. Claude Code plans its approach, executes each step, and adapts based on what it discovers along the way.
+
+<Diagram chart="graph LR\n    A[Understand Task] --> B[Gather Context]\n    B --> C[Plan Approach]\n    C --> D[Execute Steps]\n    D --> E[Verify Results]\n    E -->|Adjust| C\n    E -->|Complete| F[Report to User]" />
+
+## Claude Code vs Other AI Coding Tools
+
+The AI-assisted coding landscape has several players. Here is how Claude Code compares to the most popular alternatives.
+
+<ComparisonTable
+  headers={["Feature", "Claude Code", "GitHub Copilot", "Cursor"]}
+  rows={[
+    ["Interface", "Terminal CLI", "IDE Extension", "Full IDE (VS Code fork)"],
+    ["Agentic Capability", "Full autonomous agent", "Limited (chat + autocomplete)", "Agent mode available"],
+    ["Codebase Awareness", "Entire project context", "Open files + limited context", "Full project indexing"],
+    ["Shell Commands", "Can execute any command", "No shell access", "Terminal integration"],
+    ["File Operations", "Create, edit, delete files", "Suggestions only", "Can edit files"],
+    ["Multi-Step Tasks", "Plans and executes autonomously", "Single-turn responses", "Multi-step with agent"],
+    ["MCP Support", "Built-in MCP server support", "No", "Limited"],
+    ["Pricing", "API usage or Pro subscription", "$10-39/month", "$20/month + API costs"],
+    ["Underlying Model", "Claude (Opus, Sonnet, Haiku)", "GPT-4o / Codex", "Multiple models supported"]
+  ]}
+/>
+
+<Callout type="tip">
+Claude Code shines when you need to perform complex, multi-file refactoring tasks, investigate bugs across a large codebase, or automate repetitive development workflows. If you primarily need inline code completion while typing, a tool like Copilot may complement Claude Code well.
+</Callout>
+
+### When to Choose Claude Code
+
+- **Complex refactoring**: Renaming a pattern across 50 files, migrating from one framework to another
+- **Code review and analysis**: Understanding unfamiliar codebases, finding security issues
+- **Automated workflows**: CI/CD integration, automated code generation from specs
+- **Terminal-first workflows**: If you prefer working in the terminal over an IDE
+
+### When Other Tools Might Be Better
+
+- **Real-time autocomplete**: Copilot and Cursor excel at inline suggestions as you type
+- **Visual diff review**: IDE-based tools provide richer visual diffs
+- **Lightweight edits**: For quick, single-line changes, an inline suggestion might be faster
+
+## Essential Commands
+
+Here are the most commonly used commands and shortcuts within a Claude Code session:
+
+```bash
+# Start interactive session
+claude
+
+# One-shot question
+claude -p "your question here"
+
+# Resume last conversation
+claude --continue
+
+# Use a specific model
+claude --model claude-sonnet-4-20250514
+
+# Run with a specific permission profile
+claude --profile permissive
+```
+
+### In-Session Shortcuts
+
+Once inside an interactive session, several slash commands are available:
+
+```
+/help          - Show available commands
+/clear         - Clear conversation history
+/compact       - Summarize and compress context
+/model         - Switch the active model
+/permissions   - View and manage tool permissions
+/memory        - View or edit CLAUDE.md memory files
+```
+
+<Callout type="warning">
+Claude Code can execute shell commands on your machine. Always review the commands it proposes before approving them, especially when working with production environments or sensitive data.
+</Callout>
+
+## What is Next?
+
+Now that you have Claude Code installed and running, you are ready to explore its more advanced features. In the following articles, we will cover:
+
+- **Skills and Plugins** for extending Claude Code's capabilities
+- **Model selection** to optimize for speed, cost, or quality
+- **Agents, Tools, and the CLI** for understanding the underlying architecture
+- **Hooks and Slash Commands** for automating your workflow
+- **MCP Servers** for connecting Claude Code to external services
+- **Configuration and Customization** to tailor Claude Code to your needs
+
+Claude Code represents a fundamental shift in how developers interact with AI assistants. Rather than providing suggestions you must manually apply, it acts as a true collaborator that can understand, plan, and execute complex development tasks alongside you. The terminal is its home, and your codebase is its workspace.

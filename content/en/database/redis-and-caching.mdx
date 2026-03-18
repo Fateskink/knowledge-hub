@@ -1,0 +1,308 @@
+---
+title: "Redis and Caching"
+description: "Learn about Redis, its data structures, caching strategies like Cache-aside, Write-through, Write-back, plus Pub/Sub and session management."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["redis", "caching", "cache", "pub-sub", "session", "performance", "in-memory"]
+featured: false
+order: 6
+sources:
+  - title: "Redis Official Documentation"
+    url: "https://redis.io/docs/"
+  - title: "Redis University"
+    url: "https://university.redis.io/"
+  - title: "AWS Caching Best Practices"
+    url: "https://aws.amazon.com/caching/best-practices/"
+  - title: "Redis GitHub Repository"
+    url: "https://github.com/redis/redis"
+---
+
+# Redis and Caching
+
+Redis (Remote Dictionary Server) is an in-memory data store that functions as a database, cache, and message broker. With blazing-fast read/write speeds (hundreds of thousands of operations per second), Redis is the go-to choice for caching and high-performance applications.
+
+## What is Redis?
+
+Redis stores data in RAM instead of disk, making it hundreds of times faster than traditional databases. Redis supports rich data structures far beyond a simple key-value store.
+
+<Diagram chart="graph TD\n    A[Application] --> B{Redis Cache}\n    B -->|Cache Hit| A\n    B -->|Cache Miss| C[Database\nPostgreSQL/MySQL]\n    C -->|Data| B\n    B -->|Store and return| A" />
+
+### Redis Data Structures
+
+```bash
+# STRING - The simplest structure
+SET user:name "John Doe"
+GET user:name
+# => "John Doe"
+
+SET counter 0
+INCR counter      # => 1
+INCRBY counter 5  # => 6
+
+# Set TTL (Time To Live) - auto-delete after 3600 seconds
+SET session:abc123 "user-data" EX 3600
+
+# HASH - Store objects (like a dictionary)
+HSET user:1 name "John Doe" email "john@example.com" age 28
+HGET user:1 name          # => "John Doe"
+HGETALL user:1            # => All fields
+
+# LIST - Ordered list
+LPUSH notifications:user1 "You have a new order"
+LPUSH notifications:user1 "Someone liked your post"
+LRANGE notifications:user1 0 -1  # Get all items
+
+# SET - Unordered collection with no duplicates
+SADD online:users "user1" "user2" "user3"
+SISMEMBER online:users "user1"  # => 1 (true)
+SMEMBERS online:users           # => All members
+
+# SORTED SET - Set with scores
+ZADD leaderboard 100 "player1" 200 "player2" 150 "player3"
+ZREVRANGE leaderboard 0 2 WITHSCORES  # Top 3 highest
+ZRANK leaderboard "player1"            # Rank
+```
+
+<Callout type="info">Redis stores data in RAM, so it is extremely fast but limited in capacity and more expensive. Only cache frequently accessed data where some staleness is acceptable on cache miss. Critical data should always live in the primary database.</Callout>
+
+## Caching Strategies
+
+### 1. Cache-Aside (Lazy Loading)
+
+The application manages the cache: check cache first, if not found then query the database and store the result in cache.
+
+<Diagram chart="graph TD\n    A[Client Request] --> B{Data in Cache?}\n    B -->|Yes - Cache Hit| C[Return from Cache]\n    B -->|No - Cache Miss| D[Query Database]\n    D --> E[Store in Cache]\n    E --> F[Return to Client]" />
+
+```typescript
+import Redis from 'ioredis';
+const redis = new Redis();
+
+// Cache-Aside pattern
+async function getProduct(productId: string) {
+  const cacheKey = `product:${productId}`;
+
+  // 1. Check cache
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    console.log('Cache HIT');
+    return JSON.parse(cached);
+  }
+
+  // 2. Cache miss - query database
+  console.log('Cache MISS');
+  const product = await db.query(
+    'SELECT * FROM products WHERE id = $1',
+    [productId]
+  );
+
+  // 3. Store in cache with 30-minute TTL
+  await redis.set(cacheKey, JSON.stringify(product), 'EX', 1800);
+
+  return product;
+}
+
+// When updating data, invalidate cache
+async function updateProduct(productId: string, data: any) {
+  await db.query(
+    'UPDATE products SET name = $1, price = $2 WHERE id = $3',
+    [data.name, data.price, productId]
+  );
+
+  // Delete cache so next query fetches fresh data
+  await redis.del(`product:${productId}`);
+}
+```
+
+### 2. Write-Through
+
+Data is written to both cache and database simultaneously. Ensures the cache is always in sync with the database.
+
+```typescript
+async function saveUser(userId: string, userData: any) {
+  // Write to database
+  await db.query(
+    'INSERT INTO users (id, name, email) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET name = $2, email = $3',
+    [userId, userData.name, userData.email]
+  );
+
+  // Write to cache immediately
+  await redis.set(
+    `user:${userId}`,
+    JSON.stringify(userData),
+    'EX', 3600
+  );
+}
+```
+
+### 3. Write-Back (Write-Behind)
+
+Data is written to cache first, then synced to the database later (in batches or periodically). Faster but carries risk of data loss.
+
+```typescript
+// Write-Back: Write to cache first, sync to database later
+async function incrementPageView(pageId: string) {
+  // Write to Redis immediately (very fast)
+  await redis.hincrby('page-views', pageId, 1);
+}
+
+// Run periodically to sync to database
+async function syncPageViewsToDatabase() {
+  const views = await redis.hgetall('page-views');
+
+  for (const [pageId, count] of Object.entries(views)) {
+    await db.query(
+      'UPDATE pages SET view_count = view_count + $1 WHERE id = $2',
+      [parseInt(count), pageId]
+    );
+  }
+
+  // Reset counters in Redis
+  await redis.del('page-views');
+}
+
+// Sync every 5 minutes
+setInterval(syncPageViewsToDatabase, 5 * 60 * 1000);
+```
+
+<Callout type="warning">Write-Back is fast but carries the risk of data loss if Redis crashes before syncing. Only use it for data where some loss is acceptable (e.g., view counts, analytics). Never use it for financial or transactional data.</Callout>
+
+## Pub/Sub with Redis
+
+Redis supports Publish/Subscribe for realtime messaging between components:
+
+```typescript
+// === Publisher ===
+import Redis from 'ioredis';
+const publisher = new Redis();
+
+// Notify when a new order is created
+async function notifyNewOrder(order: any) {
+  await publisher.publish('orders:new', JSON.stringify({
+    orderId: order.id,
+    userId: order.userId,
+    total: order.total,
+    timestamp: Date.now()
+  }));
+}
+
+// === Subscriber ===
+const subscriber = new Redis();
+
+subscriber.subscribe('orders:new', 'orders:cancelled', (err, count) => {
+  console.log(`Subscribed to ${count} channels`);
+});
+
+subscriber.on('message', (channel, message) => {
+  const data = JSON.parse(message);
+
+  switch (channel) {
+    case 'orders:new':
+      console.log('New order:', data.orderId);
+      sendEmailNotification(data);
+      break;
+    case 'orders:cancelled':
+      console.log('Order cancelled:', data.orderId);
+      processRefund(data);
+      break;
+  }
+});
+```
+
+<Callout type="tip">Redis Pub/Sub is "fire and forget" -- if a subscriber is offline when a message is published, it will miss that message. If you need guaranteed delivery, use Redis Streams or a dedicated message broker like RabbitMQ.</Callout>
+
+## Session Management
+
+Redis is an ideal choice for storing sessions in web applications, especially when running multiple servers (horizontal scaling):
+
+```typescript
+// Express.js with Redis session store
+import express from 'express';
+import session from 'express-session';
+import RedisStore from 'connect-redis';
+import Redis from 'ioredis';
+
+const app = express();
+const redis = new Redis();
+
+app.use(session({
+  store: new RedisStore({ client: redis }),
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: true,        // Only send over HTTPS
+    httpOnly: true,       // No JavaScript access
+    maxAge: 24 * 60 * 60 * 1000  // 1 day
+  }
+}));
+
+// Using sessions
+app.post('/login', async (req, res) => {
+  const user = await authenticateUser(req.body);
+  if (user) {
+    req.session.userId = user.id;
+    req.session.role = user.role;
+    res.json({ success: true });
+  }
+});
+
+app.get('/profile', (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  // ... fetch user info
+});
+```
+
+## Rate Limiting with Redis
+
+```typescript
+// Simple rate limiter with Redis
+async function rateLimit(
+  userId: string,
+  limit: number = 100,
+  windowSeconds: number = 60
+): Promise<boolean> {
+  const key = `ratelimit:${userId}`;
+
+  const current = await redis.incr(key);
+
+  if (current === 1) {
+    // First request, set expiration
+    await redis.expire(key, windowSeconds);
+  }
+
+  if (current > limit) {
+    return false; // Rate limit exceeded
+  }
+
+  return true; // Allowed
+}
+
+// Use in middleware
+app.use(async (req, res, next) => {
+  const allowed = await rateLimit(req.ip, 100, 60);
+  if (!allowed) {
+    return res.status(429).json({
+      error: 'Too many requests. Please try again later.'
+    });
+  }
+  next();
+});
+```
+
+## Redis Persistence
+
+Despite storing data in RAM, Redis can persist data to disk for recovery after restarts:
+
+| Method | Description | Pros | Cons |
+|--------|-------------|------|------|
+| RDB (Snapshotting) | Periodic point-in-time snapshots | Fast restart | May lose data between snapshots |
+| AOF (Append Only File) | Logs every write operation | Minimal data loss | Larger files, slower restart |
+| RDB + AOF | Combines both approaches | Safe and performant | Requires more disk space |
+
+## Conclusion
+
+Redis is a versatile tool that goes far beyond caching -- it serves as a message broker, session store, rate limiter, and much more. Choosing the right caching strategy and understanding Redis's data structures will help you build high-performance, scalable applications.

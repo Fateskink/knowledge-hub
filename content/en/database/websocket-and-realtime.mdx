@@ -1,0 +1,289 @@
+---
+title: "WebSocket and Realtime"
+description: "Learn about the WebSocket protocol, how it differs from HTTP, and how to build realtime applications with Socket.IO and Server-Sent Events."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["websocket", "realtime", "socket-io", "sse", "http", "chat", "notifications"]
+featured: false
+order: 3
+sources:
+  - title: "MDN WebSocket API"
+    url: "https://developer.mozilla.org/en-US/docs/Web/API/WebSocket"
+  - title: "Socket.IO Documentation"
+    url: "https://socket.io/docs/v4/"
+  - title: "RFC 6455 - The WebSocket Protocol"
+    url: "https://datatracker.ietf.org/doc/html/rfc6455"
+  - title: "MDN Server-Sent Events"
+    url: "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events"
+---
+
+# WebSocket and Realtime
+
+In the modern web, users expect data to update instantly without reloading the page. From live chat, notifications, stock prices to online games -- all require realtime communication. WebSocket is the protocol that makes this possible.
+
+## Traditional HTTP and Its Limitations
+
+HTTP (HyperText Transfer Protocol) follows a request-response model: the client sends a request, the server responds, and the connection closes. This creates problems when you need continuous data updates.
+
+<Diagram chart="graph LR\n    subgraph Traditional HTTP\n    A[Client] -->|Request 1| B[Server]\n    B -->|Response 1| A\n    A -->|Request 2| B\n    B -->|Response 2| A\n    A -->|Request 3| B\n    B -->|Response 3| A\n    end" />
+
+### Solutions Before WebSocket
+
+- **Polling**: The client sends requests at regular intervals (e.g., every 5 seconds) to check for new data. Wasteful since most requests return nothing new.
+- **Long Polling**: The client sends a request and the server holds the connection open until new data is available. Better than polling but still has overhead from creating new connections.
+
+<Callout type="info">Polling is like calling someone every 5 seconds asking "Any new messages?" WebSocket is like opening a direct phone line where both sides can talk whenever they want.</Callout>
+
+## The WebSocket Protocol
+
+WebSocket creates a full-duplex (bidirectional) connection between client and server. After the initial HTTP handshake, both sides can send data at any time without establishing new connections.
+
+<Diagram chart="graph LR\n    subgraph WebSocket Connection\n    A[Client] -->|HTTP Upgrade Request| B[Server]\n    B -->|101 Switching Protocols| A\n    A <-->|Bidirectional Messages| B\n    end" />
+
+### How WebSocket Works
+
+1. Client sends an HTTP request with `Upgrade: websocket` header
+2. Server responds with status 101 (Switching Protocols)
+3. Connection is upgraded to WebSocket
+4. Both sides can freely send/receive data
+5. Connection persists until one side closes it
+
+### Basic WebSocket Example
+
+```javascript
+// === Client side ===
+const ws = new WebSocket('ws://localhost:8080');
+
+// When connection is established
+ws.onopen = () => {
+  console.log('Connected to server');
+  ws.send(JSON.stringify({
+    type: 'chat',
+    message: 'Hello!',
+    username: 'User A'
+  }));
+};
+
+// When a message is received
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('New message:', data);
+};
+
+// When an error occurs
+ws.onerror = (error) => {
+  console.error('WebSocket error:', error);
+};
+
+// When the connection closes
+ws.onclose = (event) => {
+  console.log('Connection closed:', event.code, event.reason);
+};
+```
+
+```javascript
+// === Server side (Node.js with ws library) ===
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ port: 8080 });
+
+const clients = new Set();
+
+wss.on('connection', (ws) => {
+  clients.add(ws);
+  console.log('New client connected. Total:', clients.size);
+
+  ws.on('message', (data) => {
+    const message = JSON.parse(data);
+
+    // Broadcast message to all other clients
+    clients.forEach((client) => {
+      if (client !== ws && client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
+      }
+    });
+  });
+
+  ws.on('close', () => {
+    clients.delete(ws);
+    console.log('Client disconnected. Remaining:', clients.size);
+  });
+});
+
+console.log('WebSocket server running on port 8080');
+```
+
+## Socket.IO
+
+Socket.IO is a library built on top of WebSocket that provides many advanced features:
+
+<Diagram chart="graph TD\n    A[Socket.IO] --> B[Auto Reconnect]\n    A --> C[Rooms and Namespaces]\n    A --> D[Fallback Transports]\n    A --> E[Broadcasting]\n    A --> F[Acknowledgements]\n    D --> G[WebSocket]\n    D --> H[HTTP Long Polling]" />
+
+```javascript
+// === Server with Socket.IO ===
+const { Server } = require('socket.io');
+const io = new Server(3000, {
+  cors: { origin: '*' }
+});
+
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  // Join a chat room
+  socket.on('join-room', (roomId) => {
+    socket.join(roomId);
+    socket.to(roomId).emit('user-joined', {
+      userId: socket.id,
+      message: 'A new user has joined the room'
+    });
+  });
+
+  // Send message within a room
+  socket.on('chat-message', ({ roomId, message, username }) => {
+    io.to(roomId).emit('new-message', {
+      message,
+      username,
+      timestamp: new Date()
+    });
+  });
+
+  // Typing indicator
+  socket.on('typing', ({ roomId, username }) => {
+    socket.to(roomId).emit('user-typing', { username });
+  });
+
+  // Disconnect
+  socket.on('disconnect', (reason) => {
+    console.log('User disconnected:', socket.id, reason);
+  });
+});
+```
+
+```javascript
+// === Client with Socket.IO ===
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3000');
+
+// Join a room
+socket.emit('join-room', 'room-123');
+
+// Send a message
+socket.emit('chat-message', {
+  roomId: 'room-123',
+  message: 'Hello everyone!',
+  username: 'John Doe'
+});
+
+// Listen for new messages
+socket.on('new-message', (data) => {
+  console.log(`${data.username}: ${data.message}`);
+});
+
+// Listen for typing indicators
+socket.on('user-typing', ({ username }) => {
+  console.log(`${username} is typing...`);
+});
+```
+
+<Callout type="tip">Socket.IO automatically uses WebSocket when available and falls back to HTTP long polling when WebSocket is not supported (e.g., behind certain proxies). This ensures your application works in every environment.</Callout>
+
+## Server-Sent Events (SSE)
+
+SSE is a simpler alternative to WebSocket for cases where only the server needs to push data to the client (one-way):
+
+```javascript
+// === Server SSE (Express.js) ===
+const express = require('express');
+const app = express();
+
+app.get('/events', (req, res) => {
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  // Send an event every 3 seconds
+  const interval = setInterval(() => {
+    const data = {
+      type: 'stock-update',
+      symbol: 'AAPL',
+      price: (150 + Math.random() * 10).toFixed(2),
+      timestamp: new Date().toISOString()
+    };
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  }, 3000);
+
+  // Cleanup when client disconnects
+  req.on('close', () => {
+    clearInterval(interval);
+    res.end();
+  });
+});
+
+app.listen(3000);
+```
+
+```javascript
+// === Client SSE ===
+const eventSource = new EventSource('/events');
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('New price:', data.symbol, data.price);
+};
+
+eventSource.onerror = (error) => {
+  console.error('SSE error:', error);
+};
+```
+
+## Comparing Realtime Methods
+
+<ComparisonTable
+  headers={["Criteria", "WebSocket", "SSE", "Long Polling"]}
+  rows={[
+    ["Direction", "Bidirectional (full-duplex)", "One-way (server to client)", "One-way (simulated)"],
+    ["Protocol", "ws:// or wss://", "HTTP", "HTTP"],
+    ["Auto Reconnect", "No (must handle manually)", "Yes (built-in)", "Must handle manually"],
+    ["Binary Data", "Supported", "Text only", "Supported"],
+    ["Complexity", "Medium", "Simple", "Simple"],
+    ["Best For", "Chat, games, collaboration", "Notifications, feeds, updates", "When WebSocket is unavailable"],
+    ["Browser Support", "All modern browsers", "All except IE", "All browsers"]
+  ]}
+/>
+
+## Practical Example: Live Notifications
+
+```typescript
+// Realtime notification system with Socket.IO
+// === Server ===
+io.on('connection', (socket) => {
+  const userId = socket.handshake.auth.userId;
+
+  // Each user joins their own private room
+  socket.join(`user:${userId}`);
+
+  // Send notification to a specific user
+  async function sendNotification(targetUserId, notification) {
+    // Save to database
+    await db.query(
+      'INSERT INTO notifications (user_id, title, body, type) VALUES ($1, $2, $3, $4)',
+      [targetUserId, notification.title, notification.body, notification.type]
+    );
+
+    // Send in realtime
+    io.to(`user:${targetUserId}`).emit('notification', {
+      ...notification,
+      createdAt: new Date()
+    });
+  }
+});
+```
+
+<Callout type="warning">WebSocket keeps connections open continuously, so resource management is critical. Each connection consumes memory on the server. With thousands of simultaneous connections, you need techniques like connection pooling, load balancing, and horizontal scaling.</Callout>
+
+## Conclusion
+
+WebSocket is the core technology for modern realtime applications. With libraries like Socket.IO, implementation becomes much simpler. Choose the right technology for your needs: WebSocket for bidirectional communication, SSE for one-way server updates, and Polling when you need the simplest solution.

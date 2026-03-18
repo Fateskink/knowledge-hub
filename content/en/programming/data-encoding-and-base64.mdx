@@ -1,0 +1,221 @@
+---
+title: "Data Encoding: Base64, UTF-8, and How Computers Represent Information"
+description: "Learn how computers represent text and data: from ASCII to Unicode/UTF-8, the step-by-step mechanics of Base64 encoding, and the differences between encoding, encryption, and hashing."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 14
+tags: ["encoding", "base64", "utf-8", "unicode", "ascii", "encryption", "data-representation"]
+featured: true
+order: 12
+sources:
+  - title: "RFC 4648 - The Base16, Base32, and Base64 Data Encodings"
+    url: "https://datatracker.ietf.org/doc/html/rfc4648"
+  - title: "The Unicode Standard"
+    url: "https://www.unicode.org/standard/standard.html"
+  - title: "W3C - Character encodings for beginners"
+    url: "https://www.w3.org/International/questions/qa-what-is-encoding"
+  - title: "MDN Web Docs - Base64"
+    url: "https://developer.mozilla.org/en-US/docs/Glossary/Base64"
+---
+
+# Data Encoding: Base64, UTF-8, and How Computers Represent Information
+
+Have you ever wondered why opening an image file in a text editor shows garbled characters? Or why a Base64-encoded string is always about 33% longer than the original? The answer lies in how computers **encode** information — transforming data from one representation to another for storage and transmission.
+
+## Encoding vs Encryption — A Critical Distinction
+
+Before diving in, let us clearly distinguish three concepts that are frequently confused:
+
+<ComparisonTable headers={["Property", "Encoding", "Encryption", "Hashing"]} rows={[
+    ["Purpose", "Represent data in a different format", "Protect confidentiality", "Verify integrity"],
+    ["Secret key?", "No", "Yes", "No"],
+    ["Reversible?", "Yes, by anyone", "Yes, but only with the key", "No (one-way)"],
+    ["Examples", "Base64, UTF-8, URL encoding", "AES, RSA, ChaCha20", "SHA-256, bcrypt, MD5"],
+    ["Security?", "NOT secure", "Secure if used correctly", "Cannot be reversed"]
+]} />
+
+<Callout type="warning">Base64 is NOT encryption. Anyone can decode Base64 without a key. Never use Base64 to "protect" passwords, tokens, or sensitive data.</Callout>
+
+## ASCII — The Original Character Set
+
+**ASCII** (American Standard Code for Information Interchange) was created in 1963. It uses **7 bits** to represent 128 characters: letters A-Z, a-z, digits 0-9, punctuation marks, and control characters.
+
+```
+Character → ASCII Value (decimal) → Binary (7-bit)
+  'A'     →  65                   → 1000001
+  'a'     →  97                   → 1100001
+  '0'     →  48                   → 0110000
+  ' '     →  32                   → 0100000
+```
+
+The problem: 128 characters only cover English. There is no room for Vietnamese (ă, ơ, ư), Japanese, Chinese, or thousands of other writing systems. This is why **Unicode** was created.
+
+## Unicode and UTF-8 — Every Language, One Standard
+
+**Unicode** assigns every character in every language a unique number called a **code point**. For example: `U+0041` = A, `U+00E0` = à, `U+1F600` = a grinning face emoji.
+
+But Unicode is just a mapping table. How do we store these code points as bytes in memory? That is the role of **UTF-8**.
+
+### UTF-8: Variable-Length Encoding
+
+UTF-8 is the most widely used encoding on the internet (over 98% of web pages). It uses **1 to 4 bytes** per character.
+
+<Diagram chart="graph TD
+    A[Unicode Character] --> B{Code point range?}
+    B -->|U+0000 to U+007F| C[1 byte: 0xxxxxxx]
+    B -->|U+0080 to U+07FF| D[2 bytes: 110xxxxx 10xxxxxx]
+    B -->|U+0800 to U+FFFF| E[3 bytes: 1110xxxx 10xxxxxx 10xxxxxx]
+    B -->|U+10000 to U+10FFFF| F[4 bytes: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx]" />
+
+The genius of UTF-8: ASCII characters (English letters, digits, punctuation) still use just 1 byte, maintaining full backward compatibility with ASCII. Characters from other scripts use 2-3 bytes, and emoji use 4 bytes.
+
+```python
+# UTF-8 in action
+text = "Hello 世界"
+encoded = text.encode('utf-8')
+print(encoded)        # b'Hello \xe4\xb8\x96\xe7\x95\x8c'
+print(len(text))      # 8 characters
+print(len(encoded))   # 12 bytes (each Chinese char takes 3 bytes)
+```
+
+<ComparisonTable headers={["Encoding", "Bytes per character", "ASCII compatible", "Primary use"]} rows={[
+    ["ASCII", "1 byte", "Is ASCII", "Legacy systems, basic protocols"],
+    ["UTF-8", "1-4 bytes", "Yes", "Web, Linux, JSON, nearly everywhere"],
+    ["UTF-16", "2 or 4 bytes", "No", "Windows internals, Java, JavaScript"],
+    ["UTF-32", "4 bytes (fixed)", "No", "Rarely used, internal processing"]
+]} />
+
+## Base64 — Turning Binary Into Text
+
+### Why Do We Need Base64?
+
+Many protocols (SMTP email, JSON, XML, URLs) only support ASCII text. When you need to transmit binary data (images, files, arbitrary bytes) through these text-only channels, you need to convert it into a safe character string. That is exactly what Base64 does.
+
+### How It Works, Step by Step
+
+Base64 uses an alphabet of 64 characters: `A-Z` (0-25), `a-z` (26-51), `0-9` (52-61), `+` (62), `/` (63). The `=` character is used for padding.
+
+Let us encode the string **"Hello"** step by step:
+
+**Step 1**: Convert each character to its ASCII value (8-bit binary):
+
+```
+H = 01001000
+e = 01100101
+l = 01101100
+l = 01101100
+o = 01101111
+```
+
+**Step 2**: Concatenate all bits into a continuous stream:
+
+```
+01001000 01100101 01101100 01101100 01101111
+```
+
+**Step 3**: Split into **6-bit groups** (instead of 8-bit):
+
+```
+010010 | 000110 | 010101 | 101100 | 011011 | 000110 | 1111
+```
+
+The last group has only 4 bits — pad with two `0` bits: `111100`
+
+**Step 4**: Map each 6-bit group to a Base64 character:
+
+```
+010010 = 18 → S
+000110 = 6  → G
+010101 = 21 → V
+101100 = 44 → s
+011011 = 27 → b
+000110 = 6  → G
+111100 = 60 → 8
+```
+
+**Step 5**: Add `=` padding (5 input bytes = 40 bits; 40 / 6 = 6 groups with 4 bits remaining — one `=` padding needed):
+
+Result: **`SGVsbG8=`**
+
+<Diagram chart="graph LR
+    A[Hello] -->|ASCII bytes| B[72 101 108 108 111]
+    B -->|Concatenate bits| C[0100100001100101...]
+    C -->|Split into 6-bit groups| D[010010 000110 ...]
+    D -->|Look up Base64 table| E[SGVsbG8=]" />
+
+### Verify with Code
+
+```javascript
+// JavaScript (browser)
+const encoded = btoa('Hello');
+console.log(encoded);           // "SGVsbG8="
+console.log(atob('SGVsbG8=')); // "Hello"
+
+// Node.js - supports UTF-8
+const buf = Buffer.from('Hello World', 'utf-8');
+const base64 = buf.toString('base64');
+console.log(base64); // "SGVsbG8gV29ybGQ="
+console.log(Buffer.from(base64, 'base64').toString('utf-8')); // "Hello World"
+```
+
+```python
+import base64
+
+# Python encode/decode
+encoded = base64.b64encode(b'Hello')
+print(encoded)  # b'SGVsbG8='
+
+decoded = base64.b64decode(b'SGVsbG8=')
+print(decoded)  # b'Hello'
+
+# Encode an image file to Base64
+with open('photo.jpg', 'rb') as f:
+    img_base64 = base64.b64encode(f.read()).decode('ascii')
+    # Use in HTML: <img src="data:image/jpeg;base64,{img_base64}">
+```
+
+<Callout type="info">Base64 increases data size by approximately 33% because every 3 input bytes (24 bits) are represented as 4 Base64 characters (each carrying 6 bits of information). The ratio is 4/3 = 1.33.</Callout>
+
+## Base64 in the Real World
+
+### Data URIs
+
+Embed images directly in HTML/CSS without a separate file:
+
+```html
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUg..." />
+```
+
+### Email (MIME)
+
+Raw email only supports 7-bit ASCII. Base64 allows sending file attachments (images, PDFs) over email by encoding them as text.
+
+### JWT (JSON Web Tokens)
+
+A JWT consists of three parts, each encoded with **Base64URL** (a variant using `-` and `_` instead of `+` and `/` to be URL-safe):
+
+```
+header.payload.signature
+eyJhbGciOi...  ← Base64URL encoded JSON
+```
+
+## Hex Encoding and URL Encoding
+
+**Hex encoding** represents each byte as 2 hexadecimal characters (0-9, A-F). It doubles the size but is human-readable.
+
+```python
+data = b'Hello'
+print(data.hex())  # '48656c6c6f'
+print(bytes.fromhex('48656c6c6f'))  # b'Hello'
+```
+
+**URL encoding** (Percent encoding) replaces special characters with `%XX` where XX is the hex value:
+
+```
+"Hello World!" → "Hello%20World%21"
+```
+
+## Conclusion
+
+Encoding is the foundation that enables computers to store and transmit every kind of information. ASCII paved the way for the digital age, Unicode unified every writing system, UTF-8 strikes the perfect balance between efficiency and compatibility, and Base64 bridges the gap between binary and text. Understanding these mechanisms does not just help you debug more effectively — it forms the foundation for deeper knowledge of security, networking, and how the internet truly works.

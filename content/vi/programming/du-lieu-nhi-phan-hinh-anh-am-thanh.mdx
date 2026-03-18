@@ -1,0 +1,210 @@
+---
+title: "Dữ Liệu Nhị Phân: Tại Sao 0 và 1 Có Thể Lưu Hình Ảnh, Âm Thanh và Video"
+description: "Khám phá cách máy tính biến các bit 0 và 1 thành hình ảnh sống động, âm thanh chân thực và video mượt mà. Tìm hiểu về pixel, sampling, codecs và các định dạng file phổ biến."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["binary", "digital-media", "image", "audio", "video", "codec", "compression"]
+featured: true
+order: 13
+sources:
+  - title: "W3C - PNG Specification"
+    url: "https://www.w3.org/TR/png/"
+  - title: "JPEG Standard - ITU-T T.81"
+    url: "https://www.w3.org/Graphics/JPEG/itu-t81.pdf"
+  - title: "Digital Audio Fundamentals - Stanford CCRMA"
+    url: "https://ccrma.stanford.edu/~jos/pasp/Digital_Audio.html"
+  - title: "FFmpeg Documentation - Codecs"
+    url: "https://ffmpeg.org/general.html#Supported-File-Formats_002c-Codecs-or-Features"
+---
+
+# Dữ Liệu Nhị Phân: Tại Sao 0 và 1 Có Thể Lưu Hình Ảnh, Âm Thanh và Video
+
+Mọi thứ trong máy tính — từ tin nhắn bạn gửi, bài hát bạn nghe, đến bộ phim 4K bạn xem — đều được lưu trữ dưới dạng chuỗi các số **0** và **1**. Nghe thật khó tin, nhưng chỉ với hai con số này, máy tính có thể tái tạo toàn bộ thế giới thị giác và thính giác mà chúng ta trải nghiệm mỗi ngày. Hãy cùng khám phá cách điều kỳ diệu này hoạt động.
+
+## Tại Sao Mọi Thứ Đều Là 0 và 1?
+
+Máy tính hoạt động bằng các mạch điện tử chỉ có hai trạng thái: **có điện** (1) và **không có điện** (0). Mỗi trạng thái là một **bit** (binary digit) — đơn vị thông tin nhỏ nhất.
+
+- **1 bit** = 0 hoặc 1 (2 giá trị)
+- **1 byte** = 8 bits (256 giá trị: 0-255)
+- **1 word** = 32 hoặc 64 bits (tùy kiến trúc CPU)
+
+Với 1 byte (256 giá trị), bạn có thể biểu diễn một ký tự ASCII, một mức sáng của pixel, hay một mẫu âm thanh 8-bit. Ghép nhiều bytes lại với nhau theo quy tắc nhất định, bạn có thể biểu diễn bất kỳ thông tin nào.
+
+## Hình Ảnh Số: Lưới Các Điểm Ảnh
+
+### Pixel — Đơn Vị Cơ Bản
+
+Một hình ảnh số là một **lưới 2D các điểm ảnh** (pixel). Mỗi pixel lưu thông tin màu sắc, thường theo hệ **RGB** (Red, Green, Blue) — ba thành phần màu cơ bản mà mắt người cảm nhận được.
+
+<Diagram chart="graph TB
+    subgraph Pixel RGB
+        direction LR
+        R[Red: 0-255] --> P[Pixel]
+        G[Green: 0-255] --> P
+        B[Blue: 0-255] --> P
+    end
+    subgraph Hình Ảnh
+        direction TB
+        P1[Pixel 0,0] --> P2[Pixel 1,0]
+        P2 --> P3[Pixel 2,0]
+        P4[Pixel 0,1] --> P5[Pixel 1,1]
+        P5 --> P6[Pixel 2,1]
+    end" />
+
+Mỗi kênh màu (R, G, B) dùng 1 byte (0-255), nên mỗi pixel RGB cần **3 bytes**. Với RGBA (thêm kênh Alpha cho độ trong suốt), mỗi pixel cần **4 bytes**.
+
+### Tính Dung Lượng Ảnh Thô
+
+Hãy tính dung lượng một bức ảnh Full HD 1920x1080 RGB:
+
+```
+Số pixel = 1920 × 1080 = 2,073,600 pixel
+Dung lượng = 2,073,600 × 3 bytes = 6,220,800 bytes
+           ≈ 5.93 MB (ảnh thô, không nén)
+```
+
+<Callout type="info">Một bức ảnh 4K (3840×2160) RGB thô chiếm khoảng 23.7 MB. Một giây video 4K ở 30fps sẽ cần 23.7 × 30 ≈ 711 MB! Đây là lý do nén dữ liệu cực kỳ quan trọng.</Callout>
+
+### Bitmap vs Các Định Dạng Nén
+
+**Bitmap (BMP)** lưu dữ liệu pixel gần như không nén — dung lượng rất lớn. Các định dạng hiện đại sử dụng hai loại nén:
+
+**Nén không mất dữ liệu (Lossless)**: giữ nguyên 100% chất lượng.
+- **PNG** sử dụng thuật toán DEFLATE (kết hợp LZ77 + Huffman coding). Tìm các mẫu lặp lại trong dữ liệu pixel và thay thế bằng tham chiếu ngắn hơn.
+
+**Nén có mất dữ liệu (Lossy)**: hy sinh một phần chất lượng để giảm dung lượng mạnh hơn.
+- **JPEG** loại bỏ thông tin mà mắt người khó nhận ra thông qua Discrete Cosine Transform (DCT). Mắt người nhạy cảm với độ sáng hơn màu sắc, nên JPEG nén thông tin màu mạnh hơn.
+- **WebP** (Google) kết hợp cả lossy và lossless, hiệu quả hơn JPEG khoảng 25-35%.
+
+<ComparisonTable headers={["Định dạng", "Nén", "Hỗ trợ trong suốt", "Dùng tốt cho", "Dung lượng tương đối"]} rows={[
+    ["BMP", "Không nén", "Không", "Lưu trữ thô", "Rất lớn"],
+    ["PNG", "Lossless", "Có (Alpha)", "Logo, screenshot, đồ họa", "Lớn"],
+    ["JPEG", "Lossy", "Không", "Ảnh chụp, ảnh phong cảnh", "Nhỏ"],
+    ["WebP", "Cả hai", "Có", "Web — thay thế PNG và JPEG", "Rất nhỏ"],
+    ["AVIF", "Lossy/Lossless", "Có", "Web thế hệ mới", "Nhỏ nhất"]
+]} />
+
+## Âm Thanh Số: Bắt Giữ Sóng Âm
+
+### Từ Analog Sang Digital
+
+Âm thanh trong tự nhiên là **sóng liên tục** (analog). Để máy tính lưu trữ, chúng ta cần chuyển đổi sang dạng **số rời rạc** (digital) thông qua **ADC** (Analog-to-Digital Converter).
+
+Quá trình này gồm hai bước chính:
+
+<Diagram chart="graph LR
+    A[Sóng âm analog] --> B[Microphone]
+    B --> C[ADC]
+    C --> D{Hai bước}
+    D --> E[Sampling: Lấy mẫu theo thời gian]
+    D --> F[Quantization: Lượng tử hóa biên độ]
+    E --> G[Dữ liệu số PCM]
+    F --> G" />
+
+**Sampling (Lấy mẫu)**: Đo biên độ sóng âm tại các thời điểm đều đặn. **Sampling rate** là số lần đo mỗi giây:
+
+- **44,100 Hz** (CD quality) — lấy 44,100 mẫu mỗi giây
+- **48,000 Hz** — chuẩn cho video và phim
+- **96,000 Hz / 192,000 Hz** — hi-res audio
+
+<Callout type="tip">Theo định lý Nyquist-Shannon, sampling rate phải gấp ít nhất 2 lần tần số cao nhất cần thu. Tai người nghe được đến ~20,000 Hz, nên 44,100 Hz (> 2 × 20,000) là đủ để tái tạo mọi âm thanh con người nghe được.</Callout>
+
+**Quantization (Lượng tử hóa)**: Mỗi mẫu được gán một giá trị số nguyên. **Bit depth** quyết định độ chính xác:
+
+- **16-bit**: 65,536 mức (CD quality)
+- **24-bit**: 16,777,216 mức (studio quality)
+
+### Tính Dung Lượng Âm Thanh Thô (PCM)
+
+```
+Bài hát 3 phút, stereo (2 kênh), 44.1kHz, 16-bit:
+= 44,100 × 2 × 2 × 180 giây
+= 31,752,000 bytes ≈ 30.3 MB
+```
+
+### Các Định Dạng Âm Thanh
+
+**WAV/PCM**: Âm thanh thô, không nén. Chất lượng tối đa nhưng dung lượng rất lớn.
+
+**FLAC** (Free Lossless Audio Codec): Nén lossless, giảm 50-70% dung lượng mà không mất chất lượng.
+
+**MP3** (MPEG Audio Layer III): Nén lossy, loại bỏ các tần số mà tai người ít nhạy cảm (psychoacoustic model). File 3 phút chỉ còn ~3-5 MB ở bitrate 128-320 kbps.
+
+**AAC** (Advanced Audio Coding): Kế nhiệm MP3, chất lượng tốt hơn ở cùng bitrate. Sử dụng trong iTunes, YouTube.
+
+<ComparisonTable headers={["Định dạng", "Nén", "Bitrate điển hình", "Chất lượng", "Sử dụng"]} rows={[
+    ["WAV/PCM", "Không", "1,411 kbps (CD)", "Tối đa", "Sản xuất âm nhạc, lưu trữ gốc"],
+    ["FLAC", "Lossless", "~800-1000 kbps", "Như gốc", "Audiophile, lưu trữ"],
+    ["MP3", "Lossy", "128-320 kbps", "Tốt-Rất tốt", "Nghe nhạc thông thường"],
+    ["AAC", "Lossy", "128-256 kbps", "Tốt hơn MP3", "Streaming, Apple Music"],
+    ["Opus", "Lossy", "64-510 kbps", "Xuất sắc", "VoIP, Discord, WebRTC"]
+]} />
+
+## Video: Chuỗi Hình Ảnh + Âm Thanh
+
+Video về bản chất là **chuỗi các hình ảnh** (frames) hiển thị liên tiếp nhanh đến mức mắt người thấy chuyển động mượt mà, kết hợp với track âm thanh được đồng bộ.
+
+- **24 fps**: Phim điện ảnh
+- **30 fps**: Video thông thường
+- **60 fps**: Game, thể thao, slow motion
+- **120+ fps**: Slow motion chuyên nghiệp
+
+### Container vs Codec
+
+Hai khái niệm quan trọng cần phân biệt:
+
+**Codec** (coder-decoder): Thuật toán nén/giải nén video hoặc audio.
+- Video codecs: H.264 (AVC), H.265 (HEVC), VP9, AV1
+- Audio codecs: AAC, Opus, MP3, FLAC
+
+**Container** (định dạng file): Đóng gói video, audio, phụ đề, metadata vào một file.
+- MP4, MKV, WebM, AVI, MOV
+
+<Callout type="info">File `.mp4` không nói cho bạn biết video bên trong được nén bằng codec nào. Một file MP4 có thể chứa video H.264 + audio AAC, hoặc video H.265 + audio Opus. Container chỉ là "hộp đựng".</Callout>
+
+### Nén Video: I-Frames, P-Frames, B-Frames
+
+Nén video hiệu quả nhờ một nhận xét quan trọng: **các frame liên tiếp thường rất giống nhau**. Thay vì lưu mỗi frame đầy đủ, codec chỉ lưu sự khác biệt.
+
+<Diagram chart="graph LR
+    I1[I-Frame: Đầy đủ] --> P1[P-Frame: Chỉ lưu thay đổi so với I]
+    P1 --> B1[B-Frame: Tham chiếu cả trước và sau]
+    B1 --> P2[P-Frame]
+    P2 --> B2[B-Frame]
+    B2 --> I2[I-Frame: Đầy đủ tiếp theo]" />
+
+- **I-Frame** (Intra-coded): Frame đầy đủ, được nén độc lập giống như ảnh JPEG. Đây là điểm khởi đầu để giải mã các frame sau.
+- **P-Frame** (Predicted): Chỉ chứa sự khác biệt so với frame trước. Nhỏ hơn I-Frame rất nhiều.
+- **B-Frame** (Bidirectional): Tham chiếu cả frame trước và sau để tìm sự tương đồng, nén hiệu quả nhất.
+
+```
+Kích thước trung bình:
+I-Frame: 100 KB
+P-Frame: 20-40 KB
+B-Frame: 10-20 KB
+```
+
+Nhờ kỹ thuật này, video 4K 30fps (nguyên bản ~711 MB/giây) có thể nén xuống chỉ còn ~5-15 MB/giây bằng H.265, giảm gần **50-100 lần**.
+
+<ComparisonTable headers={["Codec", "Ra mắt", "Hiệu quả nén", "Hỗ trợ phần cứng", "Bản quyền"]} rows={[
+    ["H.264/AVC", "2003", "Cơ sở (100%)", "Rất rộng", "Có phí"],
+    ["H.265/HEVC", "2013", "Tốt hơn ~50%", "Rộng", "Có phí (đắt)"],
+    ["VP9", "2013", "Tương đương HEVC", "Tốt", "Miễn phí (Google)"],
+    ["AV1", "2018", "Tốt hơn HEVC ~30%", "Đang mở rộng", "Miễn phí (Alliance)"]
+]} />
+
+## Tổng Kết: Từ Bit Đến Trải Nghiệm
+
+```
+1 bit       → 0 hoặc 1
+8 bits      → 1 byte → 1 ký tự ASCII hoặc 1 giá trị pixel đơn kênh
+3 bytes     → 1 pixel RGB đầy đủ
+6.2 MB      → 1 ảnh Full HD thô
+30 MB       → 1 bài hát 3 phút (PCM)
+~700 MB/s   → 1 giây video 4K thô
+```
+
+Từ những con số 0 và 1 đơn giản, thông qua các quy tắc tổ chức thông minh và thuật toán nén tinh vi, máy tính có thể tái tạo mọi hình ảnh, âm thanh và video mà con người tạo ra. Mỗi lần bạn chụp ảnh, nghe nhạc hay xem phim, hàng tỷ bit đang được đọc, giải mã và chuyển đổi thành tín hiệu mà giác quan bạn cảm nhận — tất cả trong tích tắc. Đó là phép màu của dữ liệu nhị phân.

@@ -1,0 +1,76 @@
+{
+  "site": {
+    "title": "Knowledge Hub",
+    "description": "AI & Programming Knowledge for Everyone"
+  },
+  "nav": {
+    "home": "Home",
+    "search": "Search",
+    "about": "About",
+    "allArticles": "All Articles"
+  },
+  "home": {
+    "hero": {
+      "title": "Knowledge Hub",
+      "subtitle": "AI & Programming Knowledge for Everyone",
+      "cta": "Explore Now"
+    },
+    "featured": "Featured Articles",
+    "categories": "Categories",
+    "latest": "Latest Articles",
+    "articles": "articles"
+  },
+  "article": {
+    "readingTime": "min read",
+    "toc": "Table of Contents",
+    "sources": "Sources",
+    "related": "Related Articles",
+    "previous": "Previous",
+    "next": "Next",
+    "backToCategory": "Back"
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search articles...",
+    "noResults": "No results found",
+    "results": "results"
+  },
+  "footer": {
+    "description": "Sharing AI & Programming knowledge with the community",
+    "madeWith": "Built with"
+  },
+  "categories": {
+    "claude-code": {
+      "name": "Claude Code",
+      "description": "Comprehensive guides for Claude Code - Anthropic's AI coding tool"
+    },
+    "ai-basics": {
+      "name": "AI Basics",
+      "description": "Fundamental concepts of Artificial Intelligence and Machine Learning"
+    },
+    "programming": {
+      "name": "Programming",
+      "description": "Programming knowledge from basics to advanced"
+    },
+    "web-development": {
+      "name": "Web Development",
+      "description": "Frontend to backend web development with modern technologies"
+    },
+    "hardware": {
+      "name": "Hardware & Electronics",
+      "description": "Computer architecture, chips, circuits, and how hardware works"
+    },
+    "database": {
+      "name": "Database & Realtime",
+      "description": "Databases, realtime communication, WebSocket, message queues and streaming"
+    },
+    "automation": {
+      "name": "Automation & Workflow",
+      "description": "Workflow automation with n8n, Airflow, Spark and modern tools"
+    },
+    "devops": {
+      "name": "DevOps",
+      "description": "Modern DevOps tools and practices"
+    }
+  }
+}

@@ -1,0 +1,185 @@
+---
+title: "Transaction và Rollback: MySQL InnoDB vs PostgreSQL MVCC"
+description: "Tìm hiểu chi tiết cơ chế transaction, rollback, MVCC bên trong MySQL InnoDB (Undo Log, Redo Log) và PostgreSQL (Dead Tuples, VACUUM), cùng so sánh hai cách tiếp cận."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["transaction", "rollback", "mysql", "postgresql", "innodb", "mvcc", "undo-log", "vacuum", "acid", "database"]
+featured: true
+order: 11
+sources:
+  - title: "InnoDB Multi-Versioning - MySQL Documentation"
+    url: "https://dev.mysql.com/doc/refman/8.4/en/innodb-multi-versioning.html"
+  - title: "InnoDB Undo Logging - Jeremy Cole"
+    url: "https://blog.jcole.us/2014/04/16/the-basics-of-the-innodb-undo-logging-and-history-system/"
+  - title: "PostgreSQL VACUUM - Official Documentation"
+    url: "https://www.postgresql.org/docs/current/routine-vacuuming.html"
+  - title: "PostgreSQL MVCC Vacuum - Postgres Professional"
+    url: "https://postgrespro.com/blog/pgsql/5967918"
+  - title: "Deep Dive PostgreSQL VACUUM - Google Cloud"
+    url: "https://cloud.google.com/blog/products/databases/deep-dive-into-postgresql-vacuum-garbage-collector"
+---
+
+# Transaction và Rollback: MySQL InnoDB vs PostgreSQL MVCC
+
+Khi bạn thực hiện một thao tác ghi dữ liệu (INSERT, UPDATE, DELETE), điều gì thực sự xảy ra bên trong database? Làm thế nào để database có thể "hoàn tác" một thao tác đã thực hiện? Bài viết này sẽ đi sâu vào cơ chế bên trong của MySQL InnoDB và PostgreSQL — hai hệ quản trị cơ sở dữ liệu phổ biến nhất — để hiểu cách chúng xử lý transaction và rollback.
+
+## ACID là gì?
+
+Mọi hệ thống cơ sở dữ liệu quan hệ đều tuân theo nguyên tắc ACID để đảm bảo tính toàn vẹn dữ liệu:
+
+- **Atomicity (Tính nguyên tử)**: Toàn bộ transaction phải thành công hoặc thất bại hoàn toàn. Không có trạng thái "nửa vời".
+- **Consistency (Tính nhất quán)**: Dữ liệu luôn chuyển từ trạng thái hợp lệ này sang trạng thái hợp lệ khác.
+- **Isolation (Tính cô lập)**: Các transaction chạy đồng thời không ảnh hưởng lẫn nhau.
+- **Durability (Tính bền vững)**: Khi transaction đã commit, dữ liệu được lưu trữ vĩnh viễn ngay cả khi hệ thống gặp sự cố.
+
+<Callout type="info" title="Ví dụ chuyển tiền ngân hàng">
+Khi bạn chuyển 1.000.000 VNĐ từ tài khoản A sang tài khoản B, hai thao tác phải xảy ra đồng thời: trừ tiền A và cộng tiền B. Nếu hệ thống crash sau khi trừ tiền A nhưng chưa cộng tiền B, ACID đảm bảo toàn bộ giao dịch sẽ bị rollback — tiền quay lại tài khoản A.
+</Callout>
+
+Vậy mỗi database engine thực hiện ACID bằng cách nào? MySQL InnoDB và PostgreSQL có hai cách tiếp cận hoàn toàn khác nhau.
+
+## MySQL InnoDB: Undo Log và Version Chain
+
+### Cơ chế Undo Log
+
+Khi InnoDB thực hiện UPDATE hoặc DELETE trên một row, nó không ghi đè dữ liệu cũ ngay lập tức. Thay vào đó, phiên bản cũ của row được lưu vào **Undo Log** (còn gọi là rollback segment).
+
+Mỗi row trong InnoDB có hai hidden columns quan trọng:
+- **db_trx_id**: ID của transaction cuối cùng thay đổi row này
+- **db_roll_pointer**: Con trỏ trỏ tới undo record — phiên bản cũ của row trong undo log
+
+Khi một row được update nhiều lần, các undo record tạo thành một **version chain** — chuỗi liên kết các phiên bản cũ của row.
+
+<Diagram chart="graph LR\n    A[Row hiện tại\ndb_trx_id=105\ndb_roll_pointer] -->|trỏ tới| B[Undo Record\nTrx 103\nGiá trị cũ 2]\n    B -->|trỏ tới| C[Undo Record\nTrx 100\nGiá trị cũ 1]\n    C -->|trỏ tới| D[Undo Record\nTrx 95\nGiá trị ban đầu]" />
+
+### Hai loại Undo Log
+
+InnoDB phân biệt hai loại undo log:
+
+1. **Insert Undo Log**: Tạo khi INSERT row mới. Chỉ cần cho rollback, nên được xóa ngay sau khi transaction commit (không transaction nào khác cần thấy row chưa tồn tại).
+2. **Update Undo Log**: Tạo khi UPDATE hoặc DELETE. Phải giữ lại lâu hơn vì các transaction khác có thể cần đọc phiên bản cũ thông qua MVCC.
+
+### Rollback hoạt động thế nào?
+
+Khi bạn gọi `ROLLBACK`, InnoDB **replay undo log ngược lại**: đọc từng undo record theo version chain và khôi phục row về giá trị trước đó. Đây chính là lý do gọi là "undo" — hoàn tác từng thay đổi một.
+
+```sql
+BEGIN;
+UPDATE accounts SET balance = balance - 1000000 WHERE id = 1;
+UPDATE accounts SET balance = balance + 1000000 WHERE id = 2;
+-- Có lỗi xảy ra!
+ROLLBACK;
+-- InnoDB replay undo log: khôi phục balance cũ cho cả hai tài khoản
+```
+
+### MVCC qua Read View
+
+**Multi-Version Concurrency Control (MVCC)** cho phép nhiều transaction đọc dữ liệu đồng thời mà không cần lock. Khi một transaction bắt đầu đọc, InnoDB tạo một **Read View** chứa danh sách các transaction đang active.
+
+Với mỗi row, InnoDB kiểm tra `db_trx_id`:
+- Nếu transaction tạo row đã commit trước Read View → row hiển thị
+- Nếu transaction tạo row vẫn đang active → đi theo version chain qua undo log để tìm phiên bản cũ phù hợp
+
+<Callout type="tip" title="Isolation Level ảnh hưởng Read View">
+Ở **REPEATABLE READ** (mặc định MySQL): Read View tạo một lần khi transaction bắt đầu đọc. Ở **READ COMMITTED**: Read View tạo mới cho mỗi câu query. Đây là lý do hai isolation level nhìn thấy dữ liệu khác nhau.
+</Callout>
+
+### Purge Thread
+
+Undo log không được giữ mãi mãi. **Purge thread** chạy trong background, dọn dẹp các undo record cũ khi không còn transaction nào cần đọc chúng. Nếu có transaction chạy quá lâu (long-running transaction), undo log sẽ tích tụ và gây ra **history list length** tăng cao — ảnh hưởng hiệu năng.
+
+## PostgreSQL: Dead Tuples và VACUUM
+
+### Cách tiếp cận khác biệt
+
+PostgreSQL có cách tiếp cận hoàn toàn khác: **không sử dụng undo log riêng biệt**. Thay vào đó, PostgreSQL lưu tất cả các phiên bản dữ liệu trực tiếp trong bảng (heap).
+
+Khi bạn UPDATE một row trong PostgreSQL, thực chất xảy ra hai bước:
+1. Đánh dấu tuple cũ là "dead" (bằng cách ghi `xmax`)
+2. INSERT một tuple mới với dữ liệu đã cập nhật
+
+Mỗi tuple trong PostgreSQL có hai trường hệ thống quan trọng:
+- **xmin**: ID của transaction đã tạo (INSERT) tuple này
+- **xmax**: ID của transaction đã xóa/update tuple này (0 nếu tuple vẫn "sống")
+
+<Diagram chart="graph TD\n    subgraph Table: accounts\n    A[Tuple 1 - DEAD\nxmin=100, xmax=105\nbalance=5000000] \n    B[Tuple 2 - LIVE\nxmin=105, xmax=0\nbalance=4000000]\n    end\n    A -.->|UPDATE tạo phiên bản mới| B\n    C[Transaction 105:\nUPDATE balance] -->|đánh dấu xmax=105| A\n    C -->|tạo tuple mới xmin=105| B" />
+
+### Rollback trong PostgreSQL
+
+Khi transaction gọi `ROLLBACK`, PostgreSQL không cần "hoàn tác" gì cả theo nghĩa đen. Tuple mới được đánh dấu là invisible (transaction tạo nó bị abort), và tuple cũ vẫn còn nguyên trong bảng với `xmax` trỏ tới transaction đã abort — các transaction khác sẽ bỏ qua `xmax` này và vẫn thấy tuple cũ.
+
+Đây là điểm khác biệt lớn: InnoDB phải **replay undo log** khi rollback, còn PostgreSQL chỉ cần **đánh dấu transaction là aborted** trong commit log (CLOG).
+
+### Vấn đề Dead Tuples và Table Bloat
+
+Nhược điểm của cách tiếp cận này: các tuple "chết" (dead tuples) tích tụ trong bảng theo thời gian. Chúng chiếm dung lượng disk, làm chậm sequential scan, và gây ra hiện tượng **table bloat** — bảng ngày càng phình to dù số lượng dữ liệu thực tế không đổi.
+
+<Callout type="warning" title="Table bloat có thể rất nghiêm trọng">
+Một bảng với 1 triệu row active nhưng 10 triệu dead tuples sẽ có kích thước gấp 10 lần cần thiết. Sequential scan phải đọc qua tất cả dead tuples, gây chậm trầm trọng.
+</Callout>
+
+### VACUUM: Bộ dọn dẹp của PostgreSQL
+
+**VACUUM** là process dọn dẹp dead tuples, thu hồi dung lượng, và cập nhật **visibility map** (bản đồ cho biết page nào chỉ chứa tuple hiển thị với mọi transaction).
+
+Có hai loại VACUUM:
+- **VACUUM** (lazy): Đánh dấu không gian của dead tuples là tái sử dụng được, nhưng không trả lại cho OS
+- **VACUUM FULL**: Viết lại toàn bộ bảng, trả lại dung lượng cho OS, nhưng lock bảng hoàn toàn
+
+**Autovacuum** là daemon chạy trong background, tự động trigger VACUUM khi số lượng dead tuples vượt ngưỡng. Cấu hình quan trọng:
+
+```sql
+-- Xem cấu hình autovacuum
+SHOW autovacuum_vacuum_threshold;        -- mặc định: 50
+SHOW autovacuum_vacuum_scale_factor;     -- mặc định: 0.2
+-- Trigger khi: dead_tuples > threshold + scale_factor * total_tuples
+```
+
+<Callout type="danger" title="Transaction ID Wraparound — Nguy hiểm thực sự!">
+PostgreSQL dùng 32-bit transaction ID, tức khoảng 4 tỷ ID. Khi ID sắp hết (wraparound), PostgreSQL phải chạy "aggressive VACUUM" để freeze các tuple cũ. Nếu không vacuum kịp, PostgreSQL sẽ **tự động shutdown** để bảo vệ dữ liệu. Đây là lý do bạn KHÔNG BAO GIỜ được tắt autovacuum trên production.
+</Callout>
+
+## So sánh MySQL Undo Log vs PostgreSQL Dead Tuples
+
+<ComparisonTable
+  headers={["Tiêu chí", "MySQL InnoDB", "PostgreSQL"]}
+  rows={[
+    ["Cơ chế versioning", "Undo Log riêng biệt", "Tuple mới trong cùng bảng"],
+    ["UPDATE hoạt động", "Ghi đè in-place + lưu bản cũ vào undo log", "Đánh dấu tuple cũ dead + INSERT tuple mới"],
+    ["Rollback", "Replay undo log ngược lại", "Đánh dấu transaction aborted trong CLOG"],
+    ["Tốc độ rollback", "Chậm hơn (phải replay)", "Nhanh hơn (chỉ đánh dấu)"],
+    ["Dọn dẹp", "Purge thread dọn undo log", "VACUUM dọn dead tuples"],
+    ["Table bloat", "Ít bị bloat (dữ liệu cũ ở undo log)", "Dễ bị bloat (dead tuples trong bảng)"],
+    ["Index khi UPDATE", "Cập nhật index in-place nếu cùng page", "Phải tạo index entry mới cho tuple mới"],
+    ["MVCC Read", "Đi theo version chain trong undo log", "Kiểm tra xmin/xmax visibility"]
+  ]}
+/>
+
+## Redo Log / Write-Ahead Log (WAL)
+
+Cả MySQL InnoDB và PostgreSQL đều sử dụng kỹ thuật **Write-Ahead Logging** để đảm bảo Durability — tính bền vững trong ACID.
+
+Nguyên tắc cốt lõi: **Ghi log TRƯỚC khi ghi data vào disk**. Nếu hệ thống crash, database có thể đọc lại log để khôi phục (crash recovery).
+
+<Diagram chart="graph LR\n    A[Transaction\nCOMMIT] -->|1. Ghi Redo/WAL| B[Redo Log / WAL\nTuần tự - Nhanh]\n    B -->|2. Trả về OK| A\n    B -->|3. Background\nCheckpoint| C[Data Files\nRandom I/O - Chậm]" />
+
+### MySQL: InnoDB Redo Log
+- File: `ib_logfile0`, `ib_logfile1` (circular buffer)
+- Ghi tuần tự (sequential write) — rất nhanh
+- **Checkpoint**: background process ghi dữ liệu từ buffer pool xuống data file, sau đó đánh dấu redo log có thể tái sử dụng
+
+### PostgreSQL: Write-Ahead Log
+- Thư mục: `pg_wal/`
+- Chia thành các segment file 16MB (mặc định)
+- Hỗ trợ **Point-in-Time Recovery (PITR)**: kết hợp base backup + WAL replay để khôi phục database tới bất kỳ thời điểm nào
+- **Streaming Replication**: WAL được gửi tới replica server theo thời gian thực
+
+### Điểm chung quan trọng
+
+Cả hai hệ thống đều đảm bảo: khi `COMMIT` trả về thành công, thay đổi đã được ghi vào redo log/WAL trên disk. Dù server crash ngay sau đó, dữ liệu vẫn an toàn và có thể được khôi phục thông qua crash recovery — đọc lại log và replay các thay đổi chưa được ghi vào data file.
+
+## Tổng kết
+
+MySQL InnoDB và PostgreSQL đi hai con đường khác nhau để đạt cùng mục tiêu: transaction an toàn và nhất quán. InnoDB sử dụng undo log riêng biệt, giúp bảng chính gọn gàng nhưng rollback phải replay. PostgreSQL lưu mọi phiên bản trong cùng bảng, rollback cực nhanh nhưng cần VACUUM để dọn dẹp. Hiểu rõ cơ chế bên trong giúp bạn tối ưu hiệu năng, xử lý sự cố, và đưa ra quyết định kiến trúc phù hợp cho ứng dụng.

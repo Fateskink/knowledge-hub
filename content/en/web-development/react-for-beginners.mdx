@@ -1,0 +1,381 @@
+---
+title: "React for Beginners"
+description: "A beginner's guide to React: components, JSX, props, state, and hooks. Everything you need to start building interfaces with React."
+category: "web-development"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["react", "javascript", "components", "hooks", "useState", "useEffect", "frontend"]
+featured: false
+order: 3
+sources:
+  - title: "React Official Documentation"
+    url: "https://react.dev/"
+  - title: "MDN Web Docs - JavaScript"
+    url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript"
+  - title: "React Hooks Documentation"
+    url: "https://react.dev/reference/react/hooks"
+  - title: "Thinking in React"
+    url: "https://react.dev/learn/thinking-in-react"
+---
+
+# React for Beginners
+
+React is the most popular JavaScript library for building user interfaces (UI). Developed by Meta (Facebook), React lets you create interactive web applications through reusable components. This article will help you understand the core concepts of React.
+
+## What is React?
+
+React is a JavaScript library for building UIs. Instead of directly manipulating the DOM (Document Object Model), React uses a Virtual DOM to update the interface efficiently.
+
+<Diagram chart="graph TD\n    A[Component] --> B[JSX Template]\n    B --> C[Virtual DOM]\n    C --> D{Diff Changes}\n    D --> E[Update Real DOM]\n    E --> F[UI Renders]\n    G[State Changes] --> A\n    H[Props from Parent] --> A" />
+
+<Callout type="info">React is not a framework (like Angular). It focuses only on the View layer (UI). To build complete applications, you typically combine React with other libraries like React Router and Redux, or use a framework like Next.js.</Callout>
+
+## Creating a React Project
+
+The fastest way to get started with React is using Vite:
+
+```bash
+# Create a new project with Vite
+npm create vite@latest my-react-app -- --template react
+
+# Navigate to the project directory
+cd my-react-app
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+
+## JSX - JavaScript XML
+
+JSX lets you write HTML-like markup inside JavaScript. It is React's special syntax for describing UI.
+
+```jsx
+// JSX looks like HTML but is actually JavaScript
+const element = <h1>Hello, React!</h1>;
+
+// Embedding JavaScript expressions in JSX
+const name = "Alice";
+const greeting = <h1>Hello, {name}!</h1>;
+
+// JSX with conditional rendering
+const isLoggedIn = true;
+const message = (
+  <div>
+    {isLoggedIn ? (
+      <p>Welcome back!</p>
+    ) : (
+      <p>Please log in.</p>
+    )}
+  </div>
+);
+
+// JSX with lists
+const subjects = ["Math", "Physics", "Chemistry", "English"];
+const list = (
+  <ul>
+    {subjects.map((subject, index) => (
+      <li key={index}>{subject}</li>
+    ))}
+  </ul>
+);
+```
+
+<Callout type="warning">Every element in a JSX list needs a unique `key` prop. React uses keys to track which items have changed, been added, or been removed. Avoid using array indices as keys when the list order can change.</Callout>
+
+## Components
+
+Components are the building blocks of React. Each component is a function that returns JSX.
+
+```jsx
+// Simple function component
+function HelloWorld() {
+  return <h1>Hello, World!</h1>;
+}
+
+// Arrow function component
+const Notification = () => {
+  return (
+    <div className="notification">
+      <p>This is an important notification.</p>
+    </div>
+  );
+};
+
+// Using components
+function App() {
+  return (
+    <div>
+      <HelloWorld />
+      <Notification />
+    </div>
+  );
+}
+```
+
+## Props - Passing Data Between Components
+
+Props (properties) are the mechanism for passing data from a parent component down to a child component.
+
+```jsx
+// Component receiving props
+function UserCard({ name, age, avatar, role = "Member" }) {
+  return (
+    <div className="user-card">
+      <img src={avatar} alt={name} />
+      <h3>{name}</h3>
+      <p>Age: {age}</p>
+      <span className="role">{role}</span>
+    </div>
+  );
+}
+
+// Parent component passing props
+function UserList() {
+  const users = [
+    { id: 1, name: "Alice", age: 25, avatar: "/alice.jpg", role: "Admin" },
+    { id: 2, name: "Bob", age: 30, avatar: "/bob.jpg" },
+    { id: 3, name: "Charlie", age: 22, avatar: "/charlie.jpg", role: "Mod" },
+  ];
+
+  return (
+    <div className="user-list">
+      {users.map(user => (
+        <UserCard key={user.id} {...user} />
+      ))}
+    </div>
+  );
+}
+
+// Children props
+function Card({ title, children }) {
+  return (
+    <div className="card">
+      <h2>{title}</h2>
+      <div className="card-body">{children}</div>
+    </div>
+  );
+}
+
+// Using children
+function App() {
+  return (
+    <Card title="Information">
+      <p>Any content goes here.</p>
+      <button>Click me</button>
+    </Card>
+  );
+}
+```
+
+<Callout type="info">Props flow in one direction only (one-way data flow): from parent to child. A child component cannot modify the props it receives. If you need to change data, use state instead.</Callout>
+
+## State with useState
+
+State is a component's internal data that can change over time and triggers a re-render when updated.
+
+```jsx
+import { useState } from "react";
+
+function ProductCounter() {
+  const [quantity, setQuantity] = useState(1);
+  const unitPrice = 29.99;
+
+  const increment = () => setQuantity(prev => prev + 1);
+  const decrement = () => setQuantity(prev => Math.max(1, prev - 1));
+
+  return (
+    <div className="counter">
+      <h3>Product Quantity</h3>
+      <div className="controls">
+        <button onClick={decrement}>-</button>
+        <span>{quantity}</span>
+        <button onClick={increment}>+</button>
+      </div>
+      <p>Total: ${(quantity * unitPrice).toFixed(2)}</p>
+    </div>
+  );
+}
+
+// State with objects
+function RegistrationForm() {
+  const [formData, setFormData] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log("Form data:", formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        name="fullName"
+        value={formData.fullName}
+        onChange={handleChange}
+        placeholder="Full name"
+      />
+      <input
+        name="email"
+        type="email"
+        value={formData.email}
+        onChange={handleChange}
+        placeholder="Email"
+      />
+      <input
+        name="password"
+        type="password"
+        value={formData.password}
+        onChange={handleChange}
+        placeholder="Password"
+      />
+      <button type="submit">Register</button>
+    </form>
+  );
+}
+```
+
+<Callout type="warning">Never modify state directly. Always use the setter function (like `setQuantity`). For example: `quantity = 5` is WRONG. You must use `setQuantity(5)`. With objects and arrays, always create a new copy instead of mutating directly.</Callout>
+
+## useEffect - Side Effects
+
+useEffect lets you perform side effects such as fetching data from an API, updating the document title, or setting up timers.
+
+```jsx
+import { useState, useEffect } from "react";
+
+function PostList() {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch data when the component mounts
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(
+          "https://jsonplaceholder.typicode.com/posts?_limit=5"
+        );
+        if (!response.ok) throw new Error("Failed to fetch data");
+        const data = await response.json();
+        setPosts(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPosts();
+  }, []); // Empty array = runs only once on mount
+
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error}</p>;
+
+  return (
+    <div>
+      <h2>Latest Posts</h2>
+      {posts.map(post => (
+        <article key={post.id}>
+          <h3>{post.title}</h3>
+          <p>{post.body}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+// useEffect with cleanup
+function Clock() {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    // Cleanup function - runs when component unmounts
+    return () => clearInterval(timer);
+  }, []);
+
+  return <p>Current time: {time.toLocaleTimeString()}</p>;
+}
+```
+
+<Diagram chart="graph TD\n    A[Component Mount] --> B[Initial Render]\n    B --> C[useEffect Runs]\n    C --> D{State Changes?}\n    D -->|Yes| E[Re-render]\n    E --> F[Cleanup Previous Effect]\n    F --> G[useEffect Runs Again]\n    G --> D\n    D -->|Unmount| H[Cleanup Effect]\n    H --> I[Component Removed]" />
+
+## Custom Hooks
+
+Custom hooks let you extract and reuse logic across multiple components.
+
+```jsx
+// Custom hook for API calls
+function useFetch(url) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        setData(json);
+      } catch (err) {
+        if (err.name !== "AbortError") setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => controller.abort();
+  }, [url]);
+
+  return { data, loading, error };
+}
+
+// Using the custom hook
+function UserProfile({ userId }) {
+  const { data: user, loading, error } = useFetch(
+    `https://api.example.com/users/${userId}`
+  );
+
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error}</p>;
+
+  return (
+    <div>
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+    </div>
+  );
+}
+```
+
+<Callout type="tip">Naming convention: Custom hooks must start with the word "use" (e.g., useFetch, useLocalStorage, useDebounce). This is a mandatory convention so that React can identify and apply the rules of hooks.</Callout>
+
+## Conclusion
+
+React provides a powerful approach to building user interfaces. With the concepts of components, props, state, and hooks, you can create complex web applications from simple building blocks.
+
+Your next step is to build a small project to practice, such as a to-do list app or a weather display page. After that, explore React Router, Context API, and state management libraries to take your skills further.

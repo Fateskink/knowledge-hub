@@ -1,0 +1,248 @@
+---
+title: "Vector Database: Tìm Kiếm Ngữ Nghĩa Ở Quy Mô Lớn"
+description: "Tìm hiểu vector database, thuật toán HNSW, IVF, so sánh Pinecone, Weaviate, Qdrant, ChromaDB và cách xây dựng semantic search, RAG pipeline với vector DB."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["vector-database", "chromadb", "pinecone", "qdrant", "hnsw", "semantic-search", "rag", "embeddings"]
+featured: true
+order: 8
+sources:
+  - title: "Pinecone Documentation - Vector Database"
+    url: "https://docs.pinecone.io/"
+  - title: "ChromaDB Documentation"
+    url: "https://docs.trychroma.com/"
+  - title: "Qdrant Documentation"
+    url: "https://qdrant.tech/documentation/"
+  - title: "HNSW Algorithm Paper"
+    url: "https://arxiv.org/abs/1603.09320"
+---
+
+# Vector Database: Tìm Kiếm Ngữ Nghĩa Ở Quy Mô Lớn
+
+Ở bài trước, chúng ta đã biết cách biến văn bản thành vectors và tính cosine similarity. Nhưng khi bạn có 10 triệu tài liệu, việc so sánh query vector với từng vector một (brute-force) sẽ mất hàng giây — quá chậm cho ứng dụng thực tế. **Vector database** ra đời để giải quyết chính xác bài toán này: tìm kiếm các vectors tương tự nhất trong tập dữ liệu khổng lồ, chỉ trong vài mili-giây.
+
+## Vector Database Là Gì?
+
+Vector database là hệ thống cơ sở dữ liệu được thiết kế chuyên biệt để lưu trữ, đánh chỉ mục (index) và truy vấn dữ liệu dạng vector nhiều chiều (high-dimensional vectors). Không giống SQL database tìm kiếm theo giá trị chính xác, hay document database tìm theo từ khóa, vector database tìm theo **độ tương đồng ngữ nghĩa**.
+
+<Diagram chart="graph TD\n    subgraph SQL Database\n    A[SELECT * WHERE id = 5]\n    end\n    subgraph Document DB\n    B[Tìm kiếm từ khóa]\n    end\n    subgraph Vector Database\n    C[Tìm K vectors gần nhất]\n    end\n    A --> D[Kết quả chính xác]\n    B --> E[Kết quả match từ khóa]\n    C --> F[Kết quả tương đồng ngữ nghĩa]" />
+
+<Callout type="info">
+Vector database không thay thế SQL hay NoSQL — chúng bổ sung nhau. Trong thực tế, bạn thường dùng vector DB kết hợp với database truyền thống: vector DB cho tìm kiếm ngữ nghĩa, SQL/NoSQL cho dữ liệu có cấu trúc và nghiệp vụ.
+</Callout>
+
+## Tại Sao Cần Vector Database?
+
+### Vấn Đề Với Brute-Force Search
+
+Với N vectors và D chiều, brute-force search có độ phức tạp O(N × D). Với 10 triệu vectors 1536 chiều, mỗi truy vấn cần ~15 tỷ phép tính dấu phẩy động. Điều này không khả thi cho ứng dụng real-time.
+
+### Giải Pháp: Approximate Nearest Neighbor (ANN)
+
+Vector databases sử dụng thuật toán **ANN** (Approximate Nearest Neighbor) — chấp nhận tìm kết quả "gần đúng" nhưng cực nhanh, với độ chính xác (recall) trên 95%.
+
+## Thuật Toán Tìm Kiếm Vector
+
+### HNSW (Hierarchical Navigable Small World)
+
+HNSW là thuật toán phổ biến nhất hiện nay. Ý tưởng: xây dựng một đồ thị nhiều tầng, trong đó mỗi node là một vector và các cạnh kết nối tới "hàng xóm gần nhất".
+
+<Diagram chart="graph TD\n    subgraph Layer 2 - Thưa\n    A2[Node A] --> B2[Node B]\n    end\n    subgraph Layer 1 - Trung bình\n    A1[Node A] --> B1[Node B]\n    A1 --> C1[Node C]\n    B1 --> D1[Node D]\n    end\n    subgraph Layer 0 - Dày đặc\n    A0[A] --> B0[B]\n    A0 --> C0[C]\n    B0 --> D0[D]\n    C0 --> E0[E]\n    D0 --> F0[F]\n    E0 --> F0\n    end\n    A2 -.-> A1\n    B2 -.-> B1\n    A1 -.-> A0\n    B1 -.-> B0\n    C1 -.-> C0\n    D1 -.-> D0" />
+
+Tìm kiếm bắt đầu từ tầng cao nhất (thưa, ít node), nhảy nhanh đến vùng lân cận, rồi "lặn" xuống các tầng thấp hơn (dày đặc hơn) để tinh chỉnh kết quả. Tương tự cách bạn tìm địa chỉ: nhìn bản đồ cả nước trước, rồi zoom vào thành phố, quận, phố.
+
+### IVF (Inverted File Index)
+
+IVF chia không gian vector thành nhiều cụm (clusters) bằng K-means. Khi tìm kiếm, chỉ cần so sánh với các vectors trong vài cụm gần nhất, thay vì toàn bộ dataset.
+
+### Product Quantization (PQ)
+
+PQ nén vectors bằng cách chia vector gốc thành các sub-vectors nhỏ rồi lượng tử hóa. Giảm bộ nhớ 10-100x nhưng hy sinh một chút độ chính xác.
+
+<ComparisonTable headers={["Thuật toán", "Tốc độ", "Bộ nhớ", "Recall", "Phù hợp với"]} rows={[["Brute-force", "Chậm", "Thấp", "100%", "< 100K vectors"], ["IVF", "Nhanh", "Trung bình", "~95%", "Triệu vectors"], ["HNSW", "Rất nhanh", "Cao", "~98%", "Triệu-tỷ vectors"], ["IVF + PQ", "Nhanh", "Rất thấp", "~90%", "Tỷ vectors, hạn chế RAM"]]} />
+
+## Các Vector Database Phổ Biến
+
+<ComparisonTable headers={["Database", "Loại", "Ngôn ngữ", "Đặc điểm nổi bật", "Phù hợp với"]} rows={[["Pinecone", "Managed cloud", "API", "Serverless, dễ dùng nhất", "Production, không muốn quản lý infra"], ["Weaviate", "Self-hosted / Cloud", "Go", "Hybrid search, GraphQL API", "Dự án cần tùy chỉnh cao"], ["Qdrant", "Self-hosted / Cloud", "Rust", "Hiệu năng cao, filtering tốt", "Dữ liệu lớn cần filter phức tạp"], ["Milvus", "Self-hosted", "Go/C++", "Scale lớn nhất, distributed", "Enterprise, tỷ vectors"], ["ChromaDB", "Embedded / Server", "Python", "Đơn giản nhất, developer-friendly", "Prototyping, dự án nhỏ-vừa"], ["pgvector", "PostgreSQL extension", "C", "Tích hợp sẵn PostgreSQL", "Đã dùng PostgreSQL, không muốn thêm DB"]]} />
+
+<Callout type="tip">
+Nếu bạn mới bắt đầu, hãy dùng **ChromaDB** để prototype nhanh — cài đặt chỉ một lệnh pip install. Khi sẵn sàng production, chuyển sang **Qdrant** hoặc **Pinecone** tùy nhu cầu quản lý infra.
+</Callout>
+
+## Thực Hành: Semantic Search Với ChromaDB
+
+### Cài Đặt
+
+```bash
+pip install chromadb sentence-transformers
+```
+
+### CRUD Hoàn Chỉnh Với ChromaDB
+
+```python
+import chromadb
+from chromadb.utils import embedding_functions
+
+# Khởi tạo client (persistent - lưu dữ liệu lên disk)
+client = chromadb.PersistentClient(path="./chroma_data")
+
+# Sử dụng Sentence-Transformers làm embedding function
+sentence_tf = embedding_functions.SentenceTransformerEmbeddingFunction(
+    model_name="paraphrase-multilingual-MiniLM-L12-v2"
+)
+
+# Tạo hoặc lấy collection
+collection = client.get_or_create_collection(
+    name="articles",
+    embedding_function=sentence_tf,
+    metadata={"hnsw:space": "cosine"}  # Sử dụng cosine similarity
+)
+
+# === CREATE: Thêm tài liệu ===
+collection.add(
+    documents=[
+        "PostgreSQL hỗ trợ JSON, full-text search và nhiều tính năng nâng cao",
+        "Redis là in-memory data store, thường dùng cho caching và session",
+        "Docker đóng gói ứng dụng thành container để deploy dễ dàng",
+        "Kubernetes quản lý và điều phối nhiều container cùng lúc",
+        "MongoDB lưu trữ dữ liệu dưới dạng document JSON linh hoạt",
+        "GraphQL cho phép client yêu cầu chính xác dữ liệu cần thiết",
+    ],
+    metadatas=[
+        {"category": "database", "language": "vi"},
+        {"category": "database", "language": "vi"},
+        {"category": "devops", "language": "vi"},
+        {"category": "devops", "language": "vi"},
+        {"category": "database", "language": "vi"},
+        {"category": "api", "language": "vi"},
+    ],
+    ids=["doc1", "doc2", "doc3", "doc4", "doc5", "doc6"]
+)
+
+# === READ: Tìm kiếm ngữ nghĩa ===
+results = collection.query(
+    query_texts=["cách lưu trữ dữ liệu nhanh nhất"],
+    n_results=3
+)
+
+print("=== Kết quả tìm kiếm ===")
+for doc, score in zip(results['documents'][0], results['distances'][0]):
+    print(f"[{1 - score:.3f}] {doc}")
+
+# === READ: Tìm kiếm với filter metadata ===
+results_filtered = collection.query(
+    query_texts=["quản lý ứng dụng"],
+    n_results=3,
+    where={"category": "devops"}  # Chỉ tìm trong category devops
+)
+
+# === UPDATE: Cập nhật document ===
+collection.update(
+    ids=["doc1"],
+    documents=["PostgreSQL 17 hỗ trợ JSON, full-text search, vector và nhiều tính năng"],
+    metadatas=[{"category": "database", "language": "vi", "version": "17"}]
+)
+
+# === DELETE: Xóa document ===
+collection.delete(ids=["doc6"])
+
+print(f"\nTổng số documents: {collection.count()}")
+```
+
+<Callout type="warning">
+ChromaDB mặc định trả về `distances` (khoảng cách), không phải similarity score. Với cosine space, `similarity = 1 - distance`. Distance càng nhỏ thì càng tương đồng.
+</Callout>
+
+## Hybrid Search: Kết Hợp Keyword và Vector
+
+Không phải lúc nào vector search cũng tốt hơn keyword search. Ví dụ: tìm mã sản phẩm "SKU-12345" thì keyword search chính xác hơn. **Hybrid search** kết hợp cả hai:
+
+<Diagram chart="graph LR\n    A[Query] --> B[Keyword Search - BM25]\n    A --> C[Vector Search - ANN]\n    B --> D[Kết quả keyword]\n    C --> E[Kết quả semantic]\n    D --> F[Reciprocal Rank Fusion]\n    E --> F\n    F --> G[Kết quả cuối cùng]\n    style F fill:#f96,stroke:#333" />
+
+```python
+# Ví dụ hybrid search với Qdrant (hỗ trợ native)
+from qdrant_client import QdrantClient
+from qdrant_client.models import (
+    Distance, VectorParams, PointStruct,
+    SearchParams, FusionQuery, Prefetch, Query
+)
+
+client = QdrantClient(url="http://localhost:6333")
+
+# Tìm kiếm hybrid: kết hợp sparse (keyword) + dense (semantic)
+results = client.query_points(
+    collection_name="articles",
+    prefetch=[
+        Prefetch(
+            query=dense_vector,      # Vector search
+            using="dense",
+            limit=20,
+        ),
+        Prefetch(
+            query=sparse_vector,     # Keyword search (BM25)
+            using="sparse",
+            limit=20,
+        ),
+    ],
+    query=FusionQuery(fusion="rrf"),  # Reciprocal Rank Fusion
+    limit=10,
+)
+```
+
+## Vector DB Trong Kiến Trúc RAG
+
+Retrieval-Augmented Generation (RAG) là kiến trúc quan trọng nhất khi xây dựng ứng dụng AI với dữ liệu riêng. Vector database đóng vai trò **bộ nhớ dài hạn** cho LLM.
+
+<Diagram chart="graph TD\n    subgraph Indexing Pipeline\n    A[Tài liệu] --> B[Chia nhỏ - Chunking]\n    B --> C[Tạo Embeddings]\n    C --> D[(Vector Database)]\n    end\n    subgraph Query Pipeline\n    E[Câu hỏi người dùng] --> F[Tạo Query Embedding]\n    F --> G[Tìm kiếm Vector DB]\n    G --> H[Top-K chunks liên quan]\n    H --> I[Xây dựng Prompt]\n    I --> J[LLM sinh câu trả lời]\n    end\n    D --> G\n    style D fill:#bbf,stroke:#333\n    style J fill:#f96,stroke:#333" />
+
+### Pipeline RAG Với ChromaDB và OpenAI
+
+```python
+import chromadb
+from openai import OpenAI
+
+# Bước 1: Index tài liệu
+chroma_client = chromadb.PersistentClient(path="./rag_data")
+collection = chroma_client.get_or_create_collection("knowledge_base")
+
+# Thêm chunks tài liệu (đã chia nhỏ)
+collection.add(
+    documents=document_chunks,
+    ids=[f"chunk_{i}" for i in range(len(document_chunks))]
+)
+
+# Bước 2: Truy vấn RAG
+def ask_rag(question: str) -> str:
+    # Tìm chunks liên quan
+    results = collection.query(
+        query_texts=[question],
+        n_results=5
+    )
+
+    # Xây dựng context
+    context = "\n\n".join(results['documents'][0])
+
+    # Gọi LLM với context
+    openai_client = OpenAI()
+    response = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": f"Trả lời dựa trên context:\n{context}"},
+            {"role": "user", "content": question}
+        ]
+    )
+    return response.choices[0].message.content
+
+answer = ask_rag("Vector database hoạt động như thế nào?")
+print(answer)
+```
+
+<Callout type="danger">
+Khi xây dựng RAG, **chunking strategy** (cách chia nhỏ tài liệu) ảnh hưởng rất lớn đến chất lượng. Chunk quá nhỏ mất ngữ cảnh, quá lớn thì chứa nhiều thông tin không liên quan. Thường bắt đầu với 500-1000 tokens mỗi chunk, overlap 100-200 tokens.
+</Callout>
+
+## Tổng Kết
+
+Vector database là thành phần thiết yếu trong hệ sinh thái AI hiện đại. Chúng giải quyết bài toán tìm kiếm ngữ nghĩa ở quy mô lớn — điều mà database truyền thống không thể làm hiệu quả. Hãy bắt đầu với ChromaDB cho prototyping, nắm vững các khái niệm HNSW, cosine similarity, hybrid search, rồi chuyển sang production-ready solutions khi sẵn sàng. Kết hợp với kiến trúc RAG, vector database mở ra khả năng xây dựng ứng dụng AI thông minh dựa trên dữ liệu riêng của tổ chức bạn.

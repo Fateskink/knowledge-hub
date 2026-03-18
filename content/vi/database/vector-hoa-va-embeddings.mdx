@@ -1,0 +1,254 @@
+---
+title: "Vector Hóa và Embeddings: Cách Máy Tính Hiểu Ngôn Ngữ Tự Nhiên"
+description: "Tìm hiểu vector hóa (vectorization), word embeddings, sentence embeddings, cosine similarity và cách tạo embeddings với OpenAI API, Sentence-Transformers cho semantic search và RAG."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 14
+tags: ["vectorization", "embeddings", "word2vec", "nlp", "cosine-similarity", "openai", "semantic-search", "rag"]
+featured: true
+order: 7
+sources:
+  - title: "OpenAI Embeddings Documentation"
+    url: "https://platform.openai.com/docs/guides/embeddings"
+  - title: "Sentence-Transformers Documentation"
+    url: "https://www.sbert.net/"
+  - title: "Word2Vec Paper - Mikolov et al."
+    url: "https://arxiv.org/abs/1301.3781"
+  - title: "Pinecone - What are Vector Embeddings?"
+    url: "https://www.pinecone.io/learn/vector-embeddings/"
+---
+
+# Vector Hóa và Embeddings: Cách Máy Tính Hiểu Ngôn Ngữ Tự Nhiên
+
+Con người đọc một câu văn và ngay lập tức hiểu ý nghĩa. Nhưng máy tính chỉ hiểu con số. Vậy làm thế nào để máy tính "hiểu" rằng "chó" và "cún" có nghĩa gần giống nhau, trong khi "chó" và "xe hơi" thì hoàn toàn khác? Câu trả lời nằm ở **vector hóa** (vectorization) và **embeddings** — kỹ thuật biến đổi ngôn ngữ tự nhiên thành các vector số học mà máy tính có thể tính toán, so sánh và suy luận.
+
+## Vector Hóa Là Gì?
+
+Vector hóa là quá trình chuyển đổi dữ liệu phi cấu trúc (văn bản, hình ảnh, âm thanh) thành các vector số — tức là mảng các con số có kích thước cố định. Mỗi vector đại diện cho "ý nghĩa" của dữ liệu trong một không gian toán học nhiều chiều.
+
+<Callout type="info">
+Một vector embedding không chỉ là mã hóa đơn thuần — nó nắm bắt **ngữ nghĩa** (semantic meaning). Các từ hoặc câu có ý nghĩa tương tự sẽ có vector gần nhau trong không gian nhiều chiều.
+</Callout>
+
+<Diagram chart="graph LR\n    A[Văn bản thô] --> B[Mô hình Embedding]\n    B --> C[Vector số]\n    C --> D[So sánh / Tìm kiếm]\n    style A fill:#f9f,stroke:#333\n    style C fill:#bbf,stroke:#333" />
+
+## Từ One-Hot Encoding Đến Word Embeddings
+
+### One-Hot Encoding: Bước Khởi Đầu Thô Sơ
+
+Cách đơn giản nhất để biểu diễn từ là one-hot encoding: mỗi từ là một vector có đúng một vị trí bằng 1, còn lại bằng 0.
+
+```python
+# Giả sử từ điển có 5 từ: ["chó", "mèo", "cá", "xe", "nhà"]
+cho  = [1, 0, 0, 0, 0]
+meo  = [0, 1, 0, 0, 0]
+ca   = [0, 0, 1, 0, 0]
+xe   = [0, 0, 0, 1, 0]
+nha  = [0, 0, 0, 0, 1]
+```
+
+<Callout type="warning">
+One-hot encoding có hai nhược điểm nghiêm trọng: (1) Vector rất thưa thớt (sparse) — với từ điển 100.000 từ, mỗi vector có 99.999 số 0. (2) Không thể hiện mối quan hệ ngữ nghĩa — khoảng cách giữa "chó" và "mèo" bằng khoảng cách giữa "chó" và "xe hơi".
+</Callout>
+
+<Diagram chart="graph TD\n    subgraph One-Hot Encoding\n    A[chó = 1,0,0,0,0]\n    B[mèo = 0,1,0,0,0]\n    C[cá = 0,0,1,0,0]\n    end\n    subgraph Dense Embedding\n    D[chó = 0.8, 0.3, 0.1]\n    E[mèo = 0.7, 0.4, 0.1]\n    F[cá = 0.2, 0.1, 0.9]\n    end\n    A -.->|tiến hóa| D\n    B -.->|tiến hóa| E\n    C -.->|tiến hóa| F" />
+
+### Word2Vec: Cuộc Cách Mạng Đầu Tiên
+
+Năm 2013, nhóm nghiên cứu của Tomas Mikolov tại Google công bố **Word2Vec** — mô hình học biểu diễn từ dưới dạng vector dày đặc (dense vector) từ ngữ cảnh. Ý tưởng cốt lõi: "Một từ được định nghĩa bởi những từ xung quanh nó" (distributional hypothesis).
+
+Word2Vec có hai kiến trúc:
+- **CBOW** (Continuous Bag of Words): Dự đoán từ trung tâm từ các từ ngữ cảnh
+- **Skip-gram**: Dự đoán các từ ngữ cảnh từ từ trung tâm
+
+Kết quả đáng kinh ngạc: `vector("vua") - vector("đàn ông") + vector("phụ nữ") ≈ vector("nữ hoàng")`.
+
+### GloVe: Kết Hợp Thống Kê Toàn Cục
+
+**GloVe** (Global Vectors for Word Representation) từ Stanford kết hợp ưu điểm của ma trận đồng xuất hiện (co-occurrence matrix) với phương pháp học của Word2Vec, tạo ra embeddings chất lượng cao bằng cách tận dụng thống kê toàn cục của corpus.
+
+## Sentence Embeddings và Document Embeddings
+
+Word embeddings chỉ biểu diễn từ đơn lẻ. Nhưng trong thực tế, chúng ta cần biểu diễn cả câu và tài liệu.
+
+### Các Phương Pháp Tạo Sentence Embeddings
+
+| Phương pháp | Mô tả | Chất lượng |
+|---|---|---|
+| Trung bình word vectors | Lấy trung bình tất cả word embeddings | Thấp |
+| TF-IDF weighted average | Trung bình có trọng số TF-IDF | Trung bình |
+| Sentence-BERT (SBERT) | Mô hình transformer chuyên biệt | Cao |
+| OpenAI text-embedding | Mô hình thương mại | Rất cao |
+
+<Callout type="tip">
+**Sentence-Transformers** (SBERT) là thư viện mã nguồn mở tốt nhất cho sentence embeddings. Nó cung cấp nhiều mô hình pre-trained hỗ trợ đa ngôn ngữ, hoàn toàn miễn phí.
+</Callout>
+
+## Tạo Embeddings Trong Thực Tế
+
+### Với OpenAI API
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="your-api-key")
+
+def get_embedding(text: str, model: str = "text-embedding-3-small") -> list[float]:
+    """Tạo embedding từ văn bản sử dụng OpenAI API."""
+    response = client.embeddings.create(
+        input=text,
+        model=model
+    )
+    return response.data[0].embedding
+
+# Tạo embedding cho một câu
+embedding = get_embedding("Vector hóa giúp máy tính hiểu ngôn ngữ")
+print(f"Số chiều: {len(embedding)}")  # 1536 cho text-embedding-3-small
+print(f"5 giá trị đầu: {embedding[:5]}")
+```
+
+### Với Sentence-Transformers (Miễn Phí, Chạy Local)
+
+```python
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
+# Tải mô hình đa ngôn ngữ
+model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+
+# Tạo embeddings cho nhiều câu cùng lúc
+sentences = [
+    "Cơ sở dữ liệu lưu trữ thông tin",
+    "Database dùng để chứa dữ liệu",
+    "Hôm nay trời đẹp quá",
+    "Mèo là loài động vật dễ thương"
+]
+
+embeddings = model.encode(sentences)
+print(f"Shape: {embeddings.shape}")  # (4, 384) - 4 câu, mỗi câu 384 chiều
+```
+
+## Cosine Similarity: Đo Độ Tương Đồng
+
+Khi đã có vectors, làm sao biết hai vectors "giống" nhau? Phương pháp phổ biến nhất là **cosine similarity** — đo góc giữa hai vectors.
+
+Công thức: `cos(θ) = (A · B) / (||A|| × ||B||)`
+
+- Giá trị 1.0: hoàn toàn giống nhau
+- Giá trị 0.0: không liên quan
+- Giá trị -1.0: hoàn toàn trái ngược
+
+```python
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+
+# Các câu cần so sánh
+sentences = [
+    "Cơ sở dữ liệu lưu trữ thông tin",     # Câu gốc
+    "Database dùng để chứa dữ liệu",         # Nghĩa tương tự
+    "Hôm nay trời đẹp quá",                   # Không liên quan
+]
+
+embeddings = model.encode(sentences)
+
+# Tính cosine similarity giữa câu đầu và các câu còn lại
+for i in range(1, len(sentences)):
+    sim = cosine_similarity([embeddings[0]], [embeddings[i]])[0][0]
+    print(f"'{sentences[0]}' vs '{sentences[i]}'")
+    print(f"  → Similarity: {sim:.4f}\n")
+
+# Kết quả mong đợi:
+# "Cơ sở dữ liệu..." vs "Database..." → ~0.85 (rất giống)
+# "Cơ sở dữ liệu..." vs "Hôm nay trời..." → ~0.15 (không liên quan)
+```
+
+<Callout type="info">
+Cosine similarity đo hướng chứ không đo độ dài của vector, nên nó phù hợp để so sánh ngữ nghĩa hơn Euclidean distance. Hai câu nói cùng một ý nhưng dài ngắn khác nhau vẫn có cosine similarity cao.
+</Callout>
+
+## Không Gian Vector Nhiều Chiều
+
+Tại sao embeddings thường có 768 hoặc 1536 chiều? Mỗi chiều nắm bắt một "khía cạnh" của ý nghĩa — có thể là chủ đề, ngữ cảm, mức độ trang trọng, lĩnh vực chuyên môn, v.v. Càng nhiều chiều, mô hình càng biểu diễn tinh vi hơn, nhưng cũng tốn nhiều bộ nhớ và tính toán hơn.
+
+<ComparisonTable headers={["Mô hình", "Số chiều", "Kích thước", "Chất lượng"]} rows={[["Word2Vec", "300", "~1.5 GB", "Cơ bản"], ["GloVe", "50-300", "~1 GB", "Tốt cho từ đơn"], ["SBERT MiniLM", "384", "~120 MB", "Tốt, nhanh"], ["OpenAI text-embedding-3-small", "1536", "API cloud", "Rất tốt"], ["OpenAI text-embedding-3-large", "3072", "API cloud", "Xuất sắc"]]} />
+
+## Ứng Dụng Thực Tế
+
+### 1. Semantic Search (Tìm Kiếm Ngữ Nghĩa)
+
+Thay vì tìm kiếm theo từ khóa chính xác, semantic search tìm kết quả theo **ý nghĩa**. Người dùng gõ "cách bảo mật ứng dụng web" có thể tìm được bài viết về "phòng chống SQL injection" dù không có từ khóa trùng nhau.
+
+### 2. Retrieval-Augmented Generation (RAG)
+
+RAG kết hợp vector search với LLM: tìm tài liệu liên quan bằng embedding, rồi đưa vào context cho LLM sinh câu trả lời. Đây là kiến trúc phổ biến nhất cho chatbot doanh nghiệp hiện nay.
+
+<Diagram chart="graph LR\n    A[Câu hỏi] --> B[Tạo Embedding]\n    B --> C[Tìm kiếm Vector DB]\n    C --> D[Top-K tài liệu]\n    D --> E[LLM + Context]\n    E --> F[Câu trả lời]\n    style E fill:#f96,stroke:#333" />
+
+### 3. Recommendation System
+
+Biểu diễn sản phẩm và người dùng dưới dạng vectors, rồi tìm sản phẩm có vector gần nhất với sở thích người dùng.
+
+### 4. Clustering và Phân Loại
+
+Nhóm các tài liệu tương tự, phát hiện bài viết trùng lặp, phân loại email spam dựa trên khoảng cách vector.
+
+## Ví Dụ Hoàn Chỉnh: Xây Dựng Semantic Search Đơn Giản
+
+```python
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+class SimpleSemanticSearch:
+    def __init__(self, model_name='paraphrase-multilingual-MiniLM-L12-v2'):
+        self.model = SentenceTransformer(model_name)
+        self.documents = []
+        self.embeddings = None
+
+    def add_documents(self, docs: list[str]):
+        """Thêm tài liệu và tạo embeddings."""
+        self.documents = docs
+        self.embeddings = self.model.encode(docs)
+
+    def search(self, query: str, top_k: int = 3) -> list[dict]:
+        """Tìm kiếm tài liệu theo ngữ nghĩa."""
+        query_embedding = self.model.encode([query])
+        similarities = cosine_similarity(query_embedding, self.embeddings)[0]
+
+        # Sắp xếp theo độ tương đồng giảm dần
+        top_indices = np.argsort(similarities)[::-1][:top_k]
+
+        results = []
+        for idx in top_indices:
+            results.append({
+                "document": self.documents[idx],
+                "score": float(similarities[idx])
+            })
+        return results
+
+# Sử dụng
+search_engine = SimpleSemanticSearch()
+search_engine.add_documents([
+    "PostgreSQL là hệ quản trị cơ sở dữ liệu quan hệ mã nguồn mở",
+    "Redis là in-memory data store dùng cho caching",
+    "Docker giúp đóng gói ứng dụng thành container",
+    "Kubernetes điều phối các container ở quy mô lớn",
+    "MongoDB là cơ sở dữ liệu NoSQL document-based",
+])
+
+results = search_engine.search("cách lưu trữ dữ liệu nhanh trong bộ nhớ")
+for r in results:
+    print(f"[{r['score']:.3f}] {r['document']}")
+```
+
+<Callout type="tip">
+Đây chỉ là ví dụ minh họa. Với dữ liệu lớn (hàng triệu documents), bạn cần sử dụng vector database chuyên dụng thay vì brute-force cosine similarity. Hãy xem bài tiếp theo về Vector Database.
+</Callout>
+
+## Tổng Kết
+
+Vector hóa và embeddings là nền tảng cho hầu hết ứng dụng AI hiện đại — từ chatbot, tìm kiếm thông minh, đến hệ thống gợi ý. Hiểu rõ cách chúng hoạt động giúp bạn thiết kế hệ thống tốt hơn và chọn đúng công cụ cho bài toán của mình. Hãy bắt đầu với Sentence-Transformers để thử nghiệm miễn phí trên máy cá nhân, rồi mở rộng lên OpenAI API khi cần chất lượng cao hơn.

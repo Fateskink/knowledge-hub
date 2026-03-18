@@ -1,0 +1,244 @@
+---
+title: "Apache Spark - Big Data Processing"
+description: "Learn Apache Spark, the distributed data processing framework. Understand RDD, DataFrame, Spark SQL, and compare batch vs stream processing."
+category: "automation"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 13
+tags: ["apache-spark", "big-data", "rdd", "dataframe", "spark-sql", "batch-processing", "stream-processing", "hadoop"]
+featured: false
+order: 3
+sources:
+  - title: "Apache Spark Official Documentation"
+    url: "https://spark.apache.org/docs/latest/"
+  - title: "Apache Spark GitHub"
+    url: "https://github.com/apache/spark"
+  - title: "Databricks - Spark Guide"
+    url: "https://docs.databricks.com/en/spark/index.html"
+  - title: "Spark By Examples"
+    url: "https://sparkbyexamples.com/"
+---
+
+# Apache Spark - Big Data Processing
+
+Apache Spark is an open-source distributed data processing framework designed to handle large-scale data at high speed. Developed at UC Berkeley's AMPLab in 2009 and becoming a top-level Apache project in 2014, Spark has replaced Hadoop MapReduce as the de facto standard for Big Data processing.
+
+## What is Apache Spark?
+
+Spark is a **unified analytics engine** for large-scale data processing. It provides high-level APIs in Scala, Java, Python (PySpark), and R, along with integrated tools for SQL, streaming, machine learning, and graph processing.
+
+<Callout type="info">Spark can process data up to 100x faster than Hadoop MapReduce in-memory and 10x faster on-disk, thanks to its in-memory processing model and optimized DAG execution engine.</Callout>
+
+### Key Strengths
+
+- **Speed**: In-memory processing, optimized query plans
+- **Versatility**: Batch, streaming, ML, and graph processing in one framework
+- **Ease of use**: Developer-friendly APIs for Python, Scala, Java, R, and SQL
+- **Scalability**: From a laptop to thousands of cluster nodes
+- **Fault tolerance**: Automatic recovery on failure
+
+## Apache Spark Architecture
+
+<Diagram chart="graph TD\n    subgraph Spark Application\n    A[Driver Program - SparkContext] --> B[Cluster Manager]\n    B --> C[Worker Node 1]\n    B --> D[Worker Node 2]\n    B --> E[Worker Node 3]\n    C --> F[Executor - Cache + Tasks]\n    D --> G[Executor - Cache + Tasks]\n    E --> H[Executor - Cache + Tasks]\n    end" />
+
+| Component | Function |
+|-----------|----------|
+| Driver Program | Main program, creates SparkContext, distributes work |
+| Cluster Manager | Manages resources (YARN, Mesos, K8s, Standalone) |
+| Worker Node | Machines in the cluster that execute tasks |
+| Executor | Process running on workers, executes tasks and caches data |
+| Task | Smallest unit of work, runs on a single partition |
+
+### Spark Ecosystem
+
+<Diagram chart="graph TD\n    A[Spark Core - RDD API] --> B[Spark SQL + DataFrame]\n    A --> C[Spark Streaming]\n    A --> D[MLlib - Machine Learning]\n    A --> E[GraphX - Graph Processing]\n    F[Data Sources] --> A\n    F --> G[HDFS / S3 / GCS]\n    F --> H[JDBC / Cassandra / MongoDB]\n    F --> I[Kafka / Kinesis]" />
+
+## Core Concepts
+
+### RDD (Resilient Distributed Dataset)
+
+RDD is the most fundamental data structure in Spark. It is a collection of elements distributed across the cluster that can be processed in parallel.
+
+```python
+from pyspark import SparkContext
+
+sc = SparkContext("local[*]", "RDD Example")
+
+# Create RDD from a list
+numbers = sc.parallelize([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+# Transformation: create a new RDD from an existing one
+even_numbers = numbers.filter(lambda x: x % 2 == 0)
+squared = even_numbers.map(lambda x: x ** 2)
+
+# Action: return results
+result = squared.collect()
+print(result)  # [4, 16, 36, 64, 100]
+
+# Compute sum
+total = numbers.reduce(lambda a, b: a + b)
+print(total)   # 55
+```
+
+<Callout type="warning">RDD is the low-level API of Spark. In most cases, you should use the DataFrame API as it is better optimized through the Catalyst optimizer.</Callout>
+
+### DataFrame and Spark SQL
+
+A DataFrame is a tabular data structure with an explicit schema, similar to a Pandas DataFrame but distributed across a cluster:
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, avg, sum, count, when
+
+# Initialize SparkSession
+spark = SparkSession.builder \
+    .appName("DataFrame Example") \
+    .master("local[*]") \
+    .getOrCreate()
+
+# Read data from CSV
+df = spark.read \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .csv("/data/sales.csv")
+
+# Display schema
+df.printSchema()
+# root
+#  |-- order_id: integer
+#  |-- product: string
+#  |-- category: string
+#  |-- amount: double
+#  |-- quantity: integer
+#  |-- sale_date: date
+
+# Process data with DataFrame API
+result = df \
+    .filter(col("amount") > 100) \
+    .groupBy("category") \
+    .agg(
+        count("order_id").alias("total_orders"),
+        sum("amount").alias("total_revenue"),
+        avg("amount").alias("avg_order_value")
+    ) \
+    .orderBy(col("total_revenue").desc())
+
+result.show()
+
+# Using Spark SQL
+df.createOrReplaceTempView("sales")
+
+sql_result = spark.sql("""
+    SELECT
+        category,
+        COUNT(*) as total_orders,
+        SUM(amount) as total_revenue,
+        AVG(amount) as avg_order_value
+    FROM sales
+    WHERE amount > 100
+    GROUP BY category
+    ORDER BY total_revenue DESC
+""")
+
+sql_result.show()
+```
+
+### Dataset (Scala/Java)
+
+Dataset combines the advantages of RDD (type-safety) and DataFrame (optimization). It is only available in Scala and Java; in Python, DataFrame and Dataset are the same.
+
+## Batch vs Stream Processing
+
+<ComparisonTable headers={["Criteria", "Batch Processing", "Stream Processing"]} rows={[["Data", "Fixed, stored datasets", "Continuous, real-time data streams"], ["Latency", "Minutes to hours", "Milliseconds to seconds"], ["Processing", "Entire dataset at once", "Per-record or micro-batch"], ["Use cases", "Reports, ETL, historical analysis", "Monitoring, alerts, real-time dashboards"], ["Spark API", "Spark SQL, DataFrame", "Structured Streaming"], ["Complexity", "Lower", "Higher (late data, ordering)"]]} />
+
+### Structured Streaming Example
+
+```python
+# Read streaming data from Kafka
+streaming_df = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("subscribe", "sales-events") \
+    .load()
+
+# Process streaming data
+from pyspark.sql.functions import from_json, window
+from pyspark.sql.types import StructType, StringType, DoubleType, TimestampType
+
+schema = StructType() \
+    .add("product", StringType()) \
+    .add("amount", DoubleType()) \
+    .add("timestamp", TimestampType())
+
+parsed = streaming_df \
+    .selectExpr("CAST(value AS STRING)") \
+    .select(from_json(col("value"), schema).alias("data")) \
+    .select("data.*")
+
+# Compute revenue in 5-minute windows
+windowed_revenue = parsed \
+    .withWatermark("timestamp", "10 minutes") \
+    .groupBy(
+        window("timestamp", "5 minutes"),
+        "product"
+    ) \
+    .agg(sum("amount").alias("revenue"))
+
+# Write results to console
+query = windowed_revenue.writeStream \
+    .outputMode("update") \
+    .format("console") \
+    .start()
+
+query.awaitTermination()
+```
+
+## Spark vs Hadoop MapReduce
+
+<ComparisonTable headers={["Criteria", "Apache Spark", "Hadoop MapReduce"]} rows={[["Speed", "10-100x faster", "Slower due to disk I/O"], ["Processing", "In-memory", "Disk-based"], ["API", "High-level (DataFrame, SQL)", "Low-level (Map/Reduce functions)"], ["Streaming", "Yes (Structured Streaming)", "No (needs Storm/Flink)"], ["Machine Learning", "Yes (MLlib)", "Needs Mahout"], ["Ease of use", "Python, Scala, SQL", "Primarily Java"], ["Cost", "Requires more RAM", "Runs well on commodity hardware"], ["Fault tolerance", "RDD lineage", "Replication"]]} />
+
+<Callout type="tip">Spark does not fully replace Hadoop. Spark typically runs on HDFS (Hadoop Distributed File System) and uses YARN as the cluster manager. They are complementary tools.</Callout>
+
+## Performance Optimization
+
+### 1. Partitioning
+
+```python
+# Check number of partitions
+df.rdd.getNumPartitions()
+
+# Change number of partitions
+df_repartitioned = df.repartition(200, "category")
+
+# Reduce partitions (no shuffle)
+df_coalesced = df.coalesce(50)
+```
+
+### 2. Caching and Persistence
+
+```python
+# Cache DataFrame in memory
+df.cache()    # equivalent to persist(MEMORY_ONLY)
+df.persist(StorageLevel.MEMORY_AND_DISK)
+
+# Release cache
+df.unpersist()
+```
+
+### 3. Broadcast Join
+
+```python
+from pyspark.sql.functions import broadcast
+
+# When one table is small, use broadcast to avoid shuffle
+result = large_df.join(
+    broadcast(small_df),
+    "key_column"
+)
+```
+
+<Callout type="danger">Avoid using collect() on large DataFrames as it pulls all data back to the Driver and can cause OutOfMemoryError. Only use collect() when you are certain the data is small enough to fit in memory.</Callout>
+
+## Conclusion
+
+Apache Spark is the most powerful distributed data processing framework available today. With the ability to handle both batch and streaming workloads, integrated machine learning and SQL capabilities, Spark is the ideal platform for modern Big Data systems. Whether you are building ETL pipelines, analyzing real-time data, or training ML models, Spark can deliver.

@@ -1,0 +1,279 @@
+---
+title: "MQTT - Giao thức IoT"
+description: "Tìm hiểu MQTT, giao thức nhắn tin nhẹ cho IoT. Publish/subscribe pattern, QoS levels, retained messages và ứng dụng trong smart home, cảm biến."
+category: "automation"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["mqtt", "iot", "protocol", "publish-subscribe", "broker", "smart-home", "sensor", "mosquitto"]
+featured: false
+order: 4
+sources:
+  - title: "MQTT.org - Official Specification"
+    url: "https://mqtt.org/"
+  - title: "HiveMQ MQTT Essentials"
+    url: "https://www.hivemq.com/mqtt-essentials/"
+  - title: "Eclipse Mosquitto"
+    url: "https://mosquitto.org/"
+  - title: "MQTT v5.0 Specification - OASIS"
+    url: "https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html"
+---
+
+# MQTT - Giao thức IoT
+
+MQTT (Message Queuing Telemetry Transport) là một giao thức nhắn tin nhẹ (lightweight messaging protocol), được thiết kế cho các thiết bị có tài nguyên hạn chế và mạng có băng thông thấp, độ trễ cao. Đây là giao thức phổ biến nhất trong thế giới IoT (Internet of Things), từ cảm biến nhiệt độ đến hệ thống smart home phức tạp.
+
+## MQTT là gì?
+
+MQTT là một giao thức truyền tin dựa trên mô hình **publish/subscribe** (xuất bản/đăng ký). Thay vì các client giao tiếp trực tiếp với nhau (như HTTP), tất cả giao tiếp đi qua một trung gian gọi là **broker**. Client có thể publish (gửi) message đến một topic, và các client khác subscribe (đăng ký) topic đó để nhận message.
+
+<Callout type="info">MQTT được phát minh bởi Andy Stanford-Clark (IBM) và Arlen Nipper vào năm 1999, ban đầu để giám sát đường ống dẫn dầu qua vệ tinh. Phiên bản hiện tại là MQTT 5.0, được chuẩn hóa bởi OASIS.</Callout>
+
+### Đặc điểm chính của MQTT
+
+- **Nhẹ**: Header tối thiểu chỉ 2 bytes
+- **Bi-directional**: Giao tiếp hai chiều giữa client và broker
+- **Publish/Subscribe**: Tách biệt người gửi và người nhận
+- **QoS levels**: 3 mức đảm bảo chất lượng truyền tin
+- **Retained messages**: Lưu trữ message cuối cùng của topic
+- **Last Will & Testament**: Thông báo khi client mất kết nối
+- **Session persistence**: Duy trì phiên kết nối
+
+## Mô hình Publish/Subscribe
+
+<Diagram chart="graph TD\n    subgraph Publishers\n    A[Sensor Nhiệt độ] -->|publish: home/temp = 25C| D[MQTT Broker]\n    B[Sensor Độ ẩm] -->|publish: home/humidity = 60%| D\n    C[Camera] -->|publish: home/camera/status = ON| D\n    end\n    subgraph Broker\n    D --> E{Topic Matching}\n    end\n    subgraph Subscribers\n    E -->|home/temp| F[Dashboard App]\n    E -->|home/#| G[Mobile App]\n    E -->|home/camera/status| H[Security System]\n    end" />
+
+### Cách hoạt động
+
+1. **Publisher** gửi message đến một **topic** trên broker
+2. **Broker** nhận message và chuyển tiếp đến tất cả **subscriber** của topic đó
+3. **Subscriber** nhận message mà không cần biết publisher là ai
+
+### Topic Structure
+
+Topic trong MQTT có cấu trúc dạng phân cấp, phân cách bởi dấu `/`:
+
+```
+home/living-room/temperature
+home/living-room/humidity
+home/bedroom/temperature
+office/server-room/temperature
+```
+
+**Wildcard patterns:**
+- `+` : Thay thế một cấp (single level) - `home/+/temperature` match `home/living-room/temperature` và `home/bedroom/temperature`
+- `#` : Thay thế nhiều cấp (multi level) - `home/#` match tất cả topic bắt đầu bằng `home/`
+
+<Callout type="warning">Tránh subscribe topic `#` (tất cả topic) trong production vì nó sẽ nhận tất cả message đi qua broker, gây quá tải cho client.</Callout>
+
+## QoS (Quality of Service) Levels
+
+MQTT cung cấp 3 mức đảm bảo chất lượng truyền tin:
+
+<ComparisonTable headers={["QoS Level", "Tên gọi", "Đảm bảo", "Hiệu suất", "Sử dụng"]} rows={[["QoS 0", "At most once (Fire & Forget)", "Message có thể mất", "Nhanh nhất", "Sensor data không quan trọng"], ["QoS 1", "At least once", "Message đến ít nhất 1 lần (có thể trùng)", "Trung bình", "Cảnh báo, thông báo"], ["QoS 2", "Exactly once", "Message đến đúng 1 lần", "Chậm nhất", "Thanh toán, lệnh điều khiển"]]} />
+
+<Diagram chart="graph LR\n    subgraph QoS 0\n    A1[Publisher] -->|PUBLISH| B1[Broker]\n    end\n    subgraph QoS 1\n    A2[Publisher] -->|PUBLISH| B2[Broker]\n    B2 -->|PUBACK| A2\n    end\n    subgraph QoS 2\n    A3[Publisher] -->|PUBLISH| B3[Broker]\n    B3 -->|PUBREC| A3\n    A3 -->|PUBREL| B3\n    B3 -->|PUBCOMP| A3\n    end" />
+
+## Retained Messages và Last Will
+
+### Retained Messages
+
+Khi publish message với cờ `retain=True`, broker sẽ lưu trữ message cuối cùng của topic. Bất kỳ client nào subscribe topic đó sau này sẽ ngay lập tức nhận được message lưu trữ, không cần chờ đợi publisher gửi lại.
+
+### Last Will & Testament (LWT)
+
+Client có thể cấu hình một "di chúc" khi kết nối. Nếu client mất kết nối đột ngột (không gửi DISCONNECT), broker sẽ tự động publish message LWT, giúp các client khác biết rằng thiết bị đã offline.
+
+## Code ví dụ: Python MQTT Client
+
+### Cài đặt thư viện
+
+```bash
+pip install paho-mqtt
+```
+
+### Publisher - Gửi dữ liệu cảm biến
+
+```python
+import paho.mqtt.client as mqtt
+import json
+import time
+import random
+
+# Cấu hình kết nối
+BROKER_HOST = "localhost"
+BROKER_PORT = 1883
+CLIENT_ID = "sensor-living-room-01"
+
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        print("Kết nối thành công với MQTT Broker!")
+    else:
+        print(f"Kết nối thất bại, mã lỗi: {rc}")
+
+def on_publish(client, userdata, mid):
+    print(f"Message {mid} đã được publish thành công")
+
+# Tạo client và cấu hình
+client = mqtt.Client(client_id=CLIENT_ID)
+client.on_connect = on_connect
+client.on_publish = on_publish
+
+# Cấu hình Last Will & Testament
+client.will_set(
+    topic="home/living-room/status",
+    payload=json.dumps({"status": "offline", "device": CLIENT_ID}),
+    qos=1,
+    retain=True
+)
+
+# Xác thực (nếu broker yêu cầu)
+client.username_pw_set("mqtt_user", "mqtt_password")
+
+# Kết nối
+client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
+client.loop_start()
+
+# Gửi dữ liệu cảm biến liên tục
+try:
+    while True:
+        # Mô phỏng dữ liệu cảm biến
+        temperature = round(random.uniform(20, 35), 1)
+        humidity = round(random.uniform(40, 80), 1)
+
+        # Publish nhiệt độ (QoS 0 - dữ liệu cảm biến)
+        temp_payload = json.dumps({
+            "value": temperature,
+            "unit": "celsius",
+            "device": CLIENT_ID,
+            "timestamp": time.time()
+        })
+        client.publish(
+            topic="home/living-room/temperature",
+            payload=temp_payload,
+            qos=0,
+            retain=True
+        )
+
+        # Publish độ ẩm (QoS 1 - quan trọng hơn)
+        humidity_payload = json.dumps({
+            "value": humidity,
+            "unit": "percent",
+            "device": CLIENT_ID,
+            "timestamp": time.time()
+        })
+        client.publish(
+            topic="home/living-room/humidity",
+            payload=humidity_payload,
+            qos=1,
+            retain=True
+        )
+
+        print(f"Sent: temp={temperature}C, humidity={humidity}%")
+        time.sleep(5)  # Gửi mỗi 5 giây
+
+except KeyboardInterrupt:
+    print("Dừng gửi dữ liệu")
+    # Gửi trạng thái offline
+    client.publish(
+        "home/living-room/status",
+        json.dumps({"status": "offline", "device": CLIENT_ID}),
+        qos=1, retain=True
+    )
+    client.loop_stop()
+    client.disconnect()
+```
+
+### Subscriber - Nhận và xử lý dữ liệu
+
+```python
+import paho.mqtt.client as mqtt
+import json
+
+BROKER_HOST = "localhost"
+BROKER_PORT = 1883
+
+def on_connect(client, userdata, flags, rc):
+    print("Đã kết nối, đang subscribe các topic...")
+    # Subscribe tất cả topic trong nhà
+    client.subscribe("home/#", qos=1)
+
+def on_message(client, userdata, msg):
+    topic = msg.topic
+    try:
+        payload = json.loads(msg.payload.decode())
+    except json.JSONDecodeError:
+        payload = msg.payload.decode()
+
+    print(f"Topic: {topic}")
+    print(f"Payload: {payload}")
+    print(f"QoS: {msg.qos}, Retain: {msg.retain}")
+    print("---")
+
+    # Xử lý cảnh báo nhiệt độ cao
+    if "temperature" in topic:
+        temp = payload.get("value", 0)
+        if temp > 30:
+            print(f"CẢNH BÁO: Nhiệt độ cao {temp}C tại {topic}!")
+            client.publish(
+                "home/alerts",
+                json.dumps({
+                    "type": "high_temperature",
+                    "value": temp,
+                    "source": topic
+                }),
+                qos=2  # Đảm bảo cảnh báo được gửi chính xác
+            )
+
+# Tạo và cấu hình client
+client = mqtt.Client(client_id="dashboard-app")
+client.on_connect = on_connect
+client.on_message = on_message
+client.username_pw_set("mqtt_user", "mqtt_password")
+
+client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
+client.loop_forever()  # Chạy liên tục
+```
+
+## Ứng dụng IoT thực tế
+
+### Smart Home
+
+<Diagram chart="graph TD\n    A[Cảm biến nhiệt độ] -->|MQTT| E[Mosquitto Broker]\n    B[Cảm biến cửa] -->|MQTT| E\n    C[Camera IP] -->|MQTT| E\n    D[Công tắc thông minh] -->|MQTT| E\n    E --> F[Home Assistant]\n    E --> G[Mobile App]\n    E --> H[Node-RED Dashboard]\n    F --> D" />
+
+### Giám sát công nghiệp
+
+- Cảm biến nhiệt độ, áp suất, độ rung trong nhà máy
+- Giám sát trạng thái máy móc real-time
+- Cảnh báo tự động khi vượt ngưỡng
+
+### Nông nghiệp thông minh
+
+- Đo độ ẩm đất, nhiệt độ không khí
+- Tự động tưới nước dựa trên dữ liệu cảm biến
+- Giám sát sức khỏe cây trồng
+
+<Callout type="tip">Eclipse Mosquitto là MQTT broker mã nguồn mở phổ biến nhất, phù hợp cho môi trường từ development đến production nhỏ. Với quy mô lớn hơn, xem xét HiveMQ, EMQX hoặc VerneMQ.</Callout>
+
+## Bảo mật MQTT
+
+```python
+# Kết nối MQTT với TLS/SSL
+client = mqtt.Client(client_id="secure-client")
+
+# Cấu hình TLS
+client.tls_set(
+    ca_certs="/path/to/ca.crt",
+    certfile="/path/to/client.crt",
+    keyfile="/path/to/client.key"
+)
+
+# Kết nối qua port TLS (8883)
+client.connect("broker.example.com", 8883, keepalive=60)
+```
+
+<Callout type="danger">Không bao giờ sử dụng MQTT không mã hóa (port 1883) trên mạng công khai. Luôn sử dụng TLS (port 8883) và xác thực username/password hoặc certificate trong production.</Callout>
+
+## Kết luận
+
+MQTT là giao thức lý tưởng cho các ứng dụng IoT nhờ sự đơn giản, hiệu quả và độ tin cậy. Với mô hình publish/subscribe, nhiều mức QoS và khả năng hoạt động trên mạng không ổn định, MQTT đã trở thành xu hướng cốt lõi của IoT. Dù bạn đang xây dựng hệ thống smart home hay giám sát công nghiệp, MQTT đều là lựa chọn hàng đầu.

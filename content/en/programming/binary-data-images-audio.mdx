@@ -1,0 +1,210 @@
+---
+title: "Binary Data: How 0s and 1s Store Images, Audio, and Video"
+description: "Discover how computers turn bits into vivid images, lifelike audio, and smooth video. Learn about pixels, sampling, codecs, compression techniques, and popular media formats."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["binary", "digital-media", "image", "audio", "video", "codec", "compression"]
+featured: true
+order: 13
+sources:
+  - title: "W3C - PNG Specification"
+    url: "https://www.w3.org/TR/png/"
+  - title: "JPEG Standard - ITU-T T.81"
+    url: "https://www.w3.org/Graphics/JPEG/itu-t81.pdf"
+  - title: "Digital Audio Fundamentals - Stanford CCRMA"
+    url: "https://ccrma.stanford.edu/~jos/pasp/Digital_Audio.html"
+  - title: "FFmpeg Documentation - Codecs"
+    url: "https://ffmpeg.org/general.html#Supported-File-Formats_002c-Codecs-or-Features"
+---
+
+# Binary Data: How 0s and 1s Store Images, Audio, and Video
+
+Everything inside a computer — from the messages you send, the songs you listen to, the 4K movies you watch — is stored as sequences of **0s** and **1s**. It sounds almost unbelievable, but with just these two digits, computers can recreate the entire visual and auditory world we experience every day. Let us explore how this remarkable feat works.
+
+## Why Everything Is 0s and 1s
+
+Computers operate using electronic circuits that have only two states: **on** (1) and **off** (0). Each state represents one **bit** (binary digit) — the smallest unit of information.
+
+- **1 bit** = 0 or 1 (2 possible values)
+- **1 byte** = 8 bits (256 possible values: 0-255)
+- **1 word** = 32 or 64 bits (depending on CPU architecture)
+
+With a single byte (256 values), you can represent an ASCII character, one channel of a pixel's brightness, or an 8-bit audio sample. Combine many bytes according to specific rules, and you can represent any information imaginable.
+
+## Digital Images: A Grid of Pixels
+
+### Pixels — The Building Blocks
+
+A digital image is a **2D grid of pixels** (picture elements). Each pixel stores color information, typically using the **RGB** (Red, Green, Blue) color model — the three primary colors that human eyes perceive.
+
+<Diagram chart="graph TB
+    subgraph RGB Pixel
+        direction LR
+        R[Red: 0-255] --> P[Pixel]
+        G[Green: 0-255] --> P
+        B[Blue: 0-255] --> P
+    end
+    subgraph Image Grid
+        direction TB
+        P1[Pixel 0,0] --> P2[Pixel 1,0]
+        P2 --> P3[Pixel 2,0]
+        P4[Pixel 0,1] --> P5[Pixel 1,1]
+        P5 --> P6[Pixel 2,1]
+    end" />
+
+Each color channel (R, G, B) uses 1 byte (0-255), so each RGB pixel requires **3 bytes**. With RGBA (adding an Alpha channel for transparency), each pixel needs **4 bytes**.
+
+### Calculating Raw Image Size
+
+Let us calculate the size of a raw Full HD 1920x1080 RGB image:
+
+```
+Total pixels = 1920 x 1080 = 2,073,600 pixels
+Raw size     = 2,073,600 x 3 bytes = 6,220,800 bytes
+             ≈ 5.93 MB (uncompressed)
+```
+
+<Callout type="info">A raw 4K image (3840x2160) in RGB takes approximately 23.7 MB. One second of raw 4K video at 30fps would require 23.7 x 30 = 711 MB! This is why compression is absolutely essential.</Callout>
+
+### Bitmap vs Compressed Formats
+
+**Bitmap (BMP)** stores pixel data with little to no compression — resulting in very large files. Modern formats use two types of compression:
+
+**Lossless compression**: Preserves 100% of the original quality.
+- **PNG** uses the DEFLATE algorithm (combining LZ77 + Huffman coding). It finds repeating patterns in pixel data and replaces them with shorter references.
+
+**Lossy compression**: Sacrifices some quality for dramatically smaller file sizes.
+- **JPEG** discards information that the human eye can barely perceive, using the Discrete Cosine Transform (DCT). Since human vision is more sensitive to brightness than color, JPEG compresses color information more aggressively.
+- **WebP** (by Google) supports both lossy and lossless modes, outperforming JPEG by roughly 25-35%.
+
+<ComparisonTable headers={["Format", "Compression", "Transparency", "Best for", "Relative size"]} rows={[
+    ["BMP", "None", "No", "Raw storage", "Very large"],
+    ["PNG", "Lossless", "Yes (Alpha)", "Logos, screenshots, graphics", "Large"],
+    ["JPEG", "Lossy", "No", "Photographs, landscapes", "Small"],
+    ["WebP", "Both", "Yes", "Web — replacing PNG and JPEG", "Very small"],
+    ["AVIF", "Lossy/Lossless", "Yes", "Next-gen web images", "Smallest"]
+]} />
+
+## Digital Audio: Capturing Sound Waves
+
+### From Analog to Digital
+
+Sound in nature is a **continuous wave** (analog). To store it digitally, we must convert it into **discrete numerical values** using an **ADC** (Analog-to-Digital Converter).
+
+This process involves two key steps:
+
+<Diagram chart="graph LR
+    A[Analog sound wave] --> B[Microphone]
+    B --> C[ADC]
+    C --> D{Two steps}
+    D --> E[Sampling: Measure at regular intervals]
+    D --> F[Quantization: Map amplitude to integers]
+    E --> G[Digital PCM data]
+    F --> G" />
+
+**Sampling**: Measuring the amplitude of the sound wave at evenly spaced points in time. The **sampling rate** is the number of measurements per second:
+
+- **44,100 Hz** (CD quality) — 44,100 samples per second
+- **48,000 Hz** — standard for video and film
+- **96,000 Hz / 192,000 Hz** — high-resolution audio
+
+<Callout type="tip">According to the Nyquist-Shannon theorem, the sampling rate must be at least twice the highest frequency you want to capture. Human hearing extends to approximately 20,000 Hz, so 44,100 Hz (which is greater than 2 x 20,000) is sufficient to reproduce every sound a human can hear.</Callout>
+
+**Quantization**: Each sample is assigned an integer value. The **bit depth** determines the precision:
+
+- **16-bit**: 65,536 levels (CD quality)
+- **24-bit**: 16,777,216 levels (studio quality)
+
+### Calculating Raw Audio Size (PCM)
+
+```
+3-minute song, stereo (2 channels), 44.1kHz, 16-bit:
+= 44,100 samples/sec x 2 bytes/sample x 2 channels x 180 seconds
+= 31,752,000 bytes ≈ 30.3 MB
+```
+
+### Audio Formats
+
+**WAV/PCM**: Raw uncompressed audio. Maximum quality but very large files.
+
+**FLAC** (Free Lossless Audio Codec): Lossless compression, reducing size by 50-70% with zero quality loss.
+
+**MP3** (MPEG Audio Layer III): Lossy compression that removes frequencies the human ear is least sensitive to (psychoacoustic model). A 3-minute file shrinks to roughly 3-5 MB at 128-320 kbps.
+
+**AAC** (Advanced Audio Coding): The successor to MP3, delivering better quality at the same bitrate. Used by iTunes, YouTube, and most streaming platforms.
+
+<ComparisonTable headers={["Format", "Compression", "Typical bitrate", "Quality", "Use case"]} rows={[
+    ["WAV/PCM", "None", "1,411 kbps (CD)", "Maximum", "Music production, archival"],
+    ["FLAC", "Lossless", "~800-1000 kbps", "Identical to source", "Audiophiles, archival"],
+    ["MP3", "Lossy", "128-320 kbps", "Good to very good", "General music listening"],
+    ["AAC", "Lossy", "128-256 kbps", "Better than MP3", "Streaming, Apple Music"],
+    ["Opus", "Lossy", "64-510 kbps", "Excellent", "VoIP, Discord, WebRTC"]
+]} />
+
+## Video: A Sequence of Images Plus Audio
+
+Video is fundamentally a **sequence of images** (frames) displayed in rapid succession — fast enough that the human eye perceives smooth motion — combined with a synchronized audio track.
+
+- **24 fps**: Cinema
+- **30 fps**: Standard video
+- **60 fps**: Gaming, sports, smooth motion
+- **120+ fps**: Professional slow motion
+
+### Container vs Codec
+
+Two crucial concepts to distinguish:
+
+A **codec** (coder-decoder) is the algorithm that compresses and decompresses video or audio:
+- Video codecs: H.264 (AVC), H.265 (HEVC), VP9, AV1
+- Audio codecs: AAC, Opus, MP3, FLAC
+
+A **container** (file format) packages video, audio, subtitles, and metadata into a single file:
+- MP4, MKV, WebM, AVI, MOV
+
+<Callout type="info">An `.mp4` file does not tell you which codec was used to compress the video inside. An MP4 file might contain H.264 video with AAC audio, or H.265 video with Opus audio. The container is just a "box" that holds the streams together.</Callout>
+
+### Video Compression: I-Frames, P-Frames, B-Frames
+
+Efficient video compression relies on a key observation: **consecutive frames are usually very similar**. Instead of storing each frame in full, the codec stores only the differences.
+
+<Diagram chart="graph LR
+    I1[I-Frame: Complete image] --> P1[P-Frame: Changes from previous]
+    P1 --> B1[B-Frame: References both before and after]
+    B1 --> P2[P-Frame]
+    P2 --> B2[B-Frame]
+    B2 --> I2[I-Frame: Next full image]" />
+
+- **I-Frame** (Intra-coded): A complete image, compressed independently like a JPEG. This is the starting point for decoding subsequent frames.
+- **P-Frame** (Predicted): Contains only the differences from the previous frame. Much smaller than an I-Frame.
+- **B-Frame** (Bidirectional): References both previous and future frames to find similarities, achieving the highest compression.
+
+```
+Average sizes:
+I-Frame: 100 KB
+P-Frame: 20-40 KB
+B-Frame: 10-20 KB
+```
+
+Thanks to these techniques, raw 4K 30fps video (originally ~711 MB/second) can be compressed to just 5-15 MB/second using H.265 — a reduction of nearly **50-100x**.
+
+<ComparisonTable headers={["Codec", "Released", "Compression efficiency", "Hardware support", "Licensing"]} rows={[
+    ["H.264/AVC", "2003", "Baseline (100%)", "Very broad", "Royalty fees"],
+    ["H.265/HEVC", "2013", "~50% better", "Broad", "Royalty fees (expensive)"],
+    ["VP9", "2013", "Similar to HEVC", "Good", "Royalty-free (Google)"],
+    ["AV1", "2018", "~30% better than HEVC", "Growing", "Royalty-free (Alliance)"]
+]} />
+
+## Putting It All Together: From Bits to Experience
+
+```
+1 bit       → 0 or 1
+8 bits      → 1 byte → 1 ASCII character or 1 single-channel pixel value
+3 bytes     → 1 full RGB pixel
+6.2 MB      → 1 raw Full HD image
+30 MB       → 1 song, 3 minutes (PCM)
+~700 MB/s   → 1 second of raw 4K video
+```
+
+From simple 0s and 1s, through clever organizational rules and sophisticated compression algorithms, computers can recreate every image, sound, and video that humans produce. Each time you take a photo, listen to music, or watch a film, billions of bits are being read, decoded, and converted into signals your senses can perceive — all in the blink of an eye. That is the magic of binary data.

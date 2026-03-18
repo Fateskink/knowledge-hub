@@ -1,0 +1,276 @@
+---
+title: "CPU hoạt động như thế nào - Bộ não của máy tính"
+description: "Tìm hiểu chi tiết về CPU: cấu tạo bên trong (ALU, Control Unit, Registers, Cache), chu kỳ Fetch-Decode-Execute, pipeline, đa nhân, và so sánh CISC vs RISC."
+category: "hardware"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["cpu", "alu", "pipeline", "multi-core", "cisc", "risc", "arm", "x86", "hardware"]
+featured: true
+order: 2
+sources:
+  - title: "Computer Organization and Design - Patterson & Hennessy"
+    url: "https://www.elsevier.com/books/computer-organization-and-design/patterson/978-0-12-820109-1"
+  - title: "Wikipedia - Central Processing Unit"
+    url: "https://en.wikipedia.org/wiki/Central_processing_unit"
+  - title: "Intel - How a CPU Works"
+    url: "https://www.intel.com/content/www/us/en/gaming/resources/how-a-cpu-works.html"
+  - title: "ARM Architecture Reference Manual"
+    url: "https://developer.arm.com/documentation/"
+---
+
+# CPU hoạt động như thế nào - Bộ não của máy tính
+
+CPU (Central Processing Unit) là thành phần quan trọng nhất của máy tính. Nó thực hiện mọi phép tính, mọi quyết định, mọi thao tác dữ liệu. Một CPU hiện đại có thể xử lý hàng **tỷ lệnh mỗi giây**, nhưng bản chất của nó vẫn xoay quanh một chu kỳ đơn giản được lặp đi lặp lại: **Đọc - Giải mã - Thực thi**.
+
+## Cấu trúc bên trong CPU
+
+Một CPU hiện đại bao gồm nhiều thành phần, nhưng có 4 bộ phận cốt lõi:
+
+<Diagram chart="graph TB
+    subgraph CPU[CPU - Bộ xử lý trung tâm]
+        CU[Control Unit\nBộ điều khiển] --> ALU[ALU\nBộ tính toán số học-logic]
+        CU --> REG[Registers\nThanh ghi]
+        CU --> CACHE[Cache\nBộ nhớ đệm]
+        ALU <--> REG
+        REG <--> CACHE
+    end
+    CACHE <--> RAM[RAM - Bộ nhớ chính]
+    style CU fill:#e74c3c,color:#fff
+    style ALU fill:#3498db,color:#fff
+    style REG fill:#f39c12,color:#fff
+    style CACHE fill:#9b59b6,color:#fff
+    style RAM fill:#2ecc71,color:#fff" />
+
+### 1. ALU (Arithmetic Logic Unit) - Bộ tính toán
+
+ALU là "nhà máy" thực hiện mọi phép tính:
+- **Phép toán số học**: Cộng, trừ, nhân, chia
+- **Phép toán logic**: AND, OR, NOT, XOR
+- **Phép so sánh**: Lớn hơn, nhỏ hơn, bằng nhau
+
+Mọi phép tính phức tạp (như render 3D hay mã hóa) đều được phân nhỏ thành hàng triệu phép tính cơ bản mà ALU thực hiện.
+
+### 2. Control Unit (CU) - Bộ điều khiển
+
+Control Unit là "chỉ huy trưởng" điều phối mọi hoạt động:
+- Đọc lệnh từ bộ nhớ
+- Giải mã lệnh để hiểu cần làm gì
+- Gửi tín hiệu điều khiển đến ALU và các bộ phận khác
+- Quản lý thứ tự thực thi các lệnh
+
+### 3. Registers - Thanh ghi
+
+Registers là **bộ nhớ nhanh nhất** trong máy tính, nằm ngay bên trong CPU. Chúng lưu trữ dữ liệu đang được xử lý:
+
+- **Program Counter (PC)**: Địa chỉ của lệnh tiếp theo cần thực thi
+- **Instruction Register (IR)**: Lệnh đang được thực thi
+- **Accumulator (ACC)**: Lưu kết quả phép tính
+- **General Purpose Registers**: Các thanh ghi đa dụng (R0, R1, R2...)
+
+```
+Tốc độ truy cập (xấp xỉ):
+Register:    < 1 nanosecond   (nhanh nhất)
+L1 Cache:    ~1-2 nanoseconds
+L2 Cache:    ~3-10 nanoseconds
+L3 Cache:    ~10-30 nanoseconds
+RAM:         ~50-100 nanoseconds
+SSD:         ~100,000 nanoseconds
+HDD:         ~10,000,000 nanoseconds (chậm nhất)
+```
+
+### 4. Cache - Bộ nhớ đệm
+
+Cache là bộ nhớ tốc độ cao nằm giữa CPU và RAM, lưu trữ dữ liệu thường được truy cập:
+
+- **L1 Cache** (32-64 KB): Nhanh nhất, riêng cho từng nhân CPU. Thường chia thành L1i (lệnh) và L1d (dữ liệu).
+- **L2 Cache** (256 KB - 1 MB): Lớn hơn L1, vẫn riêng cho từng nhân.
+- **L3 Cache** (4-64 MB): Chia sẻ giữa tất cả các nhân, lớn nhất nhưng chậm hơn.
+
+<Callout type="info">Tại sao cần cache? Vì RAM chậm hơn CPU khoảng 100 lần. Không có cache, CPU sẽ phải "ngồi chờ" RAM mỗi lần cần dữ liệu. Cache giúp giảm thời gian chờ bằng cách giữ sẵn dữ liệu thường dùng.</Callout>
+
+## Chu kỳ Fetch - Decode - Execute
+
+Mọi lệnh CPU thực hiện đều đi qua 3 bước cơ bản:
+
+<Diagram chart="graph LR
+    F[1. FETCH\nĐọc lệnh từ bộ nhớ] --> D[2. DECODE\nGiải mã lệnh]
+    D --> E[3. EXECUTE\nThực thi lệnh]
+    E -->|Lệnh tiếp theo| F
+    style F fill:#3498db,color:#fff
+    style D fill:#f39c12,color:#fff
+    style E fill:#e74c3c,color:#fff" />
+
+**Bước 1 - Fetch (Đọc lệnh)**:
+- CPU xem Program Counter để biết địa chỉ lệnh tiếp theo.
+- Gửi địa chỉ đến RAM qua Address Bus.
+- Đọc lệnh về và lưu vào Instruction Register.
+- Tăng Program Counter lên để trỏ đến lệnh kế tiếp.
+
+**Bước 2 - Decode (Giải mã)**:
+- Control Unit phân tích lệnh trong IR.
+- Xác định: Đây là phép tính gì? Cần dữ liệu nào? Kết quả lưu ở đâu?
+
+**Bước 3 - Execute (Thực thi)**:
+- ALU thực hiện phép tính.
+- Kết quả được lưu vào register hoặc ghi lại vào bộ nhớ.
+
+```
+Ví dụ với lệnh Assembly: ADD R1, R2, R3  (R1 = R2 + R3)
+
+Fetch:   Đọc "ADD R1, R2, R3" từ địa chỉ 0x1000 trong RAM
+Decode:  Phép cộng | Nguồn: R2 và R3 | Đích: R1
+Execute: ALU tính R2 + R3 = 5 + 3 = 8, ghi 8 vào R1
+```
+
+## Pipeline - Xử lý dòng lệnh
+
+Nếu mỗi lệnh phải chờ bước trước hoàn thành, CPU sẽ rất lãng phí thời gian. **Pipeline** cho phép xử lý nhiều lệnh cùng lúc ở các giai đoạn khác nhau - giống như dây chuyền sản xuất trong nhà máy.
+
+<Diagram chart="graph LR
+    subgraph Cycle1[Chu kỳ 1]
+        F1[Fetch L1]
+    end
+    subgraph Cycle2[Chu kỳ 2]
+        D1[Decode L1]
+        F2[Fetch L2]
+    end
+    subgraph Cycle3[Chu kỳ 3]
+        E1[Execute L1]
+        D2[Decode L2]
+        F3[Fetch L3]
+    end
+    subgraph Cycle4[Chu kỳ 4]
+        E2[Execute L2]
+        D3[Decode L3]
+        F4[Fetch L4]
+    end
+    style F1 fill:#3498db,color:#fff
+    style F2 fill:#3498db,color:#fff
+    style F3 fill:#3498db,color:#fff
+    style F4 fill:#3498db,color:#fff
+    style D1 fill:#f39c12,color:#fff
+    style D2 fill:#f39c12,color:#fff
+    style D3 fill:#f39c12,color:#fff
+    style E1 fill:#e74c3c,color:#fff
+    style E2 fill:#e74c3c,color:#fff" />
+
+```
+Không có Pipeline:          Có Pipeline (3 giai đoạn):
+L1: |F|D|E|                 L1: |F|D|E|
+L2:       |F|D|E|           L2:   |F|D|E|
+L3:             |F|D|E|     L3:     |F|D|E|
+L4:                   |F|D|E| L4:     |F|D|E|
+Tổng: 12 chu kỳ              Tổng: 6 chu kỳ (nhanh gấp đôi!)
+```
+
+### Branch Prediction - Dự đoán rẽ nhánh
+
+Khi gặp lệnh `if-else`, CPU không biết nhánh nào sẽ được thực thi cho đến khi tính toán xong điều kiện. **Branch Predictor** sẽ "đoán trước" nhánh nào có khả năng cao hơn để pipeline không bị gián đoạn.
+
+Nếu đoán đúng: tiết kiệm thời gian. Nếu đoán sai: phải xóa pipeline và làm lại (gọi là **pipeline flush**), tốn khoảng 10-20 chu kỳ.
+
+<Callout type="tip">CPU hiện đại có tỷ lệ dự đoán đúng lên đến 95-99%. Chúng sử dụng các thuật toán phức tạp dựa trên lịch sử các lần rẽ nhánh trước đó.</Callout>
+
+### Out-of-Order Execution
+
+CPU hiện đại không nhất thiết thực thi lệnh theo thứ tự chương trình. Nếu lệnh A đang chờ dữ liệu từ RAM, CPU có thể thực thi lệnh B và C trước (nếu chúng không phụ thuộc vào A), rồi quay lại thực thi A khi dữ liệu sẵn sàng.
+
+## Đa nhân (Multi-core) và Hyper-Threading
+
+### Multi-core - Nhiều nhân xử lý
+
+Thay vì tăng tốc độ một nhân (giới hạn bởi nhiệt và điện năng), nhà sản xuất đặt **nhiều nhân CPU** trên một chip:
+
+- **Dual-core**: 2 nhân - xử lý 2 luồng công việc đồng thời
+- **Quad-core**: 4 nhân
+- **Octa-core**: 8 nhân
+- CPU server có thể có 64-128 nhân
+
+Mỗi nhân là một CPU độc lập với ALU, CU và cache riêng, chia sẻ L3 cache và bus bộ nhớ.
+
+### Hyper-Threading (SMT)
+
+Intel gọi là Hyper-Threading, AMD gọi là SMT (Simultaneous Multi-Threading). Mỗi nhân vật lý có thể xử lý **2 luồng (thread)** cùng lúc bằng cách chia sẻ tài nguyên nhân.
+
+```
+CPU 8 nhân, có Hyper-Threading:
+- 8 nhân vật lý (physical cores)
+- 16 luồng (threads)
+- Hệ điều hành "thấy" 16 CPU logic
+```
+
+<Callout type="warning">Hyper-Threading không tăng gấp đôi hiệu suất. Thực tế chỉ tăng khoảng 15-30% vì 2 luồng phải chia sẻ cùng một ALU và cache. Hiệu suất còn phụ thuộc vào đặc điểm công việc.</Callout>
+
+## CISC vs RISC - Hai trường phái thiết kế CPU
+
+### CISC (Complex Instruction Set Computer)
+
+- **Đại diện**: Intel x86, AMD64
+- **Triết lý**: Nhiều lệnh phức tạp, mỗi lệnh làm được nhiều việc
+- Một lệnh có thể mất nhiều chu kỳ để hoàn thành
+- Kích thước lệnh không cố định
+
+### RISC (Reduced Instruction Set Computer)
+
+- **Đại diện**: ARM, RISC-V, Apple Silicon
+- **Triết lý**: Ít lệnh nhưng đơn giản, mỗi lệnh chạy trong 1 chu kỳ
+- Dễ tối ưu pipeline
+- Kích thước lệnh cố định (thường 32-bit)
+
+```
+Ví dụ: Cộng 2 số từ RAM
+
+CISC (x86):
+ADD [mem1], [mem2]     # 1 lệnh, nhưng mất 3-4 chu kỳ
+
+RISC (ARM):
+LDR R1, [mem1]         # Đọc từ RAM vào R1
+LDR R2, [mem2]         # Đọc từ RAM vào R2
+ADD R3, R1, R2         # Cộng R1 + R2, lưu vào R3
+STR R3, [mem1]         # Ghi kết quả vào RAM
+# 4 lệnh, mỗi lệnh 1 chu kỳ, nhưng pipeline hiệu quả hơn
+```
+
+## So sánh các dòng CPU phổ biến
+
+<ComparisonTable
+  headers={["Đặc điểm", "Intel Core (x86)", "AMD Ryzen (x86)", "Apple Silicon (ARM)"]}
+  rows={[
+    ["Kiến trúc", "CISC (x86-64)", "CISC (x86-64)", "RISC (ARM)"],
+    ["Tiến trình", "Intel 7 (10nm)", "TSMC 4nm/5nm", "TSMC 3nm"],
+    ["Hiệu suất/Watt", "Trung bình", "Tốt", "Xuất sắc"],
+    ["Số nhân (consumer)", "6-24 nhân", "6-16 nhân", "8-12 nhân (P+E)"],
+    ["GPU tích hợp", "Intel UHD/Iris", "Radeon (một số dòng)", "Có, rất mạnh"],
+    ["Ưu điểm", "Tương thích rộng", "Giá/hiệu suất tốt", "Tiết kiệm điện, nhanh"],
+    ["Nhược điểm", "Tốn nhiều điện", "GPU tích hợp yếu", "Chỉ chạy trên Mac"],
+    ["Phù hợp", "Desktop, server", "Gaming, workstation", "Laptop, sáng tạo nội dung"]
+  ]}
+/>
+
+<Callout type="info">Apple Silicon (M1, M2, M3, M4) là ví dụ thành công của kiến trúc RISC (ARM) trong máy tính cá nhân. Nhờ thiết kế tích hợp (SoC - System on Chip), Apple kiểm soát toàn bộ từ CPU, GPU, Neural Engine đến bộ nhớ thống nhất (Unified Memory), mang lại hiệu suất và hiệu quả năng lượng vượt trội.</Callout>
+
+## Các chỉ số quan trọng của CPU
+
+Khi chọn CPU, hãy chú ý các thông số:
+
+- **Xung nhịp (Clock Speed)**: Đo bằng GHz. Ví dụ 4.5 GHz = 4.5 tỷ chu kỳ/giây. Cao hơn = nhanh hơn (trong cùng kiến trúc).
+- **Số nhân/luồng (Cores/Threads)**: Nhiều nhân = xử lý đa nhiệm tốt hơn.
+- **Cache**: L3 cache lớn giúp giảm độ trễ truy cập bộ nhớ.
+- **TDP (Thermal Design Power)**: Lượng nhiệt tối đa cần giải nhiệt, cho biết mức tiêu thụ điện.
+- **IPC (Instructions Per Clock)**: Số lệnh thực thi mỗi chu kỳ - chỉ số quan trọng hơn cả xung nhịp.
+
+```
+Hiệu suất thực tế = Xung nhịp x IPC x Số nhân (cho đa luồng)
+
+Ví dụ:
+CPU A: 5.0 GHz, IPC = 10  -> 50 tỷ thao tác/giây/nhân
+CPU B: 3.5 GHz, IPC = 16  -> 56 tỷ thao tác/giây/nhân
+-> CPU B chậm hơn về xung nhịp nhưng NHANH HƠN về thực tế!
+```
+
+## Tóm tắt
+
+CPU là một kỳ quan công nghệ - từ 4 thành phần cơ bản (ALU, CU, Registers, Cache), nó thực hiện hàng tỷ phép tính mỗi giây thông qua chu kỳ Fetch-Decode-Execute được tối ưu bằng pipeline, branch prediction và out-of-order execution. Cuộc cạnh tranh giữa Intel, AMD và Apple Silicon thúc đẩy CPU ngày càng mạnh mẽ và hiệu quả hơn.
+
+Bài tiếp theo sẽ giúp bạn hiểu **transistor và chip** - thành phần nhỏ bé nhất tạo nên CPU mạnh mẽ.

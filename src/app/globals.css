@@ -1,26 +1,266 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark, .dark *));
 
+/* ===== Light theme (default) ===== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fafbfc;
+  --foreground: #1a1a2e;
+  --primary: #6366f1;
+  --primary-light: #818cf8;
+  --primary-dark: #4f46e5;
+  --secondary: #f0f2f5;
+  --accent: #06b6d4;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --card: #ffffff;
+  --card-hover: #f9fafb;
+  --code-bg: #f3f4f6;
+}
+
+/* ===== Dark theme ===== */
+.dark {
+  --background: #0c1222;
+  --foreground: #d8dce5;
+  --primary: #93a3f8;
+  --primary-light: #b4c0fc;
+  --primary-dark: #7b8cf0;
+  --secondary: #151e2e;
+  --accent: #5bc4d6;
+  --muted: #8892a2;
+  --border: #232d3d;
+  --card: #121a2a;
+  --card-hover: #1a2538;
+  --code-bg: #171f2e;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-primary-dark: var(--primary-dark);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-code-bg: var(--code-bg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ===== Prose / Typography ===== */
+.prose {
+  --tw-prose-body: var(--foreground);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-links: var(--primary);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-code: var(--foreground);
+  --tw-prose-quotes: var(--muted);
+  --tw-prose-quote-borders: var(--primary);
+  --tw-prose-counters: var(--muted);
+  --tw-prose-bullets: var(--primary);
+  --tw-prose-hr: var(--border);
+  --tw-prose-th-borders: var(--border);
+  --tw-prose-td-borders: var(--border);
+  --tw-prose-pre-bg: #1e1e2e;
+  --tw-prose-pre-code: #cdd6f4;
+  max-width: none;
+  font-size: 1.05rem;
+  line-height: 1.85;
+}
+
+/* Headings */
+.prose h1 {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.prose h2 {
+  margin-top: 2.5em;
+  margin-bottom: 0.8em;
+  padding-bottom: 0.4em;
+  border-bottom: 2px solid var(--border);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.prose h3 {
+  margin-top: 2em;
+  margin-bottom: 0.6em;
+  font-weight: 650;
+}
+
+.prose h4 {
+  margin-top: 1.5em;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Paragraphs */
+.prose p {
+  margin-bottom: 1.25em;
+}
+
+/* Links */
+.prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  transition: text-decoration-color 0.2s;
+}
+.prose a:hover {
+  text-decoration-color: var(--primary);
+}
+
+/* Lists */
+.prose ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+}
+.prose ol {
+  padding-left: 1.5em;
+}
+.prose li {
+  margin-bottom: 0.35em;
+}
+
+/* Code blocks */
+.prose pre {
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  padding: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  overflow-x: auto;
+  background: #1e1e2e !important;
+}
+
+.prose code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.85em;
+}
+
+/* Inline code */
+.prose :not(pre) > code {
+  background: var(--code-bg);
+  padding: 0.2em 0.45em;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  color: var(--primary-dark);
+  border: 1px solid var(--border);
+}
+.dark .prose :not(pre) > code {
+  color: var(--primary-light);
+}
+.prose :not(pre) > code::before,
+.prose :not(pre) > code::after {
+  content: none;
+}
+
+/* Blockquotes */
+.prose blockquote {
+  border-left: 3px solid var(--primary);
+  background: var(--secondary);
+  padding: 1rem 1.25rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+  font-style: normal;
+}
+
+/* Tables */
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+.prose thead {
+  background: var(--secondary);
+}
+.prose th {
+  font-weight: 600;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid var(--border);
+}
+.prose td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.prose tbody tr:hover {
+  background: var(--card-hover);
+}
+
+/* Strong */
+.prose strong {
+  font-weight: 650;
+}
+
+/* Images */
+.prose img {
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+}
+
+/* HR */
+.prose hr {
+  border-color: var(--border);
+  margin: 2.5em 0;
+}
+
+/* ===== rehype-pretty-code overrides ===== */
+[data-rehype-pretty-code-figure] pre {
+  background: #1e1e2e !important;
+  border: 1px solid var(--border);
+}
+
+[data-rehype-pretty-code-figure] code {
+  color: #cdd6f4;
+}
+
+[data-rehype-pretty-code-figure] code [data-line] {
+  padding: 0 1rem;
+}
+
+/* ===== Utilities ===== */
+html {
+  scroll-behavior: smooth;
+}
+
+.toc-active {
+  color: var(--primary);
+  border-left-color: var(--primary);
+  font-weight: 600;
+}
+
+::selection {
+  background: var(--primary);
+  color: white;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
 }

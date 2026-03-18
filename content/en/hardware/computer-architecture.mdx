@@ -1,0 +1,144 @@
+---
+title: "Computer Architecture: How Machines Are Built to Think"
+description: "Explore the fundamental architecture of modern computers — from the Von Neumann model and bus systems to how CPU, RAM, storage, and I/O devices work together to execute every instruction."
+category: "hardware"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 8
+tags: ["computer-architecture", "von-neumann", "harvard-architecture", "cpu", "bus-system", "hardware-basics"]
+featured: true
+order: 1
+sources:
+  - title: "Von Neumann Architecture — Computer Science Wiki"
+    url: "https://computersciencewiki.org/index.php/Von_Neumann_architecture"
+  - title: "Computer Organization and Design — Patterson & Hennessy (Textbook Reference)"
+    url: "https://www.elsevier.com/books/computer-organization-and-design/patterson/978-0-12-820109-1"
+  - title: "Harvard Architecture — Wikipedia"
+    url: "https://en.wikipedia.org/wiki/Harvard_architecture"
+  - title: "How Computers Work — Stanford CS101"
+    url: "https://web.stanford.edu/class/cs101/"
+---
+
+# Computer Architecture: How Machines Are Built to Think
+
+Every time you open a browser, play a game, or send a message, billions of operations fire inside your computer in a carefully orchestrated sequence. But how does a machine made of silicon and metal actually execute instructions? The answer lies in computer architecture — the blueprint that defines how hardware components are organized and how they communicate.
+
+<Callout type="info">
+Computer architecture is not about individual components in isolation. It is about how those components are connected and coordinated to transform raw electrical signals into the software experiences we use every day.
+</Callout>
+
+## The Von Neumann Architecture
+
+In 1945, mathematician John von Neumann described a computer architecture that would become the foundation for nearly every general-purpose computer built since. The key insight was revolutionary in its simplicity: store both the program instructions and the data they operate on in the same memory.
+
+Before Von Neumann's model, early computers like ENIAC had to be physically rewired to run different programs. The stored-program concept meant that switching tasks was as simple as loading different instructions into memory.
+
+<Diagram chart="graph TD\n    CPU[CPU - Central Processing Unit] <-->|System Bus| MEM[Main Memory - RAM]\n    CPU <-->|System Bus| IO[Input/Output Devices]\n    MEM <-->|System Bus| IO\n    subgraph CPU_Internal[CPU Internals]\n        ALU[ALU - Arithmetic Logic Unit]\n        CU[Control Unit]\n        REG[Registers]\n    end\n    CPU --- CPU_Internal" />
+
+The Von Neumann architecture consists of four major components:
+
+### 1. Central Processing Unit (CPU)
+
+The CPU is the brain of the computer. It fetches instructions from memory, decodes them, and executes them. Inside the CPU, you find three critical sub-components:
+
+- **Arithmetic Logic Unit (ALU):** Performs mathematical operations (addition, subtraction, multiplication) and logical operations (AND, OR, NOT, comparisons).
+- **Control Unit (CU):** Directs the flow of data between the CPU, memory, and I/O devices. It reads instructions and generates the control signals that coordinate everything.
+- **Registers:** Tiny, ultra-fast storage locations inside the CPU that hold the data currently being processed. The Program Counter (PC) register, for example, keeps track of the address of the next instruction to execute.
+
+### 2. Main Memory (RAM)
+
+Random Access Memory stores both the instructions of the running program and the data it is working with. Unlike storage drives, RAM is volatile — it loses its contents when power is turned off. Its key advantage is speed: the CPU can read from or write to any memory address in roughly the same amount of time, hence "random access."
+
+### 3. Storage (Secondary Memory)
+
+Hard drives (HDDs), solid-state drives (SSDs), and other storage devices hold data persistently. They are much slower than RAM but retain information without power. When you launch an application, its instructions are loaded from storage into RAM so the CPU can access them quickly.
+
+### 4. Input/Output (I/O) Devices
+
+I/O devices allow the computer to interact with the outside world. Keyboards, mice, and microphones are input devices. Monitors, speakers, and printers are output devices. Network cards function as both, sending and receiving data.
+
+## The Bus System: Highways of Data
+
+Components do not communicate through magic — they use buses, which are shared electrical pathways that carry data between parts of the system. Think of them as highways connecting different neighborhoods in a city.
+
+<Diagram chart="graph LR\n    CPU[CPU] <-->|Data Bus| RAM[RAM]\n    CPU <-->|Address Bus| RAM\n    CPU <-->|Control Bus| RAM\n    CPU <-->|Data Bus| IO[I/O Devices]\n    CPU <-->|Address Bus| IO\n    CPU <-->|Control Bus| IO" />
+
+There are three main types of buses:
+
+- **Data Bus:** Carries the actual data being transferred. The width of the data bus (32-bit, 64-bit) determines how much data can be moved in a single transfer.
+- **Address Bus:** Carries the memory address that the CPU wants to read from or write to. The width of the address bus determines the maximum amount of memory the system can address. A 32-bit address bus can address 2^32 = 4 GB of memory.
+- **Control Bus:** Carries control signals such as "read," "write," "interrupt," and clock signals that synchronize operations.
+
+<Callout type="tip">
+The width of the data bus is one reason why 64-bit systems outperform 32-bit systems. A 64-bit data bus can transfer twice as much data per clock cycle compared to a 32-bit bus, allowing the CPU to process larger chunks of information at once.
+</Callout>
+
+## The Fetch-Decode-Execute Cycle
+
+Every instruction the CPU processes goes through the same fundamental cycle:
+
+<Diagram chart="graph LR\n    A[1. Fetch: Read instruction from memory] --> B[2. Decode: Interpret the instruction]\n    B --> C[3. Execute: Perform the operation]\n    C --> D[4. Store: Write result back]\n    D --> A" />
+
+1. **Fetch:** The Control Unit reads the instruction at the memory address stored in the Program Counter, then increments the PC to point to the next instruction.
+2. **Decode:** The Control Unit interprets the fetched instruction — determining what operation to perform and what data to use.
+3. **Execute:** The ALU or other component performs the operation (e.g., adding two numbers, comparing values, or moving data).
+4. **Store:** The result is written back to a register or to memory.
+
+This cycle repeats billions of times per second in modern processors. A CPU running at 4 GHz completes roughly 4 billion cycles every second.
+
+## The Von Neumann Bottleneck
+
+The elegant simplicity of the Von Neumann architecture comes with a significant trade-off: since instructions and data share the same memory and the same bus, the CPU often has to wait. It cannot fetch an instruction and read data at the same time if both require the memory bus. This limitation is known as the Von Neumann bottleneck.
+
+<Callout type="warning">
+The Von Neumann bottleneck is one of the primary reasons why increasing clock speed alone does not proportionally increase performance. The CPU spends a significant portion of its time waiting for data to arrive from memory rather than actually computing.
+</Callout>
+
+Modern systems mitigate this bottleneck through several techniques:
+- **Cache memory:** Small, fast memory placed close to the CPU (L1, L2, L3 caches) that stores frequently accessed data and instructions.
+- **Pipelining:** Overlapping the stages of the fetch-decode-execute cycle so multiple instructions are in different stages simultaneously.
+- **Branch prediction:** The CPU guesses which instruction will come next and starts processing it before the current instruction finishes.
+- **Prefetching:** The memory controller anticipates what data will be needed next and loads it into cache in advance.
+
+## Harvard Architecture: The Alternative
+
+The Harvard architecture, originally developed for the Harvard Mark I computer in the 1940s, takes a different approach. It uses separate memory and separate buses for instructions and data.
+
+<Diagram chart="graph TD\n    CPU[CPU] <-->|Instruction Bus| IMEM[Instruction Memory]\n    CPU <-->|Data Bus| DMEM[Data Memory]\n    CPU <-->|Control Signals| IO[I/O Devices]" />
+
+This separation allows the CPU to fetch an instruction and access data simultaneously, effectively eliminating the Von Neumann bottleneck for many operations. However, it comes with added hardware complexity and less flexibility — you cannot easily use unused instruction memory for data or vice versa.
+
+## Harvard vs. Von Neumann: A Comparison
+
+<ComparisonTable headers={["Feature", "Von Neumann", "Harvard"]} rows={[["Memory Structure", "Single unified memory for instructions and data", "Separate memory for instructions and data"], ["Bus System", "Single shared bus", "Separate buses for instructions and data"], ["Speed", "Bottleneck when accessing instructions and data simultaneously", "Faster — can fetch instructions and data in parallel"], ["Hardware Complexity", "Simpler and less expensive", "More complex due to separate memory systems"], ["Flexibility", "Memory can be allocated dynamically between code and data", "Fixed allocation — less flexible"], ["Common Usage", "General-purpose computers (PCs, servers, smartphones)", "Embedded systems, DSPs, microcontrollers (Arduino, ARM Cortex-M)"], ["Modern CPUs", "Modified Harvard — uses caches to get Harvard-like benefits", "Pure Harvard is rare in general-purpose CPUs"]]} />
+
+<Callout type="info">
+Most modern CPUs actually use a **Modified Harvard Architecture**. They maintain a Von Neumann-style unified main memory (RAM) but split their L1 cache into separate instruction cache (I-cache) and data cache (D-cache). This gives the speed benefits of Harvard architecture while keeping the programming flexibility of Von Neumann.
+</Callout>
+
+## How It All Comes Together
+
+Let us trace what happens when you type a letter on your keyboard:
+
+1. The keyboard (input device) generates an electrical signal and sends an interrupt through the I/O bus.
+2. The CPU's control unit detects the interrupt and temporarily pauses its current task.
+3. The CPU fetches the interrupt handler instructions from memory through the system bus.
+4. The interrupt handler reads the keycode from the keyboard's I/O port.
+5. The operating system processes the keycode and determines which character to display.
+6. The character data is sent to the graphics card (output device) through the bus.
+7. The graphics card updates the pixels on your monitor, and you see the letter appear.
+
+All of this happens in microseconds — so fast that it feels instantaneous.
+
+<Diagram chart="graph LR\n    KB[Keyboard Press] --> INT[Interrupt Signal]\n    INT --> CPU[CPU Handles Interrupt]\n    CPU --> MEM[Fetch Handler from Memory]\n    MEM --> PROC[Process Keycode]\n    PROC --> GPU[Send to Graphics Card]\n    GPU --> DISP[Display on Monitor]" />
+
+## Why Architecture Matters
+
+Understanding computer architecture is not just academic. It directly affects:
+
+- **Software performance:** Knowing how caches work helps developers write cache-friendly code that runs dramatically faster.
+- **System design:** Architects choose between different memory hierarchies, bus widths, and I/O configurations based on the workload.
+- **Debugging:** Many subtle bugs in low-level and systems programming trace back to how hardware handles memory access, interrupts, or bus contention.
+- **Career growth:** Whether you work in embedded systems, cloud infrastructure, or game development, understanding what happens beneath the software layer makes you a more effective engineer.
+
+The Von Neumann architecture, despite being nearly 80 years old, remains the conceptual foundation of modern computing. Every smartphone in your pocket, every server in the cloud, and every supercomputer in a research lab still follows its core principles — just with decades of clever optimizations layered on top. As we push toward new frontiers in quantum computing and neuromorphic chips, these fundamentals give you the vocabulary and mental models to understand what comes next.

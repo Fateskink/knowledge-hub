@@ -1,0 +1,313 @@
+---
+title: "Next.js và Server Components"
+description: "Tìm hiểu Next.js App Router, Server vs Client Components, và các chiến lược render SSR/SSG/ISR trong phát triển web hiện đại."
+category: "web-development"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 13
+tags: ["nextjs", "react", "server-components", "ssr", "ssg", "app-router", "web-development"]
+featured: false
+order: 4
+sources:
+  - title: "Next.js Official Documentation"
+    url: "https://nextjs.org/docs"
+  - title: "React Server Components RFC"
+    url: "https://react.dev/blog/2023/03/22/react-labs-what-we-have-been-working-on-march-2023"
+  - title: "Vercel - Next.js Learn"
+    url: "https://nextjs.org/learn"
+  - title: "Next.js App Router Documentation"
+    url: "https://nextjs.org/docs/app"
+---
+
+# Next.js và Server Components
+
+Next.js là framework React phổ biến nhất cho việc xây dựng ứng dụng web hiện đại. Với sự ra đời của App Router và React Server Components, cách chúng ta xây dựng ứng dụng web đã thay đổi căn bản. Bài viết này sẽ giúp bạn hiểu rõ các khái niệm quan trọng này.
+
+## Next.js là gì?
+
+Next.js là một React framework cung cấp nhiều tính năng mà React thuần túy không có:
+
+- **Server-Side Rendering (SSR)**: Render trang trên server
+- **Static Site Generation (SSG)**: Tạo trang tĩnh tại thời điểm build
+- **File-based Routing**: Định tuyến dựa trên cấu trúc thư mục
+- **API Routes**: Tạo backend API ngay trong dự án
+- **Image Optimization**: Tối ưu hình ảnh tự động
+- **Built-in CSS Support**: Hỗ trợ CSS Modules, Tailwind CSS
+
+<Callout type="info">Next.js giải quyết nhiều vấn đề phức tạp mà bạn sẽ gặp khi dùng React thuần túy, như routing, code splitting, SEO và performance optimization. Nó là lựa chọn hàng đầu cho production React apps.</Callout>
+
+## App Router vs Pages Router
+
+Next.js 13+ giới thiệu App Router, một cách tiếp cận mới hoàn toàn so với Pages Router truyền thống.
+
+<ComparisonTable headers={["Đặc điểm", "Pages Router (cũ)", "App Router (mới)"]} rows={[["Thư mục", "pages/", "app/"], ["Routing", "File-based trong pages/", "Folder-based trong app/"], ["Layout", "Custom, thủ công", "Nested layouts tự động"], ["Data Fetching", "getServerSideProps, getStaticProps", "async Server Components, fetch()"], ["Loading UI", "Tự làm", "loading.js tự động"], ["Error Handling", "Custom error pages", "error.js tự động"], ["Server Components", "Không hỗ trợ", "Mặc định"], ["Streaming", "Hạn chế", "Hỗ trợ đầy đủ"]]} />
+
+### Cấu trúc thư mục App Router
+
+```
+app/
+├── layout.js          # Root layout (bắt buộc)
+├── page.js            # Trang chủ (/)
+├── loading.js         # Loading UI cho trang chủ
+├── error.js           # Error UI cho trang chủ
+├── globals.css
+├── about/
+│   └── page.js        # /about
+├── blog/
+│   ├── layout.js      # Layout riêng cho blog
+│   ├── page.js        # /blog
+│   └── [slug]/
+│       ├── page.js    # /blog/bai-viet-1 (dynamic route)
+│       └── loading.js
+├── api/
+│   └── users/
+│       └── route.js   # API endpoint: /api/users
+└── (auth)/             # Route group (không ảnh hưởng URL)
+    ├── login/
+    │   └── page.js    # /login
+    └── register/
+        └── page.js    # /register
+```
+
+## Server Components vs Client Components
+
+Đây là sự khác biệt quan trọng nhất trong Next.js App Router.
+
+<Diagram chart="graph TD\n    A[Next.js App] --> B{Loại Component}\n    B --> C[Server Component]\n    B --> D[Client Component]\n    C --> C1[Render trên Server]\n    C1 --> C2[Không gửi JS đến client]\n    C2 --> C3[Truy cập trực tiếp DB/API]\n    D --> D1[Render trên Client]\n    D1 --> D2[Gửi JS đến trình duyệt]\n    D2 --> D3[Xử lý tương tác người dùng]\n    C3 --> E[HTML gửi đến trình duyệt]\n    D3 --> E" />
+
+### Server Components (Mặc định)
+
+Tất cả components trong App Router là Server Components theo mặc định. Chúng chạy trên server và không gửi JavaScript xuống client.
+
+```jsx
+// app/blog/page.js - Đây là Server Component (mặc định)
+// Có thể truy cập database trực tiếp, không cần API
+
+import { getBaiViet } from "@/lib/database";
+
+export default async function BlogPage() {
+  // Gọi database trực tiếp - chỉ chạy trên server
+  const baiVietList = await getBaiViet();
+
+  return (
+    <div>
+      <h1>Blog của tôi</h1>
+      <div className="grid">
+        {baiVietList.map(bv => (
+          <article key={bv.id} className="card">
+            <h2>{bv.title}</h2>
+            <p>{bv.excerpt}</p>
+            <time>{bv.createdAt}</time>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Có thể dùng async/await trực tiếp
+// Không gửi JavaScript cho phần này xuống client
+// An toàn để sử dụng secrets, API keys
+```
+
+### Client Components
+
+Khi cần tương tác với người dùng (events, state, effects), bạn cần dùng Client Components bằng cách thêm `"use client"` ở đầu file.
+
+```jsx
+"use client";
+// app/components/SearchBar.js - Client Component
+
+import { useState, useEffect } from "react";
+
+export default function SearchBar({ onSearch }) {
+  const [query, setQuery] = useState("");
+  const [gợiY, setGoiY] = useState([]);
+
+  useEffect(() => {
+    if (query.length < 2) {
+      setGoiY([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/search?q=${query}`);
+      const data = await res.json();
+      setGoiY(data.results);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  return (
+    <div className="search-bar">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Tìm kiếm bài viết..."
+      />
+      {gợiY.length > 0 && (
+        <ul className="goi-y">
+          {gợiY.map(item => (
+            <li key={item.id} onClick={() => onSearch(item)}>
+              {item.title}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+```
+
+<Callout type="tip">Quy tắc chọn Server hay Client Component: Mặc định dùng Server Component. Chỉ chuyển sang Client Component khi cần: useState, useEffect, onClick, onChange, hoặc bất kỳ browser API nào (localStorage, window, document).</Callout>
+
+### Kết hợp Server và Client Components
+
+```jsx
+// app/blog/page.js - Server Component
+import SearchBar from "@/components/SearchBar"; // Client
+import BlogList from "@/components/BlogList";     // Server
+
+export default async function BlogPage() {
+  const posts = await fetchPosts(); // Chạy trên server
+
+  return (
+    <div>
+      <h1>Blog</h1>
+      {/* Client component cho tương tác */}
+      <SearchBar />
+      {/* Server component cho nội dung tĩnh */}
+      <BlogList posts={posts} />
+    </div>
+  );
+}
+```
+
+## Các chiến lược Rendering
+
+Next.js cung cấp nhiều chiến lược render khác nhau, mỗi cách phù hợp với trường hợp sử dụng khác nhau.
+
+<Diagram chart="graph LR\n    A[Request] --> B{Chiến lược}\n    B --> C[SSG - Static]\n    B --> D[SSR - Server]\n    B --> E[ISR - Hybrid]\n    C --> C1[Build time]\n    C1 --> C2[HTML tĩnh]\n    C2 --> C3[CDN cache]\n    D --> D1[Mỗi request]\n    D1 --> D2[HTML mới]\n    D2 --> D3[Luôn cập nhật]\n    E --> E1[Build time + Revalidate]\n    E1 --> E2[HTML tĩnh]\n    E2 --> E3[Tự động cập nhật]" />
+
+### Static Site Generation (SSG)
+
+Trang được tạo tại thời điểm build. Phù hợp cho nội dung ít thay đổi.
+
+```jsx
+// Mặc định trong App Router - tự động SSG nếu không có dynamic data
+export default function AboutPage() {
+  return (
+    <div>
+      <h1>Giới thiệu</h1>
+      <p>Trang này được tạo tĩnh tại thời điểm build.</p>
+    </div>
+  );
+}
+```
+
+### Server-Side Rendering (SSR)
+
+Trang được render mới cho mỗi request. Phù hợp cho nội dung cá nhân hóa hoặc thay đổi liên tục.
+
+```jsx
+// Force SSR bằng cách dùng dynamic data
+export default async function DashboardPage() {
+  // cookies() hoặc headers() làm trang trở thành dynamic (SSR)
+  const res = await fetch("https://api.example.com/dashboard", {
+    cache: "no-store", // Không cache - luôn fetch mới
+  });
+  const data = await res.json();
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Dữ liệu cập nhật: {data.lastUpdated}</p>
+    </div>
+  );
+}
+```
+
+### Incremental Static Regeneration (ISR)
+
+Kết hợp ưu điểm của SSG và SSR: trang tĩnh nhưng tự động cập nhật theo chu kỳ.
+
+```jsx
+// ISR - revalidate sau mỗi 60 giây
+export default async function ProductsPage() {
+  const res = await fetch("https://api.example.com/products", {
+    next: { revalidate: 60 }, // Cập nhật mỗi 60 giây
+  });
+  const products = await res.json();
+
+  return (
+    <div>
+      <h1>Sản phẩm</h1>
+      {products.map(sp => (
+        <div key={sp.id}>
+          <h3>{sp.name}</h3>
+          <p>{sp.price.toLocaleString("vi-VN")} VND</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+<Callout type="warning">Chọn chiến lược render phù hợp là rất quan trọng cho hiệu năng. SSG nhanh nhất nhưng không phù hợp cho dữ liệu thay đổi liên tục. SSR linh hoạt nhưng chậm hơn. ISR là giải pháp cân bằng tốt cho nhiều trường hợp.</Callout>
+
+## Layouts và Loading States
+
+App Router cho phép tạo nested layouts và loading UI tự động.
+
+```jsx
+// app/layout.js - Root Layout
+export default function RootLayout({ children }) {
+  return (
+    <html lang="vi">
+      <body>
+        <header>
+          <nav>Logo | Menu</nav>
+        </header>
+        <main>{children}</main>
+        <footer>Copyright 2026</footer>
+      </body>
+    </html>
+  );
+}
+
+// app/blog/layout.js - Blog Layout (nested)
+export default function BlogLayout({ children }) {
+  return (
+    <div className="blog-layout">
+      <aside className="sidebar">
+        <h3>Danh mục</h3>
+        <ul>
+          <li>React</li>
+          <li>Next.js</li>
+          <li>CSS</li>
+        </ul>
+      </aside>
+      <div className="content">{children}</div>
+    </div>
+  );
+}
+
+// app/blog/loading.js - Hiển thị khi đang tải
+export default function Loading() {
+  return (
+    <div className="skeleton">
+      <div className="skeleton-title" />
+      <div className="skeleton-text" />
+      <div className="skeleton-text" />
+    </div>
+  );
+}
+```
+
+## Kết luận
+
+Next.js với App Router và Server Components đại diện cho tương lai của phát triển web với React. Việc hiểu rõ sự khác biệt giữa Server và Client Components, cũng như các chiến lược rendering, sẽ giúp bạn xây dựng ứng dụng web nhanh, an toàn và thân thiện với SEO.
+
+Bước tiếp theo là tạo một dự án Next.js và thực hành với App Router. Bắt đầu với một blog đơn giản hoặc portfolio, rồi dần dần áp dụng các tính năng nâng cao như ISR, middleware và API routes.

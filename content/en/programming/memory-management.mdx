@@ -1,0 +1,303 @@
+---
+title: "Memory Management: Stack, Heap, and Memory Allocation"
+description: "A deep dive into memory management: Stack vs Heap, static and dynamic allocation, C++ smart pointers, Rust Ownership, and Garbage Collectors in Go, Java, and Python."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 15
+tags: ["memory-management", "stack", "heap", "c-plus-plus", "rust", "garbage-collector", "smart-pointers"]
+featured: true
+order: 6
+sources:
+  - title: "cppreference.com - Dynamic Memory Management"
+    url: "https://en.cppreference.com/w/cpp/memory"
+  - title: "The Rust Programming Language - Ownership"
+    url: "https://doc.rust-lang.org/book/ch04-00-understanding-ownership.html"
+  - title: "A Guide to the Go Garbage Collector"
+    url: "https://go.dev/doc/gc-guide"
+  - title: "Java Garbage Collection Basics - Oracle"
+    url: "https://www.oracle.com/java/technologies/javase/gc-tuning.html"
+---
+
+# Memory Management: Stack, Heap, and Memory Allocation
+
+Memory management is one of the most important topics every programmer should master. Understanding how programs use memory helps you write more efficient code, avoid critical bugs like memory leaks and dangling pointers, and make informed decisions when choosing a programming language for your project.
+
+## Stack vs Heap: Two Fundamental Memory Regions
+
+When a program runs, the operating system allocates two primary memory regions: the **Stack** and the **Heap**. Each has distinct characteristics and use cases.
+
+<Diagram chart="graph TB
+    subgraph Memory Layout
+        direction TB
+        A[Stack - Grows downward] --> B[...]
+        B --> C[Heap - Grows upward]
+        C --> D[BSS - Uninitialized globals]
+        D --> E[Data - Initialized globals]
+        E --> F[Text - Machine code]
+    end" />
+
+### Stack
+
+The Stack follows the **LIFO** (Last In, First Out) principle. Each time a function is called, a new **stack frame** is pushed onto the top, containing local variables and the return address. When the function exits, the stack frame is immediately removed.
+
+- **Allocation speed**: Extremely fast, just a pointer adjustment
+- **Size**: Limited (typically 1-8 MB), causes **stack overflow** if exceeded
+- **Management**: Fully automatic, no programmer intervention needed
+- **Best for**: Local variables, function parameters, return values
+
+### Heap
+
+The Heap is a much larger memory region used for data whose size is unknown at compile time or that needs to outlive its containing function scope.
+
+- **Allocation speed**: Slower than Stack (must search for a suitable free block)
+- **Size**: Much larger, limited only by system RAM
+- **Management**: Programmer must free memory (C/C++) or rely on a GC
+- **Best for**: Large objects, dynamic arrays, data shared across functions
+
+<Callout type="info">In practice, when you declare `int x = 5;` in C, the variable `x` lives on the Stack. When you call `int* p = malloc(sizeof(int));`, the memory is allocated on the Heap, but the pointer variable `p` itself still lives on the Stack.</Callout>
+
+## Static vs Dynamic Allocation
+
+**Static allocation** happens at compile time. The compiler knows exactly how much memory is needed and reserves it before the program runs.
+
+**Dynamic allocation** happens at runtime. The program requests memory from the operating system as needed and must release it when done.
+
+```cpp
+// Static allocation - size known at compile time
+int arr_static[100];          // 100 elements on the stack
+static int global_var = 42;   // In the data segment
+
+// Dynamic allocation - size determined at runtime
+int n;
+std::cin >> n;
+int* arr_dynamic = new int[n]; // n elements on the heap
+// ... use the array ...
+delete[] arr_dynamic;          // MUST free manually
+```
+
+## Memory Management in C++
+
+C++ gives programmers full control over memory, but with great power comes great responsibility.
+
+### new/delete vs malloc/free
+
+```cpp
+#include <iostream>
+#include <cstdlib>
+
+struct Student {
+    std::string name;
+    int age;
+    Student(std::string n, int a) : name(n), age(a) {
+        std::cout << "Constructor called for " << name << std::endl;
+    }
+    ~Student() {
+        std::cout << "Destructor called for " << name << std::endl;
+    }
+};
+
+int main() {
+    // C-style: malloc/free - does NOT call constructor/destructor
+    Student* s1 = (Student*)malloc(sizeof(Student));
+    // s1->name and s1->age are NOT initialized - undefined behavior!
+    free(s1); // Destructor NOT called
+
+    // C++ style: new/delete - CALLS constructor/destructor
+    Student* s2 = new Student("Alice", 22);  // Constructor called
+    std::cout << s2->name << " - " << s2->age << std::endl;
+    delete s2;  // Destructor called, memory freed
+
+    // Dynamic arrays
+    int* arr = new int[1000];
+    delete[] arr;  // Use delete[] for arrays, NOT delete
+
+    return 0;
+}
+```
+
+<Callout type="warning">In modern C++ (C++11 and later), you should avoid using raw `new`/`delete`. Instead, use **smart pointers** to automatically manage memory lifetimes.</Callout>
+
+### Smart Pointers in Modern C++
+
+```cpp
+#include <memory>
+#include <iostream>
+
+class Resource {
+public:
+    Resource(int id) : id_(id) {
+        std::cout << "Resource " << id_ << " created" << std::endl;
+    }
+    ~Resource() {
+        std::cout << "Resource " << id_ << " destroyed" << std::endl;
+    }
+    void use() { std::cout << "Using Resource " << id_ << std::endl; }
+private:
+    int id_;
+};
+
+int main() {
+    // unique_ptr: exclusive ownership, cannot be copied
+    {
+        auto res1 = std::make_unique<Resource>(1);
+        res1->use();
+        // auto res2 = res1;          // COMPILE ERROR! Cannot copy
+        auto res2 = std::move(res1);   // OK: transfers ownership
+        // res1 is now nullptr
+    } // res2 automatically destroys Resource 1
+
+    // shared_ptr: shared ownership with reference counting
+    {
+        auto res3 = std::make_shared<Resource>(3);
+        std::cout << "Ref count: " << res3.use_count() << std::endl; // 1
+        {
+            auto res4 = res3; // Shares ownership
+            std::cout << "Ref count: " << res3.use_count() << std::endl; // 2
+        } // res4 goes out of scope, ref count drops to 1
+        std::cout << "Ref count: " << res3.use_count() << std::endl; // 1
+    } // ref count = 0, Resource 3 destroyed
+
+    return 0;
+}
+```
+
+## Rust: Ownership, Borrowing, and Lifetimes
+
+Rust solves memory management radically **without a Garbage Collector**. The compiler enforces all memory rules at compile time, producing zero-cost abstractions.
+
+<Diagram chart="graph LR
+    A[Value created] --> B[Single owner]
+    B --> C{Transfer ownership?}
+    C -->|Move| D[New owner]
+    C -->|Borrow &T| E[Immutable reference - many allowed]
+    C -->|Borrow &mut T| F[Mutable reference - only one]
+    D --> G[Owner goes out of scope -> drop]
+    B --> G" />
+
+### The Three Ownership Rules
+
+1. Each value has exactly **one owner**
+2. At any time, you can have either **many immutable borrows** (`&T`) OR **one mutable borrow** (`&mut T`) -- never both
+3. When the owner goes out of scope, the value is **dropped** (freed) automatically
+
+```rust
+fn main() {
+    // Ownership and Move
+    let s1 = String::from("hello");  // s1 owns the String on the heap
+    let s2 = s1;                      // Ownership moves to s2
+    // println!("{}", s1);            // COMPILE ERROR! s1 is no longer valid
+
+    // Borrowing - borrowing a reference
+    let s3 = String::from("world");
+    let len = calculate_length(&s3);   // Borrows &s3, does not transfer ownership
+    println!("{} has {} chars", s3, len); // s3 is still valid
+
+    // Mutable borrow
+    let mut s4 = String::from("Hello");
+    change_string(&mut s4);
+    println!("{}", s4); // "Hello, World!"
+}
+
+fn calculate_length(s: &String) -> usize {
+    s.len()
+} // s goes out of scope but does not drop - it is only a reference
+
+fn change_string(s: &mut String) {
+    s.push_str(", World!");
+}
+```
+
+<Callout type="tip">Rust catches memory errors at compile time rather than at runtime. This means if your Rust code compiles successfully, you can be confident there are no data races, dangling pointers, or double frees.</Callout>
+
+## Garbage Collectors in High-Level Languages
+
+Many modern languages use a **Garbage Collector** (GC) to automatically reclaim memory that is no longer in use.
+
+### Go: Tri-color Mark-and-Sweep
+
+Go uses a **tri-color mark-and-sweep** algorithm that runs concurrently with the program. Go's GC is optimized for **low latency** -- pause times under 1ms.
+
+```go
+func createData() {
+    // Go's GC automatically detects and reclaims unreferenced memory
+    data := make([]byte, 1024*1024) // 1MB on the heap
+    process(data)
+} // data has no more references -> GC will reclaim it
+```
+
+### Java: G1 Garbage Collector
+
+Java divides the heap into small **regions** and prioritizes collecting regions with the most garbage (Garbage-First). G1 GC balances throughput and latency effectively.
+
+### Python: Reference Counting + Cycle Detector
+
+Python counts the number of references to each object. When the count reaches zero, the object is freed immediately. For circular references, Python uses an additional **cycle detector** to find and reclaim them.
+
+```python
+import sys
+
+a = [1, 2, 3]
+print(sys.getrefcount(a))  # 2 (variable a + getrefcount parameter)
+b = a
+print(sys.getrefcount(a))  # 3 (a, b, and function parameter)
+del b
+print(sys.getrefcount(a))  # Back to 2
+```
+
+## Comparing Memory Management Approaches
+
+<ComparisonTable
+  headers={["Criteria", "C++", "Rust", "Go", "Java", "Python"]}
+  rows={[
+    ["Primary mechanism", "Manual / Smart pointers", "Ownership + Borrowing", "Tri-color Mark-Sweep GC", "G1 GC (region-based)", "Reference Counting + Cycle Detector"],
+    ["GC pause", "No GC", "No GC", "< 1ms", "Can be several ms", "Negligible (ref counting)"],
+    ["Memory safety", "Not guaranteed", "Guaranteed at compile time", "Guaranteed by GC", "Guaranteed by GC", "Guaranteed by GC"],
+    ["Memory leaks possible?", "Yes (forgotten delete)", "Very hard (possible with Rc cycles)", "Yes (goroutine leaks)", "Yes (holding unnecessary refs)", "Yes (complex circular refs)"],
+    ["Memory efficiency", "Highest (full control)", "Very high", "Good", "Moderate", "Low (per-object overhead)"],
+    ["Complexity", "High", "High (learning curve)", "Low", "Low", "Very low"]
+  ]}
+/>
+
+## Common Memory Errors
+
+### Memory Leak
+
+Occurs when memory is allocated but never freed, causing the program to consume increasingly more RAM over time.
+
+```cpp
+void memory_leak_example() {
+    for (int i = 0; i < 1000000; i++) {
+        int* data = new int[1000];
+        // Forgot delete[] data -> each iteration leaks 4KB
+        // Total: ~4GB leaked!
+    }
+}
+```
+
+### Dangling Pointer
+
+A pointer that references memory that has already been freed. Accessing this memory causes **undefined behavior**.
+
+```cpp
+int* create_dangling() {
+    int local = 42;
+    return &local;  // DANGEROUS: local is destroyed when the function returns
+} // The returned pointer references invalid memory
+```
+
+### Double Free
+
+Freeing the same memory twice can cause crashes or security vulnerabilities.
+
+```cpp
+int* p = new int(10);
+delete p;
+delete p;  // DOUBLE FREE - undefined behavior, potentially exploitable
+```
+
+<Callout type="danger">Double free is a serious security vulnerability. Attackers can exploit it to execute arbitrary code. Always set pointers to `nullptr` after deleting them, or better yet, use smart pointers exclusively.</Callout>
+
+## Conclusion
+
+Memory management is the foundation for understanding how programs work at a low level. Whether you are using C++ with smart pointers, Rust with its ownership model, or Python with a garbage collector, a solid understanding of Stack and Heap, static and dynamic allocation, and common memory errors will make you a better programmer and help you write safer, more efficient code.

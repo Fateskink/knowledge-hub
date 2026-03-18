@@ -1,0 +1,352 @@
+---
+title: "Linux Command Line"
+description: "Học các lệnh Linux cơ bản: quản lý file, phân quyền, piping, grep, sed và shell scripting để làm việc hiệu quả trên terminal."
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["linux", "command-line", "bash", "shell-scripting", "terminal", "devops"]
+featured: false
+order: 4
+sources:
+  - title: "Linux Command Line Basics - Ubuntu"
+    url: "https://ubuntu.com/tutorials/command-line-for-beginners"
+  - title: "The Linux Command Line - William Shotts"
+    url: "https://linuxcommand.org/tlcl.php"
+  - title: "Bash Reference Manual - GNU"
+    url: "https://www.gnu.org/software/bash/manual/"
+  - title: "explainshell.com"
+    url: "https://explainshell.com/"
+---
+
+# Linux Command Line
+
+Việc thao tác thành thạo với dòng lệnh Linux là kỹ năng không thể thiếu của bất kỳ ai làm việc trong lĩnh vực DevOps, backend development hay system administration. Terminal cho phép bạn thao tác nhanh hơn, tự động hóa công việc và kiểm soát hệ thống ở mức sâu hơn so với giao diện đồ họa. Bài viết này sẽ giới thiệu các lệnh Linux cơ bản và hướng dẫn bạn viết shell script đơn giản.
+
+## Điều hướng và quản lý file
+
+### Di chuyển trong hệ thống file
+
+```bash
+# Xem thư mục hiện tại
+pwd
+# Kết quả: /home/user
+
+# Di chuyển đến thư mục
+cd /var/log              # Di chuyển theo đường dẫn tuyệt đối
+cd ~                     # Về thư mục home
+cd ..                    # Lên thư mục cha
+cd -                     # Quay lại thư mục trước đó
+
+# Liệt kê nội dung thư mục
+ls                       # Liệt kê cơ bản
+ls -la                   # Liệt kê chi tiết, bao gồm file ẩn
+ls -lh                   # Liệt kê với kích thước dễ đọc (KB, MB, GB)
+ls -lt                   # Sắp xếp theo thời gian sửa đổi
+ls -R                    # Liệt kê đệ quy (bao gồm thư mục con)
+```
+
+### Tạo, sao chép, di chuyển và xóa
+
+```bash
+# Tạo file và thư mục
+touch myfile.txt                  # Tạo file rỗng
+mkdir mydir                       # Tạo thư mục
+mkdir -p parent/child/grandchild  # Tạo thư mục lồng nhiều cấp
+
+# Sao chép
+cp file.txt backup.txt            # Sao chép file
+cp -r mydir/ mydir_backup/        # Sao chép thư mục (đệ quy)
+
+# Di chuyển và đổi tên
+mv file.txt newname.txt           # Đổi tên file
+mv file.txt /tmp/                 # Di chuyển file sang thư mục khác
+
+# Xóa
+rm file.txt                       # Xóa file
+rm -r mydir/                      # Xóa thư mục và nội dung
+rm -rf mydir/                     # Xóa không hỏi xác nhận (cẩn thận!)
+```
+
+<Callout type="danger">Lệnh `rm -rf` là lệnh nguy hiểm nhất trong Linux. Nó xóa tất cả mà không hỏi xác nhận và không thể phục hồi. Đặc biệt, KHÔNG BAO GIỜ chạy `rm -rf /` hoặc `rm -rf *` khi đang ở thư mục root.</Callout>
+
+### Đọc nội dung file
+
+```bash
+# Xem toàn bộ file
+cat file.txt
+
+# Xem đầu file (10 dòng đầu)
+head file.txt
+head -n 20 file.txt               # 20 dòng đầu
+
+# Xem cuối file (10 dòng cuối)
+tail file.txt
+tail -n 20 file.txt               # 20 dòng cuối
+tail -f /var/log/syslog           # Theo dõi file thời gian thực (rất hữu ích cho log)
+
+# Xem file có phân trang
+less file.txt                      # Dùng phím Space để xuống, q để thoát
+
+# Đếm dòng, từ và ký tự
+wc file.txt                       # Dòng, từ, ký tự
+wc -l file.txt                    # Chỉ đếm dòng
+```
+
+## Phân quyền file (Permissions)
+
+Mỗi file và thư mục trong Linux có 3 mức phân quyền: **Owner** (chủ sở hữu), **Group** (nhóm) và **Others** (người khác).
+
+```bash
+# Xem phân quyền
+ls -la
+# -rw-r--r--  1 user group  1024 Mar 18 10:00 file.txt
+# drwxr-xr-x  2 user group  4096 Mar 18 10:00 mydir/
+#
+# r = read (đọc)      = 4
+# w = write (ghi)     = 2
+# x = execute (chạy)  = 1
+
+# Thay đổi phân quyền bằng số
+chmod 755 script.sh    # rwxr-xr-x (owner: rwx, group: r-x, others: r-x)
+chmod 644 file.txt     # rw-r--r-- (owner: rw, group: r, others: r)
+chmod 600 secret.key   # rw------- (chỉ owner đọc và ghi)
+
+# Thay đổi phân quyền bằng ký tự
+chmod +x script.sh     # Thêm quyền chạy cho tất cả
+chmod u+w file.txt     # Thêm quyền ghi cho owner
+chmod go-r file.txt    # Bỏ quyền đọc của group và others
+
+# Thay đổi chủ sở hữu
+chown user:group file.txt         # Đổi owner và group
+chown -R user:group mydir/        # Đổi đệ quy cho thư mục
+```
+
+<Callout type="tip">Để nhớ nhanh: 7 = rwx, 6 = rw-, 5 = r-x, 4 = r--, 0 = ---. Một số cấu hình thường dùng: 755 cho script, 644 cho file thường, 600 cho file nhạy cảm.</Callout>
+
+## Tìm kiếm với grep
+
+`grep` là công cụ tìm kiếm văn bản cực kỳ mạnh mẽ trong Linux.
+
+```bash
+# Tìm kiếm cơ bản
+grep "error" logfile.txt                  # Tìm dòng chứa "error"
+grep -i "error" logfile.txt               # Không phân biệt hoa thường
+grep -n "error" logfile.txt               # Hiển thị số dòng
+grep -c "error" logfile.txt               # Đếm số dòng khớp
+grep -r "TODO" ./src/                     # Tìm đệ quy trong thư mục
+
+# Tìm kiếm nâng cao với regex
+grep -E "error|warning|fatal" logfile.txt # Tìm nhiều pattern (OR)
+grep -E "^[0-9]{4}-" logfile.txt          # Dòng bắt đầu bằng 4 chữ số và dấu gạch
+grep -v "debug" logfile.txt               # Loại trừ dòng chứa "debug"
+grep -l "password" *.conf                 # Chỉ hiển thị tên file chứa pattern
+
+# Kết hợp với các lệnh khác
+ps aux | grep nginx                       # Tìm process nginx
+cat /etc/passwd | grep "/bin/bash"        # Tìm user dùng bash shell
+history | grep "docker"                   # Tìm lệnh docker đã dùng
+```
+
+## Piping và Redirect
+
+Piping (`|`) và redirect (`>`, `>>`, `<`) là những tính năng mạnh mẽ nhất của Linux command line.
+
+```bash
+# Piping: truyền output của lệnh này làm input cho lệnh kia
+ls -la | sort -k5 -n              # Liệt kê file, sắp xếp theo kích thước
+cat access.log | grep "404" | wc -l   # Đếm số request trả về 404
+ps aux | sort -k3 -rn | head -10      # 10 process tốn nhiều CPU nhất
+
+# Redirect output ra file
+echo "Hello" > file.txt           # Ghi (ghi đè) vào file
+echo "World" >> file.txt          # Thêm vào cuối file
+ls /nonexistent 2> error.log      # Redirect stderr vào file
+ls /tmp > output.txt 2>&1         # Redirect cả stdout và stderr
+
+# Kết hợp phức tạp
+cat server.log | grep "ERROR" | awk '{print $1, $2, $NF}' | sort | uniq -c | sort -rn | head -20
+# Giải thích:
+# 1. Đọc file log
+# 2. Lọc các dòng có "ERROR"
+# 3. Lấy cột 1, 2 và cột cuối
+# 4. Sắp xếp
+# 5. Đếm số lần xuất hiện
+# 6. Sắp xếp giảm dần theo số lượng
+# 7. Lấy 20 kết quả đầu
+```
+
+<Callout type="info">Piping là triết lý cốt lõi của Unix: mỗi công cụ làm tốt một việc, và các công cụ có thể kết hợp với nhau thông qua pipe. Thay vì một công cụ làm tất cả, bạn xâu chuỗi nhiều công cụ nhỏ lại với nhau.</Callout>
+
+## Tìm kiếm và thay thế với sed
+
+`sed` (stream editor) là công cụ xử lý văn bản theo dòng, thường dùng để tìm và thay thế.
+
+```bash
+# Thay thế cơ bản
+sed 's/old/new/' file.txt              # Thay thế lần xuất hiện đầu tiên mỗi dòng
+sed 's/old/new/g' file.txt             # Thay thế tất cả (global)
+sed -i 's/old/new/g' file.txt          # Thay thế trực tiếp trong file (in-place)
+
+# Ví dụ thực tế
+sed 's/http:/https:/g' urls.txt        # Chuyển HTTP sang HTTPS
+sed '/^#/d' config.conf                # Xóa các dòng comment
+sed '/^$/d' file.txt                   # Xóa các dòng trống
+sed -n '10,20p' file.txt               # In dòng 10 đến 20
+sed 's/  */ /g' file.txt               # Thay nhiều khoảng trắng bằng 1
+
+# Kết hợp với pipe
+cat config.yaml | sed 's/localhost/production-server/g'
+```
+
+## Các lệnh hữu ích khác
+
+```bash
+# Tìm file
+find / -name "*.log" -mtime -7         # Tìm file .log được sửa trong 7 ngày qua
+find . -size +100M                      # Tìm file lớn hơn 100MB
+find . -type f -name "*.tmp" -delete    # Tìm và xóa file .tmp
+
+# Quản lý process
+ps aux                                  # Liệt kê tất cả process
+top                                     # Monitor process thời gian thực
+htop                                    # Phiên bản tốt hơn của top (cần cài đặt)
+kill PID                                # Dừng process theo PID
+kill -9 PID                             # Buộc dừng process (force kill)
+
+# Dung lượng đĩa và mạng
+df -h                                   # Dung lượng đĩa còn trống
+du -sh *                                # Kích thước các thư mục
+free -h                                 # Dung lượng RAM
+curl -I https://example.com             # Kiểm tra HTTP headers
+wget https://example.com/file.zip       # Tải file
+```
+
+## Shell Scripting cơ bản
+
+Shell script cho phép bạn tự động hóa các tác vụ lặp đi lặp lại.
+
+```bash
+#!/bin/bash
+# deploy.sh - Script tự động deploy ứng dụng
+
+set -euo pipefail  # Dừng ngay khi có lỗi, báo lỗi biến chưa định nghĩa
+
+# Biến
+APP_NAME="my-app"
+DEPLOY_DIR="/var/www/$APP_NAME"
+LOG_FILE="/var/log/deploy-$APP_NAME.log"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+# Hàm log
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+# Hàm kiểm tra lệnh tồn tại
+check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        log "ERROR: $1 chưa được cài đặt"
+        exit 1
+    fi
+}
+
+# Kiểm tra điều kiện
+check_command "git"
+check_command "node"
+check_command "npm"
+
+log "=== Bắt đầu deploy $APP_NAME ==="
+
+# Backup
+log "Tạo backup..."
+if [ -d "$DEPLOY_DIR" ]; then
+    cp -r "$DEPLOY_DIR" "${DEPLOY_DIR}_backup_${TIMESTAMP}"
+    log "Backup thành công: ${DEPLOY_DIR}_backup_${TIMESTAMP}"
+fi
+
+# Pull code mới
+log "Pull code mới từ git..."
+cd "$DEPLOY_DIR"
+git pull origin main
+
+# Cài đặt dependencies
+log "Cài đặt dependencies..."
+npm ci --only=production
+
+# Build ứng dụng
+log "Build ứng dụng..."
+npm run build
+
+# Restart service
+log "Restart service..."
+sudo systemctl restart "$APP_NAME"
+
+# Kiểm tra
+sleep 3
+if systemctl is-active --quiet "$APP_NAME"; then
+    log "Deploy thành công! $APP_NAME đang chạy."
+else
+    log "ERROR: Deploy thất bại! Rollback..."
+    rm -rf "$DEPLOY_DIR"
+    mv "${DEPLOY_DIR}_backup_${TIMESTAMP}" "$DEPLOY_DIR"
+    sudo systemctl restart "$APP_NAME"
+    log "Rollback hoàn tất."
+    exit 1
+fi
+
+log "=== Kết thúc deploy ==="
+```
+
+```bash
+# Làm cho script có thể chạy được
+chmod +x deploy.sh
+
+# Chạy script
+./deploy.sh
+```
+
+<Callout type="warning">Luôn bắt đầu shell script với `set -euo pipefail` để đảm bảo script dừng lại khi có lỗi, báo lỗi khi sử dụng biến chưa định nghĩa, và xử lý lỗi trong pipeline đúng cách.</Callout>
+
+### Vòng lặp và điều kiện
+
+```bash
+#!/bin/bash
+
+# Vòng lặp for
+for file in *.log; do
+    echo "Nén file: $file"
+    gzip "$file"
+done
+
+# Vòng lặp while đọc file
+while IFS= read -r line; do
+    echo "Processing: $line"
+done < servers.txt
+
+# Điều kiện if/else
+DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%')
+if [ "$DISK_USAGE" -gt 90 ]; then
+    echo "CẢNH BÁO: Đĩa gần đầy! ($DISK_USAGE%)"
+elif [ "$DISK_USAGE" -gt 70 ]; then
+    echo "Lưu ý: Đĩa đã sử dụng $DISK_USAGE%"
+else
+    echo "Đĩa vẫn còn đủ: $DISK_USAGE% đã dùng"
+fi
+```
+
+## Các mẹo thực hành
+
+- Sử dụng phím **Tab** để tự động hoàn thành lệnh và tên file
+- Sử dụng phím **Up/Down** hoặc `history` để xem các lệnh đã dùng
+- Sử dụng **Ctrl+R** để tìm kiếm trong lịch sử lệnh
+- Sử dụng **Ctrl+C** để hủy lệnh đang chạy
+- Sử dụng **Ctrl+Z** để tạm dừng và `bg`/`fg` để tiếp tục
+- Dùng `man lệnh` hoặc `lệnh --help` để xem hướng dẫn sử dụng
+- Dùng `alias` để tạo lệnh tắt: `alias ll='ls -la'`
+
+<Callout type="tip">Trang web explainshell.com cho phép bạn dán bất kỳ lệnh Linux nào và nó sẽ giải thích từng phần của lệnh đó. Rất hữu ích khi bạn gặp một lệnh phức tạp mà không hiểu.</Callout>
+
+## Kết luận
+
+Thành thạo dòng lệnh Linux là một hành trình dài nhưng với các lệnh cơ bản trong bài viết này, bạn đã có nền tảng vững chắc. Hãy thực hành hàng ngày, bắt đầu từ những tác vụ đơn giản và dần dần xây dựng các shell script phức tạp hơn. Khả năng sử dụng terminal hiệu quả sẽ giúp bạn trở thành một developer và DevOps engineer tốt hơn.

@@ -1,0 +1,233 @@
+---
+title: "n8n - Tự động hóa Workflow"
+description: "Tìm hiểu n8n, nền tảng tự động hóa workflow self-hosted. So sánh với Zapier và Make, hướng dẫn xây dựng workflow tự động hóa đầu tiên của bạn."
+category: "automation"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 10
+tags: ["n8n", "automation", "workflow", "zapier", "make", "integromat", "webhook", "self-hosted"]
+featured: true
+order: 1
+sources:
+  - title: "n8n Official Documentation"
+    url: "https://docs.n8n.io/"
+  - title: "n8n GitHub Repository"
+    url: "https://github.com/n8n-io/n8n"
+  - title: "Zapier vs n8n Comparison"
+    url: "https://n8n.io/vs-zapier/"
+  - title: "n8n Workflow Templates"
+    url: "https://n8n.io/workflows/"
+---
+
+# n8n - Tự động hóa Workflow
+
+Trong thế giới phát triển phần mềm hiện đại, việc tự động hóa các tác vụ lặp đi lặp lại là yếu tố quan trọng để tăng năng suất. n8n (đọc là "nodemation") là một nền tảng tự động hóa workflow mã nguồn mở, cho phép bạn kết nối các ứng dụng và dịch vụ khác nhau để tạo ra các quy trình tự động mà không cần viết nhiều code.
+
+## n8n là gì?
+
+n8n là một công cụ **workflow automation** có thể tự host (self-hosted), cung cấp giao diện kéo thả trực quan để xây dựng các quy trình tự động hóa. Không giống như các giải pháp SaaS như Zapier hay Make, n8n cho phép bạn chạy trên máy chủ riêng, kiểm soát hoàn toàn dữ liệu và không bị giới hạn bởi các gói dịch vụ trả phí.
+
+<Callout type="info">n8n hỗ trợ hơn 400 node tích hợp sẵn (integrations) với các dịch vụ phổ biến như Slack, Google Sheets, GitHub, PostgreSQL, HTTP Request, và nhiều hơn nữa.</Callout>
+
+### Các tính năng nổi bật
+
+- **Self-hosted**: Chạy trên máy chủ của bạn, kiểm soát dữ liệu hoàn toàn
+- **Fair-code license**: Mã nguồn mở với giấy phép công bằng
+- **Visual editor**: Giao diện kéo thả để xây dựng workflow
+- **Code khi cần**: Hỗ trợ JavaScript/TypeScript trong Function node
+- **400+ integrations**: Kết nối với hàng trăm dịch vụ
+- **Webhook support**: Nhận dữ liệu từ bất kỳ nguồn nào qua HTTP
+- **Error handling**: Xử lý lỗi với các nhánh riêng biệt
+- **Credential management**: Quản lý thông tin xác thực an toàn
+
+## Kiến trúc của n8n
+
+<Diagram chart="graph TD\n    A[Trigger Node] -->|Start| B[Processing Node 1]\n    B --> C{Condition}\n    C -->|True| D[Action Node A]\n    C -->|False| E[Action Node B]\n    D --> F[Output Node]\n    E --> F\n    subgraph n8n Engine\n    G[Workflow Engine] --> H[Node Executor]\n    H --> I[Credential Manager]\n    H --> J[Error Handler]\n    end" />
+
+Mỗi workflow trong n8n bao gồm các **node** được kết nối với nhau:
+
+- **Trigger Node**: Nút kích hoạt workflow (Webhook, Cron, Event...)
+- **Processing Node**: Xử lý dữ liệu (Function, Set, IF, Switch...)
+- **Action Node**: Thực hiện hành động (gửi email, tạo record, gọi API...)
+- **Output Node**: Kết quả cuối cùng của workflow
+
+## So sánh n8n vs Zapier vs Make
+
+<ComparisonTable headers={["Tiêu chí", "n8n", "Zapier", "Make (Integromat)"]} rows={[["Giá", "Miễn phí (self-host) hoặc từ $20/tháng (cloud)", "Từ $19.99/tháng", "Từ $9/tháng"], ["Self-hosting", "Có", "Không", "Không"], ["Mã nguồn mở", "Có (fair-code)", "Không", "Không"], ["Số integrations", "400+", "6000+", "1500+"], ["Code tùy chỉnh", "JavaScript/TypeScript", "Hạn chế", "Hạn chế"], ["Độ phức tạp workflow", "Rất cao (branching, looping)", "Trung bình", "Cao"], ["Giao diện", "Visual node editor", "Linear steps", "Visual flowchart"], ["Xử lý lỗi", "Error branch tích hợp", "Cơ bản", "Error handler"], ["Community", "Đang phát triển", "Lớn", "Trung bình"]]} />
+
+<Callout type="tip">Nếu bạn cần kiểm soát dữ liệu và không muốn phụ thuộc vào dịch vụ bên thứ ba, n8n là lựa chọn tốt nhất. Nếu bạn cần nhiều tích hợp sẵn và không ngại trả phí, Zapier phù hợp hơn.</Callout>
+
+## Cài đặt n8n
+
+### Sử dụng Docker (khuyến nghị)
+
+```bash
+# Chạy n8n với Docker
+docker run -it --rm \
+  --name n8n \
+  -p 5678:5678 \
+  -v n8n_data:/home/node/.n8n \
+  docker.n8n.io/n8nio/n8n
+
+# Hoặc sử dụng docker-compose
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=your-secure-password
+      - WEBHOOK_URL=https://your-domain.com/
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  n8n_data:
+```
+
+### Sử dụng npm
+
+```bash
+# Cài đặt global
+npm install n8n -g
+
+# Chạy n8n
+n8n start
+```
+
+<Callout type="warning">Khi deploy lên production, luôn sử dụng HTTPS và cấu hình xác thực (authentication). Không bao giờ để n8n chạy trên mạng công khai mà không có bảo mật.</Callout>
+
+## Ví dụ Workflow: Webhook nhận dữ liệu và gửi thông báo
+
+Đây là một workflow điển hình: nhận dữ liệu từ webhook, xử lý và gửi thông báo qua Slack.
+
+<Diagram chart="graph LR\n    A[Webhook Trigger] --> B[Function: Xử lý dữ liệu]\n    B --> C{Kiểm tra điều kiện}\n    C -->|Urgent| D[Slack: Gửi cảnh báo]\n    C -->|Normal| E[Google Sheets: Lưu trữ]\n    D --> F[Email: Thông báo]\n    E --> F" />
+
+### Bước 1: Tạo Webhook Trigger
+
+Webhook node tạo một URL endpoint để nhận dữ liệu từ bên ngoài:
+
+```json
+{
+  "node": "Webhook",
+  "parameters": {
+    "httpMethod": "POST",
+    "path": "incoming-data",
+    "responseMode": "onReceived",
+    "responseData": "allEntries"
+  }
+}
+```
+
+### Bước 2: Xử lý dữ liệu với Function Node
+
+```javascript
+// Function Node - Xử lý dữ liệu đầu vào
+const items = $input.all();
+
+return items.map(item => {
+  const data = item.json;
+
+  return {
+    json: {
+      name: data.name || 'Unknown',
+      email: data.email || '',
+      priority: data.priority || 'normal',
+      message: data.message || '',
+      timestamp: new Date().toISOString(),
+      isUrgent: data.priority === 'urgent'
+    }
+  };
+});
+```
+
+### Bước 3: Điều kiện và hành động
+
+Sử dụng **IF node** để chia nhánh xử lý dựa trên mức độ ưu tiên:
+
+```javascript
+// IF Node condition
+// Kiểm tra: {{ $json.isUrgent }} === true
+// True branch  -> Gửi Slack + Email
+// False branch -> Lưu Google Sheets
+```
+
+### Bước 4: Gửi thông báo Slack
+
+```json
+{
+  "node": "Slack",
+  "parameters": {
+    "channel": "#alerts",
+    "text": "CẢNH BÁO KHẨN: {{ $json.name }} - {{ $json.message }}",
+    "attachments": [
+      {
+        "color": "#ff0000",
+        "fields": [
+          { "title": "Email", "value": "{{ $json.email }}" },
+          { "title": "Thời gian", "value": "{{ $json.timestamp }}" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Các use case phổ biến
+
+### 1. Tự động hóa DevOps
+
+- Nhận webhook từ GitHub khi có PR mới -> chạy test -> thông báo kết quả
+- Monitor server health -> gửi cảnh báo khi có vấn đề
+
+### 2. Marketing Automation
+
+- Thu thập lead từ form -> lưu CRM -> gửi email chào mừng
+- Đồng bộ danh sách email giữa các nền tảng
+
+### 3. Data Pipeline
+
+- Thu thập dữ liệu từ nhiều API -> làm sạch -> lưu vào database
+- Tạo báo cáo định kỳ và gửi qua email
+
+### 4. Customer Support
+
+- Nhận ticket mới -> phân loại tự động -> gán cho agent phù hợp
+- Gửi thông báo follow-up tự động
+
+<Callout type="tip">Bắt đầu với các workflow đơn giản và tăng dần độ phức tạp. n8n cung cấp thư viện workflow templates tại n8n.io/workflows để bạn tham khảo và học hỏi.</Callout>
+
+## Xử lý lỗi trong n8n
+
+n8n cung cấp cơ chế xử lý lỗi mạnh mẽ:
+
+```javascript
+// Error Workflow - Được gọi khi có lỗi xảy ra
+const error = $input.first().json;
+
+return [{
+  json: {
+    errorMessage: error.message,
+    errorNode: error.node?.name,
+    workflow: error.workflow?.name,
+    timestamp: new Date().toISOString(),
+    severity: 'high'
+  }
+}];
+```
+
+<Diagram chart="graph TD\n    A[Main Workflow] -->|Lỗi xảy ra| B[Error Trigger]\n    B --> C[Log lỗi vào DB]\n    B --> D[Gửi thông báo Slack]\n    B --> E[Gửi email admin]\n    A -->|Thành công| F[Hoàn thành]" />
+
+## Kết luận
+
+n8n là một công cụ tự động hóa workflow mạnh mẽ và linh hoạt, đặc biệt phù hợp cho các developer và team muốn kiểm soát hoàn toàn quy trình tự động hóa của mình. Với khả năng self-host, hỗ trợ code tùy chỉnh và cộng đồng đang phát triển mạnh, n8n là một lựa chọn xứng đáng để xem xét khi xây dựng hệ thống tự động hóa.
+
+<Callout type="info">Để bắt đầu, hãy truy cập docs.n8n.io để đọc tài liệu chính thức và thử tạo workflow đầu tiên của bạn. Cộng đồng n8n trên Discord và forum cũng rất tích cực hỗ trợ người dùng mới.</Callout>

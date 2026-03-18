@@ -1,0 +1,319 @@
+---
+title: "HTML and CSS Basics"
+description: "A comprehensive guide to HTML5 semantic tags, CSS3 Flexbox/Grid, and responsive design for web development beginners."
+category: "web-development"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 10
+tags: ["html", "css", "web-development", "responsive-design", "flexbox", "grid", "beginner"]
+featured: true
+order: 1
+sources:
+  - title: "MDN Web Docs - HTML"
+    url: "https://developer.mozilla.org/en-US/docs/Web/HTML"
+  - title: "MDN Web Docs - CSS"
+    url: "https://developer.mozilla.org/en-US/docs/Web/CSS"
+  - title: "CSS-Tricks - A Complete Guide to Flexbox"
+    url: "https://css-tricks.com/snippets/css/a-guide-to-flexbox/"
+  - title: "CSS-Tricks - A Complete Guide to CSS Grid"
+    url: "https://css-tricks.com/snippets/css/complete-guide-grid/"
+---
+
+# HTML and CSS Basics
+
+HTML and CSS are the two foundational technologies behind every website. HTML (HyperText Markup Language) defines the structure and content, while CSS (Cascading Style Sheets) controls the visual appearance and layout. Anyone who wants to become a web developer must master these two languages before learning any framework.
+
+## Basic Structure of an HTML5 Page
+
+Every web page starts with an HTML skeleton. HTML5 introduced many new tags that make web page structure clearer and more meaningful.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My First Web Page</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/contact">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <article>
+      <h1>Welcome to the Web</h1>
+      <p>This is the main content of the page.</p>
+    </article>
+    <aside>
+      <h2>Related Articles</h2>
+    </aside>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 My Website</p>
+  </footer>
+</body>
+</html>
+```
+
+<Callout type="info">The DOCTYPE declaration on the first line tells the browser that this is an HTML5 document. Always include it to ensure your page renders correctly.</Callout>
+
+## HTML5 Semantic Tags
+
+Semantic tags help browsers and search engines understand the content of your web page better. Instead of using `<div>` for everything, HTML5 provides specialized elements.
+
+<Diagram chart="graph TD\n    A[html] --> B[head]\n    A --> C[body]\n    C --> D[header]\n    C --> E[nav]\n    C --> F[main]\n    C --> G[footer]\n    F --> H[article]\n    F --> I[section]\n    F --> J[aside]\n    D --> K[Logo + Navigation]\n    H --> L[Main Content]\n    I --> M[Content Sections]\n    J --> N[Sidebar]" />
+
+### Key Semantic Tags
+
+| Tag | Purpose | Example Usage |
+|-----|---------|---------------|
+| `<header>` | Page header area | Logo, navigation menu |
+| `<nav>` | Navigation links | Main menu, breadcrumbs |
+| `<main>` | Main content | The most important content |
+| `<article>` | Self-contained content | Blog post, news article |
+| `<section>` | Grouped content | Thematic sections within a page |
+| `<aside>` | Secondary content | Sidebar, advertisements |
+| `<footer>` | Page footer | Copyright, links |
+| `<figure>` | Image with caption | Photos, diagrams |
+
+<Callout type="tip">Using semantic tags not only improves SEO but also makes your content accessible to screen reader users. This is an important part of web accessibility (a11y).</Callout>
+
+## CSS3 Flexbox
+
+Flexbox is a one-dimensional (1D) layout system that lets you arrange elements in a row or column with great flexibility.
+
+### Core Flexbox Properties
+
+```css
+/* Container (parent element) */
+.container {
+  display: flex;
+  flex-direction: row;        /* row | column | row-reverse | column-reverse */
+  justify-content: center;    /* Alignment along the main axis */
+  align-items: center;        /* Alignment along the cross axis */
+  flex-wrap: wrap;            /* Allow items to wrap to new lines */
+  gap: 16px;                  /* Space between items */
+}
+
+/* Item (child element) */
+.item {
+  flex: 1;                    /* Growth ratio */
+  flex-basis: 200px;          /* Base size */
+  flex-grow: 1;               /* Ability to expand */
+  flex-shrink: 0;             /* Ability to shrink */
+}
+```
+
+### Practical Example: Navigation Bar
+
+```css
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: #1a1a2e;
+  color: white;
+}
+
+.navbar .logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.navbar .menu {
+  display: flex;
+  gap: 1.5rem;
+  list-style: none;
+}
+
+.navbar .menu a {
+  color: white;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.navbar .menu a:hover {
+  color: #e94560;
+}
+```
+
+## CSS3 Grid
+
+Grid is a two-dimensional (2D) layout system that allows you to create complex layouts with both rows and columns simultaneously.
+
+```css
+/* Basic page layout with Grid */
+.page-layout {
+  display: grid;
+  grid-template-columns: 250px 1fr 250px;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "header header header"
+    "sidebar content aside"
+    "footer footer footer";
+  min-height: 100vh;
+  gap: 1rem;
+}
+
+.header  { grid-area: header; }
+.sidebar { grid-area: sidebar; }
+.content { grid-area: content; }
+.aside   { grid-area: aside; }
+.footer  { grid-area: footer; }
+```
+
+<Callout type="info">Flexbox is best for one-dimensional layouts (navigation bars, card lists). Grid is best for two-dimensional layouts (full page layouts). You can combine both to create complete interfaces.</Callout>
+
+### Flexbox vs Grid Comparison
+
+<ComparisonTable headers={["Criteria", "Flexbox", "Grid"]} rows={[["Dimensions", "1D (row OR column)", "2D (rows AND columns)"], ["Best for", "Small components, navigation", "Overall page layout"], ["Alignment", "Along main and cross axes", "Free row and column alignment"], ["Nesting", "Often requires nesting", "Less nesting needed"], ["Learning curve", "Easier to learn", "Slightly more complex"]]} />
+
+## Responsive Design
+
+Responsive design ensures that your web page looks good on every screen size, from mobile phones to desktop monitors.
+
+### Media Queries
+
+```css
+/* Default: design for mobile first (Mobile First approach) */
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+/* Tablet: 768px and above */
+@media (min-width: 768px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 2rem;
+  }
+}
+
+/* Desktop: 1024px and above */
+@media (min-width: 1024px) {
+  .card-grid {
+    grid-template-columns: repeat(3, 1fr);
+    padding: 3rem;
+  }
+}
+
+/* Large desktop: 1440px and above */
+@media (min-width: 1440px) {
+  .card-grid {
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}
+```
+
+### Relative Units
+
+```css
+/* Use relative units instead of fixed pixels */
+.responsive-text {
+  font-size: clamp(1rem, 2.5vw, 2rem);  /* Min, preferred, max */
+  padding: 2em;                          /* Relative to font-size */
+  max-width: 75ch;                       /* Max width in characters */
+  margin-inline: auto;                   /* Horizontal centering */
+}
+
+.responsive-image {
+  width: 100%;
+  max-width: 800px;
+  height: auto;                          /* Maintain aspect ratio */
+  object-fit: cover;
+}
+```
+
+<Callout type="warning">Always include the viewport meta tag in your HTML head for responsive design to work properly: `<meta name="viewport" content="width=device-width, initial-scale=1.0">`. Without this tag, your page will display as a shrunken desktop version on mobile devices.</Callout>
+
+## Complete Example: Card Component
+
+Let us combine everything we have learned to create a responsive card component:
+
+```html
+<div class="card-grid">
+  <article class="card">
+    <img src="image.jpg" alt="Description" class="card__image">
+    <div class="card__body">
+      <span class="card__tag">Web Development</span>
+      <h3 class="card__title">Learning HTML and CSS</h3>
+      <p class="card__desc">A beginner's guide to HTML5 and CSS3.</p>
+    </div>
+    <footer class="card__footer">
+      <span>5 min read</span>
+      <a href="/read-more">Read more &rarr;</a>
+    </footer>
+  </article>
+</div>
+```
+
+```css
+.card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: white;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.card__image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.card__body {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+.card__tag {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #e94560;
+  font-weight: 600;
+}
+
+.card__title {
+  margin: 0.5rem 0;
+  font-size: 1.25rem;
+}
+
+.card__footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #eee;
+  font-size: 0.875rem;
+}
+```
+
+## Next Steps
+
+After mastering HTML and CSS, you should:
+
+1. **Practice**: Rebuild the UI of popular websites (clone projects).
+2. **Learn JavaScript**: Add interactivity to your pages.
+3. **Explore CSS Frameworks**: Like Tailwind CSS or Bootstrap to speed up development.
+4. **Study Accessibility**: Ensure your website is usable by everyone.
+
+<Callout type="tip">The best way to learn HTML and CSS is through practice. Pick a website you like and try rebuilding its interface from scratch. You will learn an enormous amount from this process.</Callout>

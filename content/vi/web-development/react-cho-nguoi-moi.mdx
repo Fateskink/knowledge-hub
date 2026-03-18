@@ -1,0 +1,379 @@
+---
+title: "React cho Người mới bắt đầu"
+description: "Hướng dẫn cơ bản về React: components, JSX, props, state và hooks. Mọi thứ bạn cần biết để bắt đầu xây dựng giao diện với React."
+category: "web-development"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["react", "javascript", "components", "hooks", "useState", "useEffect", "frontend"]
+featured: false
+order: 3
+sources:
+  - title: "React Official Documentation"
+    url: "https://react.dev/"
+  - title: "MDN Web Docs - JavaScript"
+    url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript"
+  - title: "React Hooks Documentation"
+    url: "https://react.dev/reference/react/hooks"
+  - title: "Thinking in React"
+    url: "https://react.dev/learn/thinking-in-react"
+---
+
+# React cho Người mới bắt đầu
+
+React là thư viện JavaScript phổ biến nhất để xây dựng giao diện người dùng (UI). Được phát triển bởi Meta (Facebook), React giúp bạn tạo các ứng dụng web tương tác thông qua các component có thể tái sử dụng. Bài viết này sẽ giúp bạn hiểu các khái niệm cơ bản của React.
+
+## React là gì?
+
+React là một thư viện (library) JavaScript dùng để xây dựng UI. Thay vì thao tác trực tiếp với DOM (Document Object Model), React sử dụng Virtual DOM để cập nhật giao diện hiệu quả hơn.
+
+<Diagram chart="graph TD\n    A[Component] --> B[JSX Template]\n    B --> C[Virtual DOM]\n    C --> D{So sánh thay đổi}\n    D --> E[Cập nhật DOM thật]\n    E --> F[Giao diện hiển thị]\n    G[State thay đổi] --> A\n    H[Props từ cha] --> A" />
+
+<Callout type="info">React không phải là framework (như Angular). Nó chỉ tập trung vào phần View (giao diện). Để xây dựng ứng dụng hoàn chỉnh, bạn thường kết hợp React với các thư viện khác như React Router, Redux, hoặc sử dụng framework như Next.js.</Callout>
+
+## Tạo dự án React
+
+Cách nhanh nhất để bắt đầu với React là sử dụng Vite:
+
+```bash
+# Tạo dự án mới với Vite
+npm create vite@latest my-react-app -- --template react
+
+# Di chuyển vào thư mục dự án
+cd my-react-app
+
+# Cài đặt dependencies
+npm install
+
+# Chạy server phát triển
+npm run dev
+```
+
+## JSX - JavaScript XML
+
+JSX cho phép bạn viết mã HTML bên trong JavaScript. Đây là cú pháp đặc biệt của React.
+
+```jsx
+// JSX trông giống HTML nhưng thực chất là JavaScript
+const element = <h1>Xin chào, React!</h1>;
+
+// Nhúng biểu thức JavaScript vào JSX
+const ten = "Nguyễn Văn An";
+const loiChao = <h1>Xin chào, {ten}!</h1>;
+
+// JSX với điều kiện
+const isLoggedIn = true;
+const message = (
+  <div>
+    {isLoggedIn ? (
+      <p>Chào mừng bạn trở lại!</p>
+    ) : (
+      <p>Vui lòng đăng nhập.</p>
+    )}
+  </div>
+);
+
+// JSX với danh sách
+const monHoc = ["Toán", "Lý", "Hóa", "Anh"];
+const danhSach = (
+  <ul>
+    {monHoc.map((mon, index) => (
+      <li key={index}>{mon}</li>
+    ))}
+  </ul>
+);
+```
+
+<Callout type="warning">Mọi phần tử trong danh sách JSX cần có prop `key` duy nhất. React sử dụng key để theo dõi phần tử nào thay đổi, thêm hoặc xóa. Không nên dùng index làm key khi danh sách có thể thay đổi thứ tự.</Callout>
+
+## Components
+
+Components là đơn vị cơ bản của React. Mỗi component là một hàm trả về JSX.
+
+```jsx
+// Function Component đơn giản
+function XinChao() {
+  return <h1>Xin chào, thế giới!</h1>;
+}
+
+// Arrow function component
+const ThongBao = () => {
+  return (
+    <div className="thong-bao">
+      <p>Đây là một thông báo quan trọng.</p>
+    </div>
+  );
+};
+
+// Sử dụng component
+function App() {
+  return (
+    <div>
+      <XinChao />
+      <ThongBao />
+    </div>
+  );
+}
+```
+
+## Props - Truyền dữ liệu giữa Components
+
+Props (properties) là cách truyền dữ liệu từ component cha xuống component con.
+
+```jsx
+// Component nhận props
+function UserCard({ ten, tuoi, avatar, vaiTro = "Thành viên" }) {
+  return (
+    <div className="user-card">
+      <img src={avatar} alt={ten} />
+      <h3>{ten}</h3>
+      <p>Tuổi: {tuoi}</p>
+      <span className="vai-tro">{vaiTro}</span>
+    </div>
+  );
+}
+
+// Component cha truyền props
+function DanhSachUser() {
+  const users = [
+    { id: 1, ten: "An", tuoi: 25, avatar: "/an.jpg", vaiTro: "Admin" },
+    { id: 2, ten: "Bình", tuoi: 30, avatar: "/binh.jpg" },
+    { id: 3, ten: "Chi", tuoi: 22, avatar: "/chi.jpg", vaiTro: "Moderator" },
+  ];
+
+  return (
+    <div className="danh-sach">
+      {users.map(user => (
+        <UserCard key={user.id} {...user} />
+      ))}
+    </div>
+  );
+}
+
+// Children props
+function Card({ title, children }) {
+  return (
+    <div className="card">
+      <h2>{title}</h2>
+      <div className="card-body">{children}</div>
+    </div>
+  );
+}
+
+// Sử dụng children
+function App() {
+  return (
+    <Card title="Thông tin">
+      <p>Nội dung bất kỳ ở đây.</p>
+      <button>Bấm vào đây</button>
+    </Card>
+  );
+}
+```
+
+<Callout type="info">Props là một chiều (one-way data flow): chỉ truyền từ cha xuống con. Component con không thể thay đổi props nhận được. Nếu cần thay đổi dữ liệu, hãy sử dụng state.</Callout>
+
+## State với useState
+
+State là dữ liệu nội bộ của component, có thể thay đổi theo thời gian và làm component re-render.
+
+```jsx
+import { useState } from "react";
+
+function BoDemSanPham() {
+  const [soLuong, setSoLuong] = useState(1);
+  const donGia = 150000;
+
+  const tang = () => setSoLuong(prev => prev + 1);
+  const giam = () => setSoLuong(prev => Math.max(1, prev - 1));
+
+  return (
+    <div className="bo-dem">
+      <h3>Số lượng sản phẩm</h3>
+      <div className="controls">
+        <button onClick={giam}>-</button>
+        <span>{soLuong}</span>
+        <button onClick={tang}>+</button>
+      </div>
+      <p>Tổng tiền: {(soLuong * donGia).toLocaleString("vi-VN")} VND</p>
+    </div>
+  );
+}
+
+// State với object
+function FormDangKy() {
+  const [formData, setFormData] = useState({
+    hoTen: "",
+    email: "",
+    matKhau: "",
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log("Dữ liệu:", formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        name="hoTen"
+        value={formData.hoTen}
+        onChange={handleChange}
+        placeholder="Họ và tên"
+      />
+      <input
+        name="email"
+        type="email"
+        value={formData.email}
+        onChange={handleChange}
+        placeholder="Email"
+      />
+      <input
+        name="matKhau"
+        type="password"
+        value={formData.matKhau}
+        onChange={handleChange}
+        placeholder="Mật khẩu"
+      />
+      <button type="submit">Đăng ký</button>
+    </form>
+  );
+}
+```
+
+<Callout type="warning">Không bao giờ thay đổi state trực tiếp. Luôn sử dụng hàm setter (như `setSoLuong`). Ví dụ: `soLuong = 5` là SAI. Phải dùng `setSoLuong(5)`. Với object và array, luôn tạo bản sao mới thay vì thay đổi trực tiếp.</Callout>
+
+## useEffect - Side Effects
+
+useEffect cho phép bạn thực hiện các tác vụ phụ (side effects) như gọi API, cập nhật tiêu đề trang, hoặc đặt timer.
+
+```jsx
+import { useState, useEffect } from "react";
+
+function DanhSachBaiViet() {
+  const [baiViet, setBaiViet] = useState([]);
+  const [dangTai, setDangTai] = useState(true);
+  const [loi, setLoi] = useState(null);
+
+  // Gọi API khi component được mount
+  useEffect(() => {
+    const layBaiViet = async () => {
+      try {
+        setDangTai(true);
+        const response = await fetch("https://jsonplaceholder.typicode.com/posts?_limit=5");
+        if (!response.ok) throw new Error("Không thể tải dữ liệu");
+        const data = await response.json();
+        setBaiViet(data);
+      } catch (err) {
+        setLoi(err.message);
+      } finally {
+        setDangTai(false);
+      }
+    };
+
+    layBaiViet();
+  }, []); // Mảng rỗng = chỉ chạy 1 lần
+
+  if (dangTai) return <p>Đang tải...</p>;
+  if (loi) return <p>Lỗi: {loi}</p>;
+
+  return (
+    <div>
+      <h2>Bài viết mới nhất</h2>
+      {baiViet.map(bv => (
+        <article key={bv.id}>
+          <h3>{bv.title}</h3>
+          <p>{bv.body}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+// useEffect với cleanup
+function DongHo() {
+  const [thoiGian, setThoiGian] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setThoiGian(new Date());
+    }, 1000);
+
+    // Cleanup function - chạy khi component unmount
+    return () => clearInterval(timer);
+  }, []);
+
+  return <p>Bây giờ là: {thoiGian.toLocaleTimeString("vi-VN")}</p>;
+}
+```
+
+<Diagram chart="graph TD\n    A[Component Mount] --> B[Render lần đầu]\n    B --> C[useEffect chạy]\n    C --> D{State thay đổi?}\n    D -->|Có| E[Re-render]\n    E --> F[Cleanup effect cũ]\n    F --> G[useEffect chạy lại]\n    G --> D\n    D -->|Unmount| H[Cleanup effect]\n    H --> I[Component bị gỡ bỏ]" />
+
+## Custom Hooks
+
+Custom hooks giúp bạn trích xuất và tái sử dụng logic giữa các components.
+
+```jsx
+// Custom hook để gọi API
+function useFetch(url) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        setData(json);
+      } catch (err) {
+        if (err.name !== "AbortError") setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => controller.abort();
+  }, [url]);
+
+  return { data, loading, error };
+}
+
+// Sử dụng custom hook
+function UserProfile({ userId }) {
+  const { data: user, loading, error } = useFetch(
+    `https://api.example.com/users/${userId}`
+  );
+
+  if (loading) return <p>Đang tải...</p>;
+  if (error) return <p>Lỗi: {error}</p>;
+
+  return (
+    <div>
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+    </div>
+  );
+}
+```
+
+<Callout type="tip">Quy tắc đặt tên: Custom hooks phải bắt đầu bằng từ "use" (ví dụ: useFetch, useLocalStorage, useDebounce). Đây là quy ước bắt buộc để React nhận diện và áp dụng các quy tắc hooks.</Callout>
+
+## Kết luận
+
+React cung cấp một cách tiếp cận mạnh mẽ để xây dựng giao diện người dùng. Với các khái niệm components, props, state và hooks, bạn có thể tạo những ứng dụng web phức tạp từ những thành phần đơn giản.
+
+Bước tiếp theo là xây dựng một dự án nhỏ để thực hành, ví dụ như một ứng dụng to-do list hoặc trang hiển thị thời tiết. Sau đó, tìm hiểu thêm về React Router, Context API và các state management libraries.

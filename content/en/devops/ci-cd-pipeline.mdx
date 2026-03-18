@@ -1,0 +1,310 @@
+---
+title: "CI/CD Pipeline"
+description: "Learn about CI/CD pipelines: concepts, stages, GitHub Actions, and how to build automated deployment workflows for your applications."
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["ci-cd", "github-actions", "devops", "automation", "pipeline", "deployment"]
+featured: true
+order: 2
+sources:
+  - title: "GitHub Actions Documentation"
+    url: "https://docs.github.com/en/actions"
+  - title: "CI/CD Concepts - GitLab"
+    url: "https://about.gitlab.com/topics/ci-cd/"
+  - title: "Continuous Integration - Martin Fowler"
+    url: "https://martinfowler.com/articles/continuousIntegration.html"
+  - title: "GitHub Actions Marketplace"
+    url: "https://github.com/marketplace?type=actions"
+---
+
+# CI/CD Pipeline
+
+In modern software development, automating the build, test, and deployment process is critical for ensuring quality and delivery speed. CI/CD (Continuous Integration / Continuous Delivery) is the methodology that makes this possible. This article introduces the core concepts of CI/CD, walks through pipeline stages, and guides you through building a real pipeline with GitHub Actions.
+
+## What Is CI/CD?
+
+**Continuous Integration (CI)** is the practice of automatically merging developer code into a shared branch frequently, while running automated builds and tests to catch bugs early.
+
+**Continuous Delivery (CD)** is the practice of automatically deploying software through various environments (staging, production) after the code has passed all validation steps.
+
+<Diagram chart="graph LR\n    A[Developer Pushes Code] --> B[CI: Build & Test]\n    B --> C{Tests Pass?}\n    C -->|Yes| D[CD: Deploy to Staging]\n    C -->|No| E[Notify Failure]\n    E --> A\n    D --> F[Review & QA]\n    F --> G[CD: Deploy to Production]\n    G --> H[Monitoring]" />
+
+<Callout type="info">CI/CD is not just a set of tools -- it is a culture. It encourages developers to commit code frequently, write comprehensive tests, and keep code in a deployable state at all times.</Callout>
+
+## Stages of a CI/CD Pipeline
+
+A typical CI/CD pipeline consists of the following stages:
+
+<Diagram chart="graph TD\n    A[Source] --> B[Build]\n    B --> C[Unit Tests]\n    C --> D[Integration Tests]\n    D --> E[Code Quality & Security Scan]\n    E --> F[Build Artifact / Docker Image]\n    F --> G[Deploy to Staging]\n    G --> H[Acceptance Tests]\n    H --> I[Deploy to Production]\n    I --> J[Monitoring & Alerting]" />
+
+### 1. Source
+
+The pipeline is triggered when there is a change in the repository -- typically when a developer pushes code or opens a pull request.
+
+### 2. Build
+
+Source code is compiled, dependencies are installed, and the application is packaged.
+
+### 3. Test
+
+Various types of tests run automatically:
+- **Unit tests**: Validate individual functions and modules
+- **Integration tests**: Verify interactions between components
+- **End-to-end tests**: Validate complete application workflows
+
+### 4. Code Quality & Security
+
+- Linting and formatting checks
+- Security vulnerability scanning (SAST/DAST)
+- Code coverage analysis
+
+### 5. Deploy
+
+The application is deployed to staging or production environments.
+
+<Callout type="tip">Use safe deployment strategies like blue-green deployments or canary releases to minimize risk when updating production.</Callout>
+
+## GitHub Actions
+
+GitHub Actions is a CI/CD platform built directly into GitHub. It lets you define workflows using YAML files that run automatically based on events (push, pull request, schedule, etc.).
+
+### Key Concepts
+
+- **Workflow**: An automated process defined in a YAML file
+- **Event**: A trigger for the workflow (push, pull_request, schedule, ...)
+- **Job**: A set of steps that run on the same runner
+- **Step**: A single command or action to execute
+- **Action**: A reusable unit -- you can write your own or use ones from the Marketplace
+- **Runner**: The virtual machine that executes the workflow (GitHub-hosted or self-hosted)
+
+### Example: CI/CD for a Node.js Project
+
+Below is a complete workflow for a Node.js project, including testing, building, and deploying:
+
+```yaml
+# .github/workflows/ci-cd.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # Job 1: Lint and Test
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm run test -- --coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+
+  # Job 2: Build the application
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: dist/
+
+  # Job 3: Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: dist/
+
+      - name: Deploy to staging server
+        run: |
+          echo "Deploying to staging..."
+          # Add your actual deployment commands here
+          # e.g., rsync, scp, or cloud provider CLI
+
+  # Job 4: Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: dist/
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production..."
+          # Add your actual deployment commands here
+```
+
+<Callout type="warning">Never store secrets (API keys, passwords, tokens) directly in YAML files. Use GitHub Secrets (`Settings > Secrets and variables > Actions`) and access them with the syntax `$\{{ secrets.MY_SECRET }}`.</Callout>
+
+### Understanding Workflow Structure
+
+```yaml
+on:
+  push:
+    branches: [main, develop]    # Run on pushes to main or develop
+  pull_request:
+    branches: [main]             # Run on PRs targeting main
+```
+
+**`needs`** defines execution order between jobs:
+
+```yaml
+build:
+  needs: test          # build only runs after test succeeds
+deploy-staging:
+  needs: build         # deploy only runs after build succeeds
+```
+
+**`if`** conditions control whether a job runs:
+
+```yaml
+if: github.ref == 'refs/heads/main'   # Only deploy to production from main
+```
+
+## Example: Workflow with Docker
+
+If you use Docker, here is how to build and push Docker images in your pipeline:
+
+```yaml
+# .github/workflows/docker-build.yml
+name: Docker Build & Push
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            myuser/myapp:latest
+            myuser/myapp:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+```
+
+## Popular CI/CD Tools
+
+| Tool | Strengths | Weaknesses |
+|------|-----------|------------|
+| GitHub Actions | Native GitHub integration, rich Marketplace, free for public repos | Limited minutes for private repos |
+| GitLab CI | Native GitLab integration, powerful pipelines | Requires GitLab ecosystem |
+| Jenkins | Highly flexible, extensive plugins, self-hosted | Complex setup, requires server management |
+| CircleCI | Fast execution, easy configuration | Costs increase at scale |
+| AWS CodePipeline | Deep AWS integration, secure | Locked into AWS ecosystem |
+
+<Callout type="tip">If you are already using GitHub for your repository, GitHub Actions is the simplest and most effective choice. It is built-in, has a rich Marketplace, and is free for open source projects.</Callout>
+
+## Best Practices
+
+### 1. Keep Pipelines Fast
+
+- Run jobs in parallel whenever possible
+- Cache dependencies (`actions/cache` or the built-in `cache` option in `setup-node`)
+- Only run the tests necessary for each stage
+
+### 2. Fail Fast
+
+- Place quick-to-fail steps (lint, unit tests) at the beginning of the pipeline
+- Use `continue-on-error: false` (the default) to stop immediately on failure
+
+### 3. Environments and Approvals
+
+- Use environments (`staging`, `production`) to control deployments
+- Configure approval rules for production deployments
+- Restrict who can deploy to production
+
+### 4. Monitoring and Rollback
+
+- Set up post-deploy alerting (uptime, error rate, response time)
+- Have a clear rollback plan for failed deployments
+- Use versioning for artifacts and Docker images
+
+<Diagram chart="graph LR\n    A[Commit Code] --> B[CI Pipeline]\n    B --> C[Automated Tests]\n    C --> D[Build Artifact]\n    D --> E[Deploy Staging]\n    E --> F[Manual Review]\n    F --> G[Deploy Production]\n    G --> H[Health Check]\n    H -->|Fail| I[Rollback]\n    H -->|Pass| J[Done]" />
+
+## Conclusion
+
+A CI/CD pipeline is the backbone of modern software development. It reduces human error, accelerates delivery, and ensures code quality. Start with a simple pipeline (lint + test + build), then expand as your project grows. GitHub Actions is an excellent starting point for any project hosted on GitHub.

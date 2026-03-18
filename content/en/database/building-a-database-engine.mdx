@@ -1,0 +1,313 @@
+---
+title: "Building a Simple Database Engine: Understanding How MySQL and SQLite Work"
+description: "Explore the internals of a database engine: SQL parser, query optimizer, storage engine, B-Tree indexes, WAL, and build a key-value store from scratch in Python."
+category: "database"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 16
+tags: ["database-engine", "b-tree", "storage-engine", "wal", "sql-parser", "key-value-store", "database-internals"]
+featured: true
+order: 9
+sources:
+  - title: "Database Internals by Alex Petrov"
+    url: "https://www.databass.dev/"
+  - title: "SQLite Documentation - Architecture"
+    url: "https://www.sqlite.org/arch.html"
+  - title: "CMU Database Course - Andy Pavlo"
+    url: "https://15445.courses.cs.cmu.edu/"
+  - title: "Build Your Own Database From Scratch"
+    url: "https://build-your-own.org/database/"
+---
+
+# Building a Simple Database Engine: Understanding How MySQL and SQLite Work
+
+Every day you write `SELECT`, `INSERT`, `UPDATE` — but have you ever wondered what happens behind the scenes? When you type `SELECT * FROM users WHERE age > 25`, the database must parse the SQL, choose an optimal search strategy, read data from disk, filter results, and return them — all within milliseconds. This article opens that black box and guides you through building a simple database engine to deeply understand how everything works.
+
+## Why Build Your Own Database Engine?
+
+You do not need to build a database for production — MySQL, PostgreSQL, and SQLite already exist. But building one yourself helps you:
+
+- **Understand deeply** why indexes make queries faster
+- **Debug better** when you encounter database performance issues
+- **Design better** schemas and queries
+- **Interview confidently** when asked about database internals
+
+<Callout type="info">
+SQLite — the most widely deployed database in the world — has roughly 150,000 lines of C source code. But you can understand the core principles and build a simplified version in just a few hundred lines of Python.
+</Callout>
+
+## Architecture of a Database Engine
+
+Every database management system (DBMS) has these core components:
+
+<Diagram chart="graph TD\n    A[SQL Query] --> B[SQL Parser]\n    B --> C[AST - Abstract Syntax Tree]\n    C --> D[Query Planner / Optimizer]\n    D --> E[Query Plan]\n    E --> F[Execution Engine]\n    F --> G[Storage Engine]\n    G --> H[(Disk - Data Files)]\n    F --> I[Buffer Pool / Page Cache]\n    I --> G\n    F --> J[Index Manager - B-Tree]\n    F --> K[Transaction Manager - WAL]\n    F --> L[Lock Manager]\n    style B fill:#f9f,stroke:#333\n    style D fill:#bbf,stroke:#333\n    style G fill:#bfb,stroke:#333" />
+
+### 1. SQL Parser
+
+The parser takes a SQL string and converts it into an **AST** (Abstract Syntax Tree) — a tree data structure representing the query.
+
+```python
+# Example: "SELECT name FROM users WHERE age > 25"
+# Parsed into AST:
+ast = {
+    "type": "SELECT",
+    "columns": ["name"],
+    "from": "users",
+    "where": {
+        "operator": ">",
+        "left": {"type": "column", "name": "age"},
+        "right": {"type": "literal", "value": 25}
+    }
+}
+```
+
+### 2. Query Planner / Optimizer
+
+For any given SQL statement, there are multiple possible execution strategies. The optimizer picks the best one based on data statistics, available indexes, and a cost model.
+
+Example: `SELECT * FROM orders JOIN users ON orders.user_id = users.id WHERE users.country = 'US'`
+
+- **Plan A**: Full scan of orders, JOIN with users, then filter by country
+- **Plan B**: Filter users by country first, then JOIN with orders (better if few US users)
+
+### 3. Storage Engine
+
+Responsible for reading and writing data to disk. This is where the real magic happens.
+
+### 4. Buffer Pool / Page Cache
+
+Caches pages from disk into RAM. Databases read and write in units of **pages** (typically 4KB or 8KB), never individual bytes.
+
+### 5. Transaction Manager and WAL
+
+Ensures ACID properties — especially durability through **WAL** (Write-Ahead Logging).
+
+### 6. Lock Manager
+
+Controls concurrent access, preventing two transactions from conflicting with each other.
+
+## B-Tree: The Data Structure Behind Indexes
+
+### Why B-Tree and Not a Binary Tree?
+
+A Binary Search Tree searches in O(log2 N), but each node holds only one key — meaning each search step may require reading a new page from disk. With 1 million records, that is about 20 disk reads — each taking roughly 10ms, totaling 200ms.
+
+A **B-Tree** (Balanced Tree with high fanout) stores hundreds of keys per node — one node fits exactly one page (4KB). With a fanout of 200, you need only 3 levels to hold 8 million records. Just 3 disk reads instead of 20.
+
+<Diagram chart="graph TD\n    A[Root: 50, 100] --> B[10, 20, 30]\n    A --> C[60, 70, 80]\n    A --> D[110, 120, 130]\n    B --> E[1,2,3,5]\n    B --> F[11,12,15]\n    B --> G[21,25,28]\n    B --> H[31,35,40]\n    C --> I[51,55,58]\n    C --> J[61,65,68]\n    style A fill:#f96,stroke:#333\n    style B fill:#bbf,stroke:#333\n    style C fill:#bbf,stroke:#333\n    style D fill:#bbf,stroke:#333" />
+
+<ComparisonTable headers={["Criteria", "B-Tree", "LSM-Tree"]} rows={[["Structure", "Balanced tree, in-place update", "Sorted runs, append-only"], ["Optimized for", "Read-heavy workloads", "Write-heavy workloads"], ["Write pattern", "Random I/O (slower)", "Sequential I/O (faster)"], ["Read pattern", "Fast (1-3 disk reads)", "Slower (merge across levels)"], ["Used by", "MySQL InnoDB, PostgreSQL, SQLite", "RocksDB, LevelDB, Cassandra"], ["Space amplification", "Low", "High (due to compaction)"]]} />
+
+## Page-Based Storage
+
+Databases do not read or write individual records — they operate in units of **pages**, fixed-size blocks of data.
+
+<ComparisonTable headers={["Property", "Row Store", "Column Store"]} rows={[["Storage", "Each page holds complete rows", "Each page holds values of one column"], ["Optimized for", "OLTP - read/write individual records", "OLAP - aggregate analytics"], ["Good query example", "SELECT * FROM users WHERE id=5", "SELECT AVG(salary) FROM employees"], ["Compression", "Hard (mixed data types)", "Easy (same data type)"], ["Databases", "MySQL, PostgreSQL, SQLite", "ClickHouse, Apache Parquet, DuckDB"]]} />
+
+## WAL: Write-Ahead Logging
+
+When writing data, the database does not write directly to the data file. Instead, it writes to the **WAL** first — an append-only file that records every change. If the system crashes, the database can read the WAL and recover its state.
+
+<Diagram chart="graph LR\n    A[Transaction: UPDATE] --> B[Write to WAL]\n    B --> C[Update Buffer Pool]\n    C --> D[Return OK to Client]\n    D -.-> E[Background: Flush dirty pages to disk]\n    B --> F[(WAL File - sequential)]\n    E --> G[(Data Files - random)]\n    style B fill:#f96,stroke:#333\n    style F fill:#bfb,stroke:#333" />
+
+<Callout type="warning">
+WAL is the reason a database can return success even before data is written to the main data file. If a crash occurs, the recovery process replays the WAL to ensure no data is lost. This is exactly how **Durability** in ACID is guaranteed.
+</Callout>
+
+## Hands-On: Building a Key-Value Store in Python
+
+Let us build a simple key-value store with file-based storage, an append-only log, an in-memory index, and compaction.
+
+```python
+import json
+import os
+from typing import Optional
+from threading import Lock
+
+class SimpleKVStore:
+    """
+    A simple Key-Value Store using an append-only log.
+    Similar to how Bitcask (used by Riak) works.
+    """
+
+    def __init__(self, directory: str):
+        self.directory = directory
+        self.log_file = os.path.join(directory, "data.log")
+        self.index: dict[str, int] = {}  # key -> byte offset in file
+        self.lock = Lock()
+
+        os.makedirs(directory, exist_ok=True)
+        self._rebuild_index()
+
+    def _rebuild_index(self):
+        """Read the log file to rebuild the in-memory index."""
+        if not os.path.exists(self.log_file):
+            return
+
+        with open(self.log_file, 'r') as f:
+            offset = 0
+            for line in f:
+                entry = json.loads(line.strip())
+                if entry['type'] == 'SET':
+                    self.index[entry['key']] = offset
+                elif entry['type'] == 'DELETE':
+                    self.index.pop(entry['key'], None)
+                offset = f.tell()
+
+    def set(self, key: str, value: str):
+        """Add or update a key-value pair."""
+        with self.lock:
+            entry = json.dumps({
+                'type': 'SET',
+                'key': key,
+                'value': value
+            })
+            with open(self.log_file, 'a') as f:
+                offset = f.tell()
+                f.write(entry + '\n')
+                self.index[key] = offset
+
+    def get(self, key: str) -> Optional[str]:
+        """Read a value by key. O(1) thanks to in-memory index."""
+        if key not in self.index:
+            return None
+
+        with open(self.log_file, 'r') as f:
+            f.seek(self.index[key])
+            line = f.readline()
+            entry = json.loads(line.strip())
+            return entry['value']
+
+    def delete(self, key: str) -> bool:
+        """Delete a key by writing a tombstone."""
+        if key not in self.index:
+            return False
+
+        with self.lock:
+            entry = json.dumps({'type': 'DELETE', 'key': key})
+            with open(self.log_file, 'a') as f:
+                f.write(entry + '\n')
+            del self.index[key]
+        return True
+
+    def compact(self):
+        """
+        Compact the log file: keep only the latest value for each key.
+        Reduces file size and speeds up startup.
+        """
+        with self.lock:
+            compact_file = self.log_file + '.compact'
+            new_index = {}
+
+            with open(compact_file, 'w') as out:
+                for key, offset in self.index.items():
+                    value = self.get(key)
+                    if value is not None:
+                        entry = json.dumps({
+                            'type': 'SET',
+                            'key': key,
+                            'value': value
+                        })
+                        new_offset = out.tell()
+                        out.write(entry + '\n')
+                        new_index[key] = new_offset
+
+            # Atomic swap
+            os.replace(compact_file, self.log_file)
+            self.index = new_index
+
+    def keys(self) -> list[str]:
+        """List all keys."""
+        return list(self.index.keys())
+
+
+# === Usage ===
+db = SimpleKVStore("./my_database")
+
+# Write data
+db.set("user:1", '{"name": "Alice", "age": 28}')
+db.set("user:2", '{"name": "Bob", "age": 25}')
+db.set("user:3", '{"name": "Charlie", "age": 30}')
+
+# Read data
+print(db.get("user:1"))  # {"name": "Alice", "age": 28}
+
+# Update
+db.set("user:1", '{"name": "Alice", "age": 29}')
+print(db.get("user:1"))  # {"name": "Alice", "age": 29}
+
+# Delete
+db.delete("user:3")
+print(db.get("user:3"))  # None
+
+# Compaction - clean up old data
+db.compact()
+print(f"Total keys: {len(db.keys())}")  # 2
+```
+
+<Callout type="tip">
+The key-value store above uses the **Bitcask** model — an append-only log with an in-memory hash index. This is exactly how the Riak database works. Strengths: extremely fast writes (sequential I/O), O(1) reads. Weakness: all keys must fit in RAM.
+</Callout>
+
+## From Key-Value Store to Relational Database
+
+Our key-value store only supports GET/SET/DELETE by key. To become a relational database, we need to add:
+
+1. **SQL Parser**: Parse SQL syntax into an AST
+2. **Schema Management**: Define tables, columns, data types
+3. **B-Tree Index**: Enable range queries (WHERE age > 25)
+4. **Query Executor**: Execute JOIN, GROUP BY, ORDER BY
+5. **Transaction Support**: BEGIN, COMMIT, ROLLBACK with ACID
+6. **Concurrency Control**: Multiple clients accessing simultaneously
+
+```python
+# Simple example: adding a SQL layer on top of the key-value store
+class SimpleSQL:
+    def __init__(self, kv_store: SimpleKVStore):
+        self.kv = kv_store
+        self.schemas = {}  # table_name -> [column_names]
+
+    def create_table(self, table: str, columns: list[str]):
+        self.schemas[table] = columns
+        self.kv.set(f"__schema:{table}", json.dumps(columns))
+
+    def insert(self, table: str, values: dict):
+        # Auto-increment ID
+        counter_key = f"__counter:{table}"
+        current = self.kv.get(counter_key)
+        new_id = int(current or 0) + 1
+        self.kv.set(counter_key, str(new_id))
+
+        # Store record
+        self.kv.set(f"{table}:{new_id}", json.dumps(values))
+        return new_id
+
+    def select_by_id(self, table: str, record_id: int) -> Optional[dict]:
+        result = self.kv.get(f"{table}:{record_id}")
+        return json.loads(result) if result else None
+
+# Usage
+sql = SimpleSQL(SimpleKVStore("./sql_db"))
+sql.create_table("users", ["name", "age", "email"])
+uid = sql.insert("users", {"name": "Alice", "age": 28, "email": "alice@example.com"})
+print(sql.select_by_id("users", uid))
+```
+
+## Learning Roadmap
+
+<Diagram chart="graph TD\n    A[1. Understand Key-Value Stores\nBitcask, append-only log] --> B[2. Learn B-Trees\nBasic implementation]\n    B --> C[3. Page-based Storage\nFixed-size pages, buffer pool]\n    C --> D[4. SQL Parser\nLexer, parser, AST]\n    D --> E[5. Query Executor\nScan, filter, join]\n    E --> F[6. Transactions and WAL\nACID, crash recovery]\n    F --> G[7. Concurrency Control\nLocks, MVCC]\n    style A fill:#bfb,stroke:#333\n    style G fill:#f96,stroke:#333" />
+
+### Recommended Resources
+
+- **Book**: "Database Internals" by Alex Petrov — the most comprehensive book on database architecture
+- **Course**: CMU 15-445 Database Systems by Andy Pavlo — free on YouTube, world-class university quality
+- **Hands-on**: "Build Your Own Database From Scratch" — step-by-step guide to building a database in Go
+- **Source code**: Read the SQLite source — written in C, excellently documented, clear architecture
+
+<Callout type="info">
+Andy Pavlo — professor at CMU and a leading database expert — says: "The best way to understand a database is to build one yourself." You do not need to build a complete one — just walking through each component is enough to grasp the principles.
+</Callout>
+
+## Summary
+
+A database engine is one of the most complex pieces of software ever created. But when you break it down into individual components — parser, optimizer, storage engine, buffer pool, B-Tree, WAL — each part becomes understandable. The key-value store we built above is roughly 100 lines of code, yet it illustrates the core principles behind every database: an append-only log for durability, an in-memory index for read speed, and compaction for space management. From this foundation, you can explore B-Trees, MVCC, query optimization — and you will never look at `SELECT * FROM users` the same way again.

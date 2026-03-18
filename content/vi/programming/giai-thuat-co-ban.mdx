@@ -1,0 +1,337 @@
+---
+title: "Giải thuật Cơ bản"
+description: "Tìm hiểu các khái niệm giải thuật cơ bản: Big O, thuật toán sắp xếp, tìm kiếm và cấu trúc dữ liệu thường gặp."
+category: "programming"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["giai-thuat", "algorithm", "big-o", "sap-xep", "tim-kiem", "cau-truc-du-lieu"]
+featured: false
+order: 2
+sources:
+  - title: "Introduction to Algorithms - MIT OpenCourseWare"
+    url: "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/"
+  - title: "Big-O Cheat Sheet"
+    url: "https://www.bigocheatsheet.com/"
+  - title: "VisuAlgo - Visualizing Algorithms"
+    url: "https://visualgo.net/"
+  - title: "GeeksforGeeks - Data Structures"
+    url: "https://www.geeksforgeeks.org/data-structures/"
+---
+
+# Giải thuật Cơ bản
+
+Giải thuật (algorithm) là tập hợp các bước logic để giải quyết một vấn đề cụ thể. Hiểu về giải thuật giúp bạn viết code hiệu quả hơn, tối ưu hơn, và là nền tảng quan trọng cho mọi lập trình viên. Bài viết này sẽ giới thiệu các khái niệm giải thuật cơ bản mà bất kỳ ai học lập trình cũng cần biết.
+
+## Big O Notation - Độ phức tạp thuật toán
+
+Big O là cách đo lường hiệu suất của một thuật toán dựa trên kích thước đầu vào (n). Nó giúp bạn hiểu thuật toán sẽ chậm đi bao nhiêu khi dữ liệu tăng lên.
+
+<Diagram chart="graph LR\n    A[O 1 - Hằng số] --> B[O log n - Logarit]\n    B --> C[O n - Tuyến tính]\n    C --> D[O n log n - Log tuyến tính]\n    D --> E[O n^2 - Bình phương]\n    E --> F[O 2^n - Lũy thừa]\n    F --> G[O n! - Giai thừa]" />
+
+### Các độ phức tạp thường gặp
+
+| Big O | Tên gọi | Ví dụ | Hiệu suất |
+|-------|---------|-------|-----------|
+| O(1) | Hằng số | Truy cập phần tử mảng theo chỉ số | Rất nhanh |
+| O(log n) | Logarit | Tìm kiếm nhị phân | Nhanh |
+| O(n) | Tuyến tính | Duyệt qua mảng | Bình thường |
+| O(n log n) | Log tuyến tính | Merge Sort, Quick Sort | Khá |
+| O(n^2) | Bình phương | Bubble Sort, 2 vòng lặp lồng nhau | Chậm |
+| O(2^n) | Lũy thừa | Bài toán tập con (subsets) | Rất chậm |
+
+```python
+# Ví dụ minh họa các độ phức tạp
+
+# O(1) - Hằng số: không phụ thuộc vào kích thước đầu vào
+def lay_phan_tu_dau(mang):
+    return mang[0] if mang else None
+
+# O(n) - Tuyến tính: duyệt qua toàn bộ mảng
+def tim_gia_tri_lon_nhat(mang):
+    lon_nhat = mang[0]
+    for phan_tu in mang:
+        if phan_tu > lon_nhat:
+            lon_nhat = phan_tu
+    return lon_nhat
+
+# O(n^2) - Bình phương: 2 vòng lặp lồng nhau
+def co_cap_trung(mang):
+    for i in range(len(mang)):
+        for j in range(i + 1, len(mang)):
+            if mang[i] == mang[j]:
+                return True
+    return False
+```
+
+<Callout type="tip">Khi phân tích Big O, ta chỉ quan tâm đến trường hợp xấu nhất (worst case) và bỏ qua các hằng số. Ví dụ: O(2n) được rút gọn thành O(n).</Callout>
+
+## Thuật toán Sắp xếp (Sorting)
+
+Sắp xếp là một trong những thao tác cơ bản nhất trong lập trình. Dưới đây là các thuật toán sắp xếp phổ biến.
+
+### Bubble Sort - Sắp xếp nổi bọt
+
+Bubble Sort so sánh từng cặp phần tử kề nhau và đổi chỗ nếu chúng không đúng thứ tự. Đơn giản nhưng chậm.
+
+```python
+def bubble_sort(mang):
+    n = len(mang)
+    for i in range(n):
+        da_sap_xep = True
+        for j in range(0, n - i - 1):
+            if mang[j] > mang[j + 1]:
+                mang[j], mang[j + 1] = mang[j + 1], mang[j]
+                da_sap_xep = False
+        if da_sap_xep:
+            break
+    return mang
+
+# Sử dụng
+du_lieu = [64, 34, 25, 12, 22, 11, 90]
+print(f"Trước: {du_lieu}")
+print(f"Sau:   {bubble_sort(du_lieu.copy())}")
+```
+
+```javascript
+// Bubble Sort trong JavaScript
+function bubbleSort(arr) {
+  const n = arr.length;
+  for (let i = 0; i < n; i++) {
+    let swapped = false;
+    for (let j = 0; j < n - i - 1; j++) {
+      if (arr[j] > arr[j + 1]) {
+        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+        swapped = true;
+      }
+    }
+    if (!swapped) break;
+  }
+  return arr;
+}
+
+console.log(bubbleSort([64, 34, 25, 12, 22, 11, 90]));
+```
+
+### Merge Sort - Sắp xếp trộn
+
+Merge Sort sử dụng chiến lược "chia để trị" (divide and conquer) - chia mảng thành các phần nhỏ, sắp xếp từng phần rồi gộp lại.
+
+<Diagram chart="graph TD\n    A[38 27 43 3 9 82 10] --> B[38 27 43 3]\n    A --> C[9 82 10]\n    B --> D[38 27]\n    B --> E[43 3]\n    C --> F[9 82]\n    C --> G[10]\n    D --> H[27 38]\n    E --> I[3 43]\n    F --> J[9 82]\n    H --> K[3 27 38 43]\n    I --> K\n    J --> L[9 10 82]\n    G --> L\n    K --> M[3 9 10 27 38 43 82]\n    L --> M" />
+
+```python
+def merge_sort(mang):
+    if len(mang) <= 1:
+        return mang
+
+    giua = len(mang) // 2
+    ben_trai = merge_sort(mang[:giua])
+    ben_phai = merge_sort(mang[giua:])
+
+    return tron(ben_trai, ben_phai)
+
+def tron(trai, phai):
+    ket_qua = []
+    i = j = 0
+
+    while i < len(trai) and j < len(phai):
+        if trai[i] <= phai[j]:
+            ket_qua.append(trai[i])
+            i += 1
+        else:
+            ket_qua.append(phai[j])
+            j += 1
+
+    ket_qua.extend(trai[i:])
+    ket_qua.extend(phai[j:])
+    return ket_qua
+
+# Sử dụng
+du_lieu = [38, 27, 43, 3, 9, 82, 10]
+print(f"Trước: {du_lieu}")
+print(f"Sau:   {merge_sort(du_lieu)}")
+```
+
+<Callout type="info">Merge Sort có độ phức tạp O(n log n) trong mọi trường hợp, trong khi Bubble Sort có độ phức tạp O(n^2). Với 1 triệu phần tử, Merge Sort nhanh hơn hàng nghìn lần.</Callout>
+
+## Thuật toán Tìm kiếm (Searching)
+
+### Tìm kiếm tuyến tính (Linear Search)
+
+Duyệt qua từng phần tử cho đến khi tìm thấy giá trị cần tìm. Độ phức tạp: O(n).
+
+```python
+def tim_kiem_tuyen_tinh(mang, gia_tri):
+    for i, phan_tu in enumerate(mang):
+        if phan_tu == gia_tri:
+            return i
+    return -1
+
+du_lieu = [4, 2, 7, 1, 9, 3]
+vi_tri = tim_kiem_tuyen_tinh(du_lieu, 7)
+print(f"Tìm thấy 7 tại vị trí: {vi_tri}")  # Kết quả: 2
+```
+
+### Tìm kiếm nhị phân (Binary Search)
+
+Chỉ hoạt động trên mảng đã sắp xếp. Chia đôi mảng và so sánh giá trị giữa với giá trị cần tìm. Độ phức tạp: O(log n).
+
+```python
+def tim_kiem_nhi_phan(mang, gia_tri):
+    trai, phai = 0, len(mang) - 1
+
+    while trai <= phai:
+        giua = (trai + phai) // 2
+
+        if mang[giua] == gia_tri:
+            return giua
+        elif mang[giua] < gia_tri:
+            trai = giua + 1
+        else:
+            phai = giua - 1
+
+    return -1
+
+du_lieu = [1, 3, 5, 7, 9, 11, 13, 15]
+vi_tri = tim_kiem_nhi_phan(du_lieu, 9)
+print(f"Tìm thấy 9 tại vị trí: {vi_tri}")  # Kết quả: 4
+```
+
+```javascript
+// Binary Search trong JavaScript
+function binarySearch(arr, target) {
+  let left = 0;
+  let right = arr.length - 1;
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+
+    if (arr[mid] === target) return mid;
+    if (arr[mid] < target) left = mid + 1;
+    else right = mid - 1;
+  }
+
+  return -1;
+}
+
+const data = [1, 3, 5, 7, 9, 11, 13, 15];
+console.log(`Tìm thấy 9 tại vị trí: ${binarySearch(data, 9)}`);
+```
+
+<Callout type="warning">Tìm kiếm nhị phân chỉ hoạt động trên mảng đã sắp xếp. Nếu mảng chưa sắp xếp, bạn cần sắp xếp trước hoặc sử dụng tìm kiếm tuyến tính.</Callout>
+
+## Cấu trúc Dữ liệu cơ bản
+
+Cấu trúc dữ liệu là cách tổ chức và lưu trữ dữ liệu để có thể truy cập và xử lý hiệu quả.
+
+<Diagram chart="graph TD\n    A[Cấu trúc Dữ liệu] --> B[Tuyến tính]\n    A --> C[Phi tuyến tính]\n    B --> D[Array - Mảng]\n    B --> E[Linked List - Danh sách liên kết]\n    B --> F[Stack - Ngăn xếp]\n    B --> G[Queue - Hàng đợi]\n    C --> H[Tree - Cây]\n    C --> I[Graph - Đồ thị]\n    C --> J[Hash Table - Bảng băm]" />
+
+### Stack (Ngăn xếp) - LIFO
+
+Stack hoạt động theo nguyên tắc "Vào sau, Ra trước" (Last In, First Out).
+
+```python
+class Stack:
+    def __init__(self):
+        self.phan_tu = []
+
+    def push(self, gia_tri):
+        """Thêm phần tử vào đỉnh stack."""
+        self.phan_tu.append(gia_tri)
+
+    def pop(self):
+        """Lấy và xóa phần tử ở đỉnh stack."""
+        if self.rong():
+            raise IndexError("Stack rỗng!")
+        return self.phan_tu.pop()
+
+    def peek(self):
+        """Xem phần tử ở đỉnh stack mà không xóa."""
+        if self.rong():
+            raise IndexError("Stack rỗng!")
+        return self.phan_tu[-1]
+
+    def rong(self):
+        return len(self.phan_tu) == 0
+
+    def kich_thuoc(self):
+        return len(self.phan_tu)
+
+# Sử dụng
+stack = Stack()
+stack.push(1)
+stack.push(2)
+stack.push(3)
+print(f"Đỉnh stack: {stack.peek()}")   # 3
+print(f"Pop: {stack.pop()}")           # 3
+print(f"Đỉnh stack mới: {stack.peek()}")  # 2
+```
+
+### Queue (Hàng đợi) - FIFO
+
+Queue hoạt động theo nguyên tắc "Vào trước, Ra trước" (First In, First Out).
+
+```python
+from collections import deque
+
+class Queue:
+    def __init__(self):
+        self.phan_tu = deque()
+
+    def enqueue(self, gia_tri):
+        """Thêm phần tử vào cuối hàng đợi."""
+        self.phan_tu.append(gia_tri)
+
+    def dequeue(self):
+        """Lấy và xóa phần tử ở đầu hàng đợi."""
+        if self.rong():
+            raise IndexError("Queue rỗng!")
+        return self.phan_tu.popleft()
+
+    def rong(self):
+        return len(self.phan_tu) == 0
+
+# Sử dụng
+queue = Queue()
+queue.enqueue("Khách 1")
+queue.enqueue("Khách 2")
+queue.enqueue("Khách 3")
+print(f"Phục vụ: {queue.dequeue()}")  # Khách 1
+print(f"Phục vụ: {queue.dequeue()}")  # Khách 2
+```
+
+### Hash Table (Bảng băm)
+
+Hash Table cho phép truy cập dữ liệu theo khóa với độ phức tạp O(1) trung bình.
+
+```javascript
+// Hash Table đơn giản trong JavaScript
+// Trong thực tế, JavaScript Object và Map đã là hash table
+
+const sinhVien = new Map();
+sinhVien.set("SV001", { ten: "Nguyễn Văn A", diem: 8.5 });
+sinhVien.set("SV002", { ten: "Trần Thị B", diem: 9.0 });
+sinhVien.set("SV003", { ten: "Lê Văn C", diem: 7.5 });
+
+// Truy cập O(1)
+console.log(sinhVien.get("SV002")); // { ten: "Trần Thị B", diem: 9.0 }
+
+// Kiểm tra tồn tại O(1)
+console.log(sinhVien.has("SV001")); // true
+```
+
+## Tổng kết so sánh
+
+| Thuật toán | Độ phức tạp (trung bình) | Độ phức tạp (xấu nhất) | Ghi chú |
+|-----------|------------------------|----------------------|---------|
+| Bubble Sort | O(n^2) | O(n^2) | Đơn giản, chậm |
+| Merge Sort | O(n log n) | O(n log n) | Nhanh, ổn định |
+| Quick Sort | O(n log n) | O(n^2) | Nhanh trong thực tế |
+| Linear Search | O(n) | O(n) | Mảng bất kỳ |
+| Binary Search | O(log n) | O(log n) | Mảng đã sắp xếp |
+
+<Callout type="tip">Để luyện tập giải thuật, hãy sử dụng các trang web như LeetCode, HackerRank, hoặc Codeforces. Bắt đầu từ các bài Easy và tăng dần độ khó.</Callout>
+
+## Kết luận
+
+Giải thuật và cấu trúc dữ liệu là nền tảng của lập trình. Việc nắm vững các khái niệm này không chỉ giúp bạn viết code tốt hơn mà còn giúp bạn vượt qua các buổi phỏng vấn kỹ thuật. Hãy bắt đầu luyện tập với các ví dụ đơn giản và dần dần tiến đến các bài toán phức tạp hơn.

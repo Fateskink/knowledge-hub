@@ -1,0 +1,232 @@
+---
+title: "Rackspace Spot: Cheap Cloud Infrastructure with Managed Kubernetes"
+description: "Learn about Rackspace Spot - a cloud infrastructure platform with auction-based pricing, managed Kubernetes, and savings up to 90% compared to AWS/GCP"
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 10
+tags: ["rackspace-spot", "kubernetes", "cloud-infrastructure", "devops", "auction-pricing", "managed-kubernetes"]
+featured: true
+order: 6
+sources:
+  - title: "Rackspace Spot - Official"
+    url: "https://spot.rackspace.com"
+  - title: "Rackspace Spot Pricing"
+    url: "https://spot.rackspace.com/pricing"
+  - title: "Rackspace Introduces SPOT - Press Release"
+    url: "https://www.rackspace.com/newsroom/rackspace-technology-introduces-rackspace-spot-cloud-infrastructure-auctioned-real-time"
+  - title: "Rackspace Spot - Terraform Provider"
+    url: "https://registry.terraform.io/providers/rackerlabs/spot/latest/docs"
+  - title: "Deploy Apache Airflow on Rackspace Spot"
+    url: "https://spot.rackspace.com/blogs/deploy-apache-airflow-on-kubernetes-using-spot-instances"
+  - title: "Rackspace Spot Reviews - G2"
+    url: "https://www.g2.com/products/rackspace-spot/reviews"
+---
+
+# Rackspace Spot: Cheap Cloud Infrastructure with Managed Kubernetes
+
+## 1. What Is Rackspace Spot?
+
+Cloud infrastructure costs have become a growing burden for startups and small-to-medium businesses. **Rackspace Spot** offers a fundamentally different approach to cloud pricing. Launched in March 2024, it is a joint product developed by **Rackspace Technology** and **Platform9** - two established players in cloud and Kubernetes infrastructure.
+
+The core idea behind Rackspace Spot is an **"open market auction for cloud servers"**. Instead of the provider dictating fixed prices, supply and demand on the market determine compute costs. All infrastructure is delivered as **fully managed Kubernetes clusters**, meaning you do not need to worry about managing the control plane, networking, or storage - everything is handled for you.
+
+<Callout type="info" title="Real user feedback">
+"When we found Rackspace Spot, it seemed too good to be true. But after 6 months of usage, our infrastructure costs dropped by over 85% compared to AWS EKS." - CTO, SmartHub.ai
+</Callout>
+
+The biggest difference compared to AWS, GCP, or Azure is the **pricing model**. While hyperscalers charge fixed rates (or require long-term commitments for reserved instances), Rackspace Spot lets you set your desired price and the system automatically matches your bid against available capacity.
+
+## 2. How Does the Auction Mechanism Work?
+
+At the heart of Rackspace Spot is the **Auction Engine** - a continuously running system that matches available capacity with user demand.
+
+<Diagram chart="graph LR\n    A[User Places Bid] --> B[Auction Engine]\n    B --> C{Capacity Available?}\n    C -->|Yes| D[Bid Matched]\n    C -->|No| E[Waiting for Capacity]\n    D --> F[Provision K8s Cluster]\n    F --> G[Workloads Running]\n    E -->|Capacity Available| D" />
+
+**How the process works in detail:**
+
+1. **Place a bid**: Users select a server type (flavor) and set their desired price, starting from as low as **$0.001/hour**.
+2. **Realtime pricing**: The dashboard displays market prices in real time along with available capacity at different price points, helping you make informed decisions.
+3. **Bid matching**: The Auction Engine calculates compute pricing based on the lowest bid that can be fulfilled by current capacity.
+4. **Provisioning**: Once a bid is matched, a Kubernetes cluster is automatically provisioned and ready to use.
+
+Rackspace Spot offers two types of servers:
+
+- **Spot Servers**: The cheapest option, but they can be **recycled** (reclaimed) at any time when capacity needs to be reallocated. When recycled, stateful workloads automatically migrate to another server.
+- **On-demand Servers**: Guaranteed continuous uptime at a higher price than spot servers. Suitable for critical production workloads.
+
+<Callout type="warning" title="Important note about Spot Servers">
+Spot servers can be recycled at any time when demand surges. Design your applications with a stateless architecture or use persistent storage to ensure data is not lost when a server is reclaimed.
+</Callout>
+
+## 3. Pricing - How Much Cheaper Is It?
+
+This is the most impressive aspect of Rackspace Spot. Here is a monthly cost comparison for managed Kubernetes clusters:
+
+<ComparisonTable headers={["Criteria", "Rackspace Spot", "AWS EKS", "GCP GKE", "DigitalOcean K8s", "Linode LKE"]} rows={[["Tiny Cluster (4 nodes)", "$12.88", "$159.42", "$147.00", "$48.00", "$40.00"], ["Growth Cluster (8 nodes)", "$106.36", "$468.86", "$420.00", "$160.00", "$120.00"], ["K8s Management Fee", "From $0.72/mo", "$73/mo", "$73/mo", "Free", "Free"], ["Billing Model", "Per-second", "Per-hour", "Per-hour", "Per-hour", "Per-hour"], ["Free Egress", "Yes (scales with usage)", "No", "No", "Limited", "Limited"]]} />
+
+Key pricing highlights:
+
+- **Managed K8s cluster from $0.72/month** - cheaper than a cup of coffee!
+- **Per-second billing** - no waste when you only need resources for a few minutes.
+- **Free egress allowance** that automatically scales with your infrastructure usage.
+- **Add-ons** at fixed prices: persistent volumes, load balancers, HA control plane.
+
+With a Tiny 4-node cluster, you save approximately **92%** compared to AWS EKS. Even with a Growth 8-node cluster, savings still reach **77%**.
+
+## 4. Compute Flavors
+
+Rackspace Spot provides several compute flavors tailored to different workload types:
+
+<ComparisonTable headers={["Flavor", "Characteristics", "Use Case", "Example Configuration"]} rows={[["General Purpose", "Balanced CPU/RAM", "Web apps, APIs, microservices", "gp.vs1.small: 2 vCPU, 4GB RAM"], ["Compute Heavy", "High CPU, moderate RAM", "Build servers, data processing, encoding", "ch.vs1.medium: 8 vCPU, 8GB RAM"], ["Memory Heavy", "High RAM, moderate CPU", "Databases, caching, analytics", "mh.vs1.large: 4 vCPU, 32GB RAM"], ["GPU", "NVIDIA H100, A30", "AI/ML training, inference, rendering", "gpu.h100: 8 vCPU, 80GB GPU VRAM"]]} />
+
+The **GPU instances** featuring NVIDIA H100 and A30 cards are particularly noteworthy. They open up opportunities for AI/ML teams with limited budgets to access high-end hardware at auction prices significantly lower than the on-demand rates offered by major cloud providers.
+
+## 5. Architecture and Features
+
+<Diagram chart="graph TB\n    A[User] --> B[Dashboard / spotctl CLI / Terraform]\n    B --> C[Rackspace Spot API]\n    C --> D[Auction Engine]\n    D --> E[Managed Control Plane]\n    E --> F[K8s Cluster]\n    F --> G[Worker Nodes - Spot]\n    F --> H[Worker Nodes - On-demand]\n    F --> I[Persistent Volumes SSD/SATA]\n    F --> J[Load Balancers]\n    G --> K[Your Applications]\n    H --> K\n    E -->|Cluster-API| F\n    F -->|Calico CNI| L[Network Policies]" />
+
+**Core features:**
+
+- **Managed Control Plane**: Built on Cluster-API and fully managed by Rackspace. You do not need to maintain etcd, API server, or the scheduler.
+- **Auto-scaling Node Pools**: Automatically scales the number of nodes up or down based on workload demand.
+- **Calico CNI**: Full network policy support, allowing fine-grained control over traffic between pods.
+- **2 Storage Classes**: SSD persistent volumes for high performance and SATA persistent volumes for high-capacity storage.
+- **Integrated Load Balancers**: Easily expose services to the internet.
+- **Stateful Workload Support**: When a spot server is recycled, persistent storage automatically migrates to a new server, ensuring no data loss.
+
+**SLA commitments:**
+- **99.9%** Kubernetes API uptime
+- **>99%** Node Delivery Rate (successful node provisioning rate)
+
+## 6. How to Deploy - 3 Methods
+
+### A. Web Dashboard
+
+The simplest way to get started:
+
+1. Sign up at **spot.rackspace.com**
+2. Create a **Cloudspace** (equivalent to a K8s cluster)
+3. Select a compute flavor, number of nodes, and set your bid price
+4. Deploy applications directly through the UI
+
+### B. spotctl CLI
+
+For those who prefer the command line:
+
+```bash
+# Install spotctl
+curl -sL https://spot.rackspace.com/install | bash
+
+# Log in
+spotctl auth login
+
+# Create a new cloudspace
+spotctl cloudspace create --name my-project \
+  --bid-price 0.01 --server-class gp.vs1.small-sjc
+
+# Get kubeconfig for kubectl access
+spotctl cloudspace kubeconfig --name my-project > kubeconfig.yaml
+export KUBECONFIG=kubeconfig.yaml
+
+# Deploy your application using kubectl as usual
+kubectl apply -f deployment.yaml
+```
+
+### C. Terraform Provider
+
+Ideal for Infrastructure as Code workflows:
+
+```hcl
+terraform {
+  required_providers {
+    spot = {
+      source = "rackerlabs/spot"
+    }
+  }
+}
+
+provider "spot" {
+  token = var.spot_token  # Get from Dashboard → API Access
+}
+
+resource "spot_cloudspace" "my_project" {
+  cloudspace_name = "my-project"
+  region          = "us-central-dfw-1"
+
+  instance {
+    server_class = "gp.vs1.small"
+    bid_price    = 0.01
+  }
+}
+```
+
+## 7. Practical Example: Deploy a Next.js App
+
+Once you have a Kubernetes cluster from Rackspace Spot, deploying applications works exactly like any other K8s cluster. Here is an example deploying a Next.js application:
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextjs-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nextjs
+  template:
+    metadata:
+      labels:
+        app: nextjs
+    spec:
+      containers:
+      - name: nextjs
+        image: your-registry/nextjs-app:latest
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nextjs-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+  selector:
+    app: nextjs
+```
+
+After applying this manifest, Rackspace Spot will automatically provision a Load Balancer and provide an external IP to access your application. With 2 replicas running on spot servers, the cost can be just a few dollars per month.
+
+## 8. When Should You Use Rackspace Spot?
+
+Rackspace Spot is best suited for the following scenarios:
+
+- **Small and medium projects** that need managed Kubernetes at minimal cost
+- **Staging and dev environments** - no need for guaranteed uptime, maximize savings
+- **Batch processing and CI/CD runners** - workloads that run in batches and do not need a server running continuously
+- **AI/ML training** - leverage GPU instances (H100, A30) at auction prices far below the on-demand pricing of AWS/GCP
+
+<Callout type="tip" title="Combining Spot + On-demand strategy">
+To optimize costs while maintaining reliability, combine both node types: place critical workloads (databases, payment services) on **on-demand nodes** to guarantee uptime, and run fault-tolerant workloads (web frontends, workers, batch jobs) on **spot nodes** to save money.
+</Callout>
+
+## 9. Limitations to Be Aware Of
+
+Despite its many advantages, Rackspace Spot has limitations you should consider before committing:
+
+- **Spot servers can be recycled at any time**: Similar to AWS Spot Instances, servers can be reclaimed when demand increases. Applications need to be designed to handle sudden node loss gracefully.
+- **Fewer regions than AWS/GCP**: Currently Rackspace Spot is available in a limited number of data centers, primarily in the United States. If you need to deploy close to users in Asia or Europe, this could be a blocker.
+- **Limited managed service ecosystem**: There is no managed database (like RDS), serverless functions (like Lambda), or message queue (like SQS). You need to self-host these components on Kubernetes or use third-party services.
+- **Documentation is still maturing and the community is small**: Compared to AWS or GCP, the documentation and user community are still in early stages of growth.
+- **Requires basic Kubernetes knowledge**: Since everything runs on K8s, you need to understand concepts like Deployments, Services, and PersistentVolumeClaims to operate effectively.
+
+In summary, Rackspace Spot is an excellent choice for teams looking to leverage managed Kubernetes at extremely competitive prices. The innovative auction model and remarkably low starting prices make it a formidable contender in the cloud infrastructure market. However, make sure your application architecture is compatible with the nature of spot computing before making a full transition.

@@ -1,0 +1,284 @@
+---
+title: "Kiến trúc Hướng Sự kiện (Event-Driven Architecture)"
+description: "Tìm hiểu kiến trúc hướng sự kiện, event sourcing, CQRS và so sánh với kiến trúc monolithic, microservices. Tại sao EDA quan trọng trong hệ thống hiện đại."
+category: "automation"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 12
+tags: ["event-driven", "architecture", "event-sourcing", "cqrs", "kafka", "microservices", "message-queue", "distributed-systems"]
+featured: false
+order: 5
+sources:
+  - title: "Martin Fowler - Event-Driven Architecture"
+    url: "https://martinfowler.com/articles/201701-event-driven.html"
+  - title: "Confluent - Event-Driven Architecture"
+    url: "https://www.confluent.io/learn/event-driven-architecture/"
+  - title: "Microsoft - Event-driven architecture style"
+    url: "https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven"
+  - title: "Apache Kafka Documentation"
+    url: "https://kafka.apache.org/documentation/"
+---
+
+# Kiến trúc Hướng Sự kiện (Event-Driven Architecture)
+
+Event-Driven Architecture (EDA) là một kiểu kiến trúc phần mềm trong đó luồng công việc của hệ thống được điều khiển bởi các sự kiện (events). Thay vì các thành phần gọi trực tiếp lẫn nhau (request-response), chúng giao tiếp bằng cách phát ra và phản hồi các sự kiện. Đây là mô hình kiến trúc ngày càng phổ biến trong các hệ thống phân tán hiện đại.
+
+## Tại sao kiến trúc hướng sự kiện quan trọng?
+
+Trong kiến trúc truyền thống (request-response), các service gọi trực tiếp lẫn nhau, tạo ra sự **kết nối chặt** (tight coupling). Khi một service chậm hoặc lỗi, toàn bộ chuỗi xử lý bị ảnh hưởng. EDA giải quyết vấn đề này bằng cách tách biệt người phát ra sự kiện và người xử lý sự kiện.
+
+<Diagram chart="graph LR\n    subgraph Request-Response Truyền thống\n    A[Service A] -->|HTTP Call| B[Service B]\n    B -->|HTTP Call| C[Service C]\n    C -->|Response| B\n    B -->|Response| A\n    end" />
+
+<Diagram chart="graph LR\n    subgraph Event-Driven\n    D[Service A] -->|Publish Event| E[Event Bus / Broker]\n    E -->|Subscribe| F[Service B]\n    E -->|Subscribe| G[Service C]\n    E -->|Subscribe| H[Service D]\n    end" />
+
+### Lợi ích của EDA
+
+- **Loose coupling**: Các service không biết về nhau, chỉ biết về events
+- **Scalability**: Dễ dàng thêm consumer mới mà không ảnh hưởng service cũ
+- **Resilience**: Một service lỗi không làm sập toàn bộ hệ thống
+- **Real-time**: Xử lý sự kiện ngay khi chúng xảy ra
+- **Audit trail**: Mọi thay đổi đều được ghi lại dưới dạng event
+
+<Callout type="info">Các công ty lớn như Netflix, Uber, LinkedIn và Airbnb đều sử dụng kiến trúc hướng sự kiện làm nền tảng cho hệ thống của họ. LinkedIn đã phát triển Apache Kafka, một trong những event streaming platform phổ biến nhất, để phục vụ nhu cầu này.</Callout>
+
+## Các khái niệm cốt lõi
+
+### Event là gì?
+
+Event là một bản ghi (record) về một điều gì đó đã xảy ra trong hệ thống. Một event bao gồm:
+
+```json
+{
+  "eventId": "evt-20260318-001",
+  "eventType": "OrderPlaced",
+  "timestamp": "2026-03-18T10:30:00Z",
+  "source": "order-service",
+  "data": {
+    "orderId": "ORD-12345",
+    "customerId": "CUST-789",
+    "items": [
+      {"productId": "PROD-001", "quantity": 2, "price": 29.99}
+    ],
+    "totalAmount": 59.98
+  },
+  "metadata": {
+    "correlationId": "corr-abc-123",
+    "version": "1.0"
+  }
+}
+```
+
+### Các thành phần trong EDA
+
+| Thành phần | Chức năng |
+|-----------|-----------|
+| Event Producer | Phát ra sự kiện khi có thay đổi |
+| Event Consumer | Lắng nghe và xử lý sự kiện |
+| Event Broker/Bus | Trung gian truyền tải sự kiện (Kafka, RabbitMQ, NATS) |
+| Event Store | Lưu trữ sự kiện (cho Event Sourcing) |
+| Event Schema | Định nghĩa cấu trúc của sự kiện |
+
+## Event Sourcing
+
+Event Sourcing là một pattern trong đó trạng thái của hệ thống được lưu trữ dưới dạng chuỗi các sự kiện (event log) thay vì chỉ lưu trạng thái hiện tại. Muốn biết trạng thái hiện tại, bạn "phát lại" (replay) tất cả các sự kiện từ đầu.
+
+<Diagram chart="graph LR\n    A[OrderCreated] --> B[ItemAdded x2]\n    B --> C[PaymentReceived]\n    C --> D[OrderShipped]\n    D --> E[OrderDelivered]\n    subgraph Event Store\n    A\n    B\n    C\n    D\n    E\n    end\n    E --> F[Trạng thái hiện tại: Delivered]" />
+
+### Ví dụ Event Sourcing cho hệ thống Order
+
+```python
+from datetime import datetime
+from dataclasses import dataclass
+from typing import List
+import json
+
+# Định nghĩa các Event
+@dataclass
+class Event:
+    event_id: str
+    event_type: str
+    timestamp: str
+    data: dict
+
+@dataclass
+class OrderCreated(Event):
+    pass
+
+@dataclass
+class ItemAdded(Event):
+    pass
+
+@dataclass
+class PaymentReceived(Event):
+    pass
+
+# Event Store
+class EventStore:
+    def __init__(self):
+        self.events: List[Event] = []
+
+    def append(self, event: Event):
+        self.events.append(event)
+        print(f"Event stored: {event.event_type}")
+
+    def get_events(self, aggregate_id: str) -> List[Event]:
+        return [e for e in self.events
+                if e.data.get("order_id") == aggregate_id]
+
+# Order Aggregate - Tái tạo trạng thái từ events
+class Order:
+    def __init__(self):
+        self.order_id = None
+        self.status = None
+        self.items = []
+        self.total = 0.0
+        self.paid = False
+
+    def apply(self, event: Event):
+        """Áp dụng event để cập nhật trạng thái"""
+        if event.event_type == "OrderCreated":
+            self.order_id = event.data["order_id"]
+            self.status = "created"
+
+        elif event.event_type == "ItemAdded":
+            self.items.append(event.data["item"])
+            self.total += event.data["item"]["price"] * event.data["item"]["quantity"]
+
+        elif event.event_type == "PaymentReceived":
+            self.paid = True
+            self.status = "paid"
+
+        elif event.event_type == "OrderShipped":
+            self.status = "shipped"
+
+    @staticmethod
+    def rebuild_from_events(events: List[Event]) -> 'Order':
+        """Tái tạo Order từ chuỗi events"""
+        order = Order()
+        for event in events:
+            order.apply(event)
+        return order
+
+# Sử dụng
+store = EventStore()
+
+# Tạo đơn hàng
+store.append(Event(
+    event_id="evt-001",
+    event_type="OrderCreated",
+    timestamp=datetime.now().isoformat(),
+    data={"order_id": "ORD-100", "customer_id": "CUST-50"}
+))
+
+# Thêm sản phẩm
+store.append(Event(
+    event_id="evt-002",
+    event_type="ItemAdded",
+    timestamp=datetime.now().isoformat(),
+    data={"order_id": "ORD-100", "item": {"product": "Laptop", "price": 999, "quantity": 1}}
+))
+
+# Thanh toán
+store.append(Event(
+    event_id="evt-003",
+    event_type="PaymentReceived",
+    timestamp=datetime.now().isoformat(),
+    data={"order_id": "ORD-100", "amount": 999}
+))
+
+# Tái tạo trạng thái Order
+events = store.get_events("ORD-100")
+order = Order.rebuild_from_events(events)
+print(f"Order: {order.order_id}, Status: {order.status}, Total: ${order.total}")
+```
+
+<Callout type="tip">Event Sourcing cho phép bạn "quay lại thời gian" để xem trạng thái hệ thống tại bất kỳ thời điểm nào. Điều này cực kỳ hữu ích cho việc debug, audit và phân tích.</Callout>
+
+## CQRS (Command Query Responsibility Segregation)
+
+CQRS là pattern tách biệt thao tác đọc (Query) và ghi (Command) thành hai model riêng biệt. CQRS thường được kết hợp với Event Sourcing.
+
+<Diagram chart="graph TD\n    A[Client] -->|Command: Đặt hàng| B[Command Handler]\n    A -->|Query: Xem đơn hàng| C[Query Handler]\n    B --> D[Write Model - Event Store]\n    D -->|Publish Events| E[Event Bus]\n    E -->|Update| F[Read Model - Database]\n    C --> F" />
+
+### Tại sao CQRS?
+
+| Vấn đề | Giải pháp CQRS |
+|--------|---------------|
+| Đọc và ghi có yêu cầu khác nhau | Tối ưu hóa riêng cho từng bên |
+| Read nhiều hơn Write | Scale read model độc lập |
+| Model phức tạp | Đơn giản hóa bằng cách tách đôi |
+| Performance | Read model được tối ưu cho query |
+
+## So sánh các kiểu kiến trúc
+
+<ComparisonTable headers={["Tiêu chí", "Monolithic", "Microservices (Request-Response)", "Event-Driven"]} rows={[["Coupling", "Rất chặt", "Trung bình (HTTP calls)", "Lỏng lẻo (qua events)"], ["Scalability", "Scale toàn bộ", "Scale từng service", "Scale từng consumer"], ["Data consistency", "ACID transactions", "Eventual consistency + saga", "Eventual consistency"], ["Độ phức tạp", "Thấp ban đầu", "Cao (networking, discovery)", "Rất cao (ordering, idempotency)"], ["Debugging", "Dễ (single process)", "Khó (distributed tracing)", "Rất khó (async, event replay)"], ["Latency", "Thấp", "Trung bình", "Thấp (async) hoặc cao (eventual)"], ["Phù hợp", "MVP, team nhỏ", "Hệ thống trung bình", "Hệ thống lớn, real-time"]]} />
+
+<Callout type="warning">Event-Driven Architecture không phải là "silver bullet". Nó thêm độ phức tạp đáng kể và chỉ thực sự cần thiết khi hệ thống yêu cầu loose coupling, xử lý real-time hoặc khả năng mở rộng cao. Không nên sử dụng EDA cho các ứng dụng đơn giản.</Callout>
+
+## Công cụ và nền tảng EDA phổ biến
+
+### Apache Kafka
+
+Kafka là nền tảng event streaming phổ biến nhất, hỗ trợ lưu trữ và phát lại events với throughput cao:
+
+```python
+# Kafka Producer
+from kafka import KafkaProducer
+import json
+
+producer = KafkaProducer(
+    bootstrap_servers=['localhost:9092'],
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+
+# Gửi event
+producer.send('order-events', {
+    'eventType': 'OrderPlaced',
+    'orderId': 'ORD-12345',
+    'timestamp': '2026-03-18T10:30:00Z'
+})
+producer.flush()
+```
+
+```python
+# Kafka Consumer
+from kafka import KafkaConsumer
+import json
+
+consumer = KafkaConsumer(
+    'order-events',
+    bootstrap_servers=['localhost:9092'],
+    group_id='notification-service',
+    value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+)
+
+for message in consumer:
+    event = message.value
+    if event['eventType'] == 'OrderPlaced':
+        print(f"Gửi thông báo cho đơn hàng: {event['orderId']}")
+```
+
+### Các công cụ khác
+
+| Công cụ | Đặc điểm |
+|---------|---------|
+| RabbitMQ | Message broker truyền thống, hỗ trợ nhiều protocol |
+| Apache Pulsar | Kafka alternative với multi-tenancy tích hợp |
+| NATS | Nhẹ, nhanh, phù hợp cho cloud-native |
+| AWS EventBridge | Serverless event bus trên AWS |
+| Redis Streams | Event streaming đơn giản trên Redis |
+
+## Best practices
+
+1. **Schema Registry**: Sử dụng schema registry (như Confluent Schema Registry) để quản lý schema của events
+2. **Idempotent consumers**: Consumer phải xử lý được event trùng lặp
+3. **Event versioning**: Thiết kế event schema để có thể tiến hóa mà không gây lỗi
+4. **Dead letter queue**: Xử lý các event không thể tiêu thụ
+5. **Correlation ID**: Thêm ID để truy vết chuỗi sự kiện liên quan
+6. **Monitoring**: Giám sát lag, throughput và error rate
+
+<Callout type="info">Nếu bạn mới bắt đầu với EDA, hãy thử nghiệm với RabbitMQ (đơn giản hơn) trước khi chuyển sang Kafka. Hiểu rõ các khái niệm cơ bản như publish/subscribe, message durability và consumer groups trước khi áp dụng vào production.</Callout>
+
+## Kết luận
+
+Kiến trúc hướng sự kiện là một trong những xu hướng quan trọng nhất trong thiết kế hệ thống phần mềm hiện đại. Với khả năng tách biệt các thành phần, xử lý real-time và mở rộng linh hoạt, EDA giúp xây dựng các hệ thống lớn, phức tạp mà vẫn duy trì được tính linh hoạt và độ tin cậy. Kết hợp với Event Sourcing và CQRS, EDA trở thành nền tảng mạnh mẽ cho các hệ thống doanh nghiệp quy mô lớn.

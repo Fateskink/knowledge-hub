@@ -1,0 +1,76 @@
+{
+  "site": {
+    "title": "Knowledge Hub",
+    "description": "Kiến thức AI & Lập trình cho mọi người"
+  },
+  "nav": {
+    "home": "Trang chủ",
+    "search": "Tìm kiếm",
+    "about": "Giới thiệu",
+    "allArticles": "Tất cả bài viết"
+  },
+  "home": {
+    "hero": {
+      "title": "Knowledge Hub",
+      "subtitle": "Kiến thức AI & Lập trình cho mọi người",
+      "cta": "Khám phá ngay"
+    },
+    "featured": "Bài viết nổi bật",
+    "categories": "Danh mục",
+    "latest": "Bài viết mới nhất",
+    "articles": "bài viết"
+  },
+  "article": {
+    "readingTime": "phút đọc",
+    "toc": "Mục lục",
+    "sources": "Nguồn tham khảo",
+    "related": "Bài viết liên quan",
+    "previous": "Bài trước",
+    "next": "Bài tiếp",
+    "backToCategory": "Quay lại"
+  },
+  "search": {
+    "title": "Tìm kiếm",
+    "placeholder": "Tìm kiếm bài viết...",
+    "noResults": "Không tìm thấy kết quả",
+    "results": "kết quả"
+  },
+  "footer": {
+    "description": "Chia sẻ kiến thức AI & Lập trình cho cộng đồng",
+    "madeWith": "Được xây dựng với"
+  },
+  "categories": {
+    "claude-code": {
+      "name": "Claude Code",
+      "description": "Hướng dẫn chi tiết về Claude Code - công cụ AI coding của Anthropic"
+    },
+    "ai-basics": {
+      "name": "AI Cơ Bản",
+      "description": "Các khái niệm cơ bản về Trí tuệ Nhân tạo và Machine Learning"
+    },
+    "programming": {
+      "name": "Lập Trình",
+      "description": "Kiến thức lập trình từ cơ bản đến nâng cao"
+    },
+    "web-development": {
+      "name": "Web Development",
+      "description": "Phát triển web từ frontend đến backend với các công nghệ hiện đại"
+    },
+    "hardware": {
+      "name": "Phần Cứng & Điện Tử",
+      "description": "Kiến trúc máy tính, chip, mạch điện tử, và nguyên lý hoạt động phần cứng"
+    },
+    "database": {
+      "name": "Database & Realtime",
+      "description": "Cơ sở dữ liệu, giao tiếp realtime, WebSocket, message queue và streaming"
+    },
+    "automation": {
+      "name": "Automation & Workflow",
+      "description": "Tự động hóa quy trình với n8n, Airflow, Spark và các công cụ hiện đại"
+    },
+    "devops": {
+      "name": "DevOps",
+      "description": "Công cụ và quy trình DevOps hiện đại"
+    }
+  }
+}
