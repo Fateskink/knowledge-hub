@@ -1,0 +1,289 @@
+---
+title: "WebSocket và Realtime"
+description: "Tìm hiểu WebSocket protocol, sự khác biệt với HTTP, và cách xây dựng ứng dụng realtime với Socket.IO, Server-Sent Events."
+category: "networking"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 11
+tags: ["websocket", "realtime", "socket-io", "sse", "http", "chat", "notifications"]
+featured: false
+order: 3
+sources:
+  - title: "MDN WebSocket API"
+    url: "https://developer.mozilla.org/en-US/docs/Web/API/WebSocket"
+  - title: "Socket.IO Documentation"
+    url: "https://socket.io/docs/v4/"
+  - title: "RFC 6455 - The WebSocket Protocol"
+    url: "https://datatracker.ietf.org/doc/html/rfc6455"
+  - title: "MDN Server-Sent Events"
+    url: "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events"
+---
+
+# WebSocket và Realtime
+
+Trong thế giới web hiện đại, người dùng mong đợi dữ liệu được cập nhật ngay lập tức mà không cần tải lại trang. Từ chat trực tuyến, thông báo, giá cổ phiếu đến game online -- tất cả đều cần giao tiếp realtime. WebSocket là giao thức giúp hiện thực hóa điều này.
+
+## HTTP truyền thống và hạn chế của nó
+
+HTTP (HyperText Transfer Protocol) hoạt động theo mô hình request-response: client gửi yêu cầu, server trả lời, rồi kết nối đóng lại. Điều này tạo ra vấn đề khi cần cập nhật dữ liệu liên tục.
+
+<Diagram chart="graph LR\n    subgraph HTTP Truyền thống\n    A[Client] -->|Request 1| B[Server]\n    B -->|Response 1| A\n    A -->|Request 2| B\n    B -->|Response 2| A\n    A -->|Request 3| B\n    B -->|Response 3| A\n    end" />
+
+### Các giải pháp trước WebSocket
+
+- **Polling**: Client gửi request định kỳ (ví dụ mỗi 5 giây) để kiểm tra dữ liệu mới. Lãng phí tài nguyên vì phần lớn request không có dữ liệu mới.
+- **Long Polling**: Client gửi request và server giữ kết nối mở cho đến khi có dữ liệu mới. Tốt hơn polling nhưng vẫn tồn tại overhead của việc tạo kết nối mới.
+
+<Callout type="info">Polling giống như bạn gọi điện thoại hỏi "Có tin nhắn mới không?" mỗi 5 giây. WebSocket giống như bạn mở một đường dây trực tiếp và cả hai bên có thể nói bất cứ lúc nào.</Callout>
+
+## WebSocket Protocol
+
+WebSocket tạo một kết nối hai chiều (full-duplex) giữa client và server. Sau khi thiết lập kết nối qua HTTP handshake, cả hai bên có thể gửi dữ liệu bất cứ lúc nào mà không cần tạo kết nối mới.
+
+<Diagram chart="graph LR\n    subgraph WebSocket Connection\n    A[Client] -->|HTTP Upgrade Request| B[Server]\n    B -->|101 Switching Protocols| A\n    A <-->|Bi-directional Messages| B\n    end" />
+
+### Cách WebSocket hoạt động
+
+1. Client gửi HTTP request với header `Upgrade: websocket`
+2. Server phản hồi với status 101 (Switching Protocols)
+3. Kết nối được nâng cấp thành WebSocket
+4. Cả hai bên có thể gửi/nhận dữ liệu tự do
+5. Kết nối duy trì cho đến khi một bên đóng
+
+### Ví dụ WebSocket cơ bản
+
+```javascript
+// === Client side ===
+const ws = new WebSocket('ws://localhost:8080');
+
+// Khi kết nối thành công
+ws.onopen = () => {
+  console.log('Đã kết nối đến server');
+  ws.send(JSON.stringify({
+    type: 'chat',
+    message: 'Xin chào!',
+    username: 'User A'
+  }));
+};
+
+// Khi nhận tin nhắn
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Tin nhắn mới:', data);
+};
+
+// Khi xảy ra lỗi
+ws.onerror = (error) => {
+  console.error('WebSocket error:', error);
+};
+
+// Khi kết nối đóng
+ws.onclose = (event) => {
+  console.log('Kết nối đóng:', event.code, event.reason);
+};
+```
+
+```javascript
+// === Server side (Node.js với ws library) ===
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ port: 8080 });
+
+const clients = new Set();
+
+wss.on('connection', (ws) => {
+  clients.add(ws);
+  console.log('Client mới kết nối. Tổng:', clients.size);
+
+  ws.on('message', (data) => {
+    const message = JSON.parse(data);
+
+    // Broadcast tin nhắn đến tất cả client khác
+    clients.forEach((client) => {
+      if (client !== ws && client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
+      }
+    });
+  });
+
+  ws.on('close', () => {
+    clients.delete(ws);
+    console.log('Client ngắt kết nối. Còn lại:', clients.size);
+  });
+});
+
+console.log('WebSocket server chạy tại port 8080');
+```
+
+## Socket.IO
+
+Socket.IO là thư viện phía trên WebSocket, cung cấp nhiều tính năng nâng cao hơn:
+
+<Diagram chart="graph TD\n    A[Socket.IO] --> B[Tự động reconnect]\n    A --> C[Room và Namespace]\n    A --> D[Fallback transport]\n    A --> E[Broadcasting]\n    A --> F[Acknowledgements]\n    D --> G[WebSocket]\n    D --> H[HTTP Long Polling]" />
+
+```javascript
+// === Server với Socket.IO ===
+const { Server } = require('socket.io');
+const io = new Server(3000, {
+  cors: { origin: '*' }
+});
+
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  // Tham gia phòng chat
+  socket.on('join-room', (roomId) => {
+    socket.join(roomId);
+    socket.to(roomId).emit('user-joined', {
+      userId: socket.id,
+      message: 'Một người dùng mới tham gia phòng'
+    });
+  });
+
+  // Gửi tin nhắn trong phòng
+  socket.on('chat-message', ({ roomId, message, username }) => {
+    io.to(roomId).emit('new-message', {
+      message,
+      username,
+      timestamp: new Date()
+    });
+  });
+
+  // Typing indicator
+  socket.on('typing', ({ roomId, username }) => {
+    socket.to(roomId).emit('user-typing', { username });
+  });
+
+  // Ngắt kết nối
+  socket.on('disconnect', (reason) => {
+    console.log('User disconnected:', socket.id, reason);
+  });
+});
+```
+
+```javascript
+// === Client với Socket.IO ===
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3000');
+
+// Tham gia phòng
+socket.emit('join-room', 'room-123');
+
+// Gửi tin nhắn
+socket.emit('chat-message', {
+  roomId: 'room-123',
+  message: 'Hello mọi người!',
+  username: 'Nguyen Van A'
+});
+
+// Lắng nghe tin nhắn mới
+socket.on('new-message', (data) => {
+  console.log(`${data.username}: ${data.message}`);
+});
+
+// Lắng nghe ai đang gõ
+socket.on('user-typing', ({ username }) => {
+  console.log(`${username} đang gõ...`);
+});
+```
+
+<Callout type="tip">Socket.IO tự động sử dụng WebSocket khi có thể và fallback về HTTP long polling khi WebSocket không khả dụng (ví dụ sau proxy không hỗ trợ). Điều này đảm bảo ứng dụng của bạn hoạt động ở mọi môi trường.</Callout>
+
+## Server-Sent Events (SSE)
+
+SSE là một giải pháp đơn giản hơn WebSocket cho trường hợp chỉ cần server gửi dữ liệu đến client (một chiều):
+
+```javascript
+// === Server SSE (Express.js) ===
+const express = require('express');
+const app = express();
+
+app.get('/events', (req, res) => {
+  // Thiết lập SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  // Gửi event mỗi 3 giây
+  const interval = setInterval(() => {
+    const data = {
+      type: 'stock-update',
+      symbol: 'VNM',
+      price: (100 + Math.random() * 10).toFixed(2),
+      timestamp: new Date().toISOString()
+    };
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  }, 3000);
+
+  // Cleanup khi client ngắt kết nối
+  req.on('close', () => {
+    clearInterval(interval);
+    res.end();
+  });
+});
+
+app.listen(3000);
+```
+
+```javascript
+// === Client SSE ===
+const eventSource = new EventSource('/events');
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Giá mới:', data.symbol, data.price);
+};
+
+eventSource.onerror = (error) => {
+  console.error('SSE error:', error);
+};
+```
+
+## So sánh các phương pháp Realtime
+
+<ComparisonTable
+  headers={["Tiêu chí", "WebSocket", "SSE", "Long Polling"]}
+  rows={[
+    ["Hướng giao tiếp", "Hai chiều (full-duplex)", "Một chiều (server to client)", "Một chiều mô phỏng"],
+    ["Protocol", "ws:// hoặc wss://", "HTTP", "HTTP"],
+    ["Tự động reconnect", "Không (cần tự xử lý)", "Có (built-in)", "Cần tự xử lý"],
+    ["Binary data", "Hỗ trợ", "Chỉ text", "Hỗ trợ"],
+    ["Độ phức tạp", "Trung bình", "Đơn giản", "Đơn giản"],
+    ["Phù hợp cho", "Chat, game, collaboration", "Notifications, feeds, updates", "Khi WebSocket không khả dụng"],
+    ["Browser support", "Tất cả browser hiện đại", "Tất cả trừ IE", "Tất cả"]
+  ]}
+/>
+
+## Ví dụ thực tế: Live Notifications
+
+```typescript
+// Hệ thống thông báo realtime với Socket.IO
+// === Server ===
+io.on('connection', (socket) => {
+  const userId = socket.handshake.auth.userId;
+
+  // Mỗi user tham gia room riêng của mình
+  socket.join(`user:${userId}`);
+
+  // Gửi thông báo đến user cụ thể
+  async function sendNotification(targetUserId, notification) {
+    // Lưu vào database
+    await db.query(
+      'INSERT INTO notifications (user_id, title, body, type) VALUES ($1, $2, $3, $4)',
+      [targetUserId, notification.title, notification.body, notification.type]
+    );
+
+    // Gửi realtime
+    io.to(`user:${targetUserId}`).emit('notification', {
+      ...notification,
+      createdAt: new Date()
+    });
+  }
+});
+```
+
+<Callout type="warning">WebSocket giữ kết nối mở liên tục, nên cần quản lý tài nguyên cẩn thận. Mỗi kết nối tiêu tốn bộ nhớ trên server. Với hàng ngàn kết nối đồng thời, cần sử dụng các kỹ thuật như connection pooling, load balancing, và horizontal scaling.</Callout>
+
+## Kết luận
+
+WebSocket là công nghệ cốt lõi cho các ứng dụng realtime hiện đại. Với các thư viện như Socket.IO, việc triển khai trở nên đơn giản hơn nhiều. Hãy chọn công nghệ phù hợp với nhu cầu: WebSocket cho giao tiếp hai chiều, SSE cho cập nhật một chiều, và Polling khi cần giải pháp đơn giản nhất.

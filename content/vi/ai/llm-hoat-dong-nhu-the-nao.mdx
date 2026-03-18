@@ -1,0 +1,214 @@
+---
+title: "LLM hoạt động như thế nào? Hiểu về mô hình ngôn ngữ lớn"
+description: "Giải thích cách Large Language Models (LLM) hoạt động: từ tokenization, kiến trúc Transformer, quá trình huấn luyện đến inference."
+category: "ai"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 10
+tags: ["llm", "transformer", "tokenization", "gpt", "deep-learning"]
+featured: false
+order: 2
+sources:
+  - title: "Google Research - Attention Is All You Need"
+    url: "https://arxiv.org/abs/1706.03762"
+  - title: "OpenAI - GPT-4 Technical Report"
+    url: "https://arxiv.org/abs/2303.08774"
+  - title: "Anthropic - Claude Model Card"
+    url: "https://docs.anthropic.com/en/docs/about-claude/models"
+  - title: "AWS - What are LLMs?"
+    url: "https://aws.amazon.com/what-is/large-language-model/"
+---
+
+# LLM hoạt động như thế nào? Hiểu về mô hình ngôn ngữ lớn
+
+Large Language Models (LLM) - Mô hình Ngôn ngữ Lớn - là công nghệ đứng đằng sau ChatGPT, Claude, Gemini và nhiều ứng dụng AI ấn tượng khác. Nhưng chúng thực sự hoạt động ra sao? Bài viết này sẽ giải thích từng bước, từ cách máy tính "đọc" văn bản cho đến cách nó tạo ra câu trả lời.
+
+## LLM là gì?
+
+**Large Language Model** là một mô hình AI được huấn luyện trên lượng lớn dữ liệu văn bản để hiểu và tạo ra ngôn ngữ tự nhiên. "Large" ở đây chỉ cả kích thước mô hình (hàng tỷ tham số) lẫn lượng dữ liệu huấn luyện (hàng nghìn tỷ token).
+
+<Callout type="info" title="Quy mô của LLM hiện đại">
+GPT-4 được ước tính có khoảng 1.7 nghìn tỷ tham số (parameters). Claude 3.5 Sonnet, Gemini Ultra, và Llama 3 cũng có quy mô tương tự. Để huấn luyện những mô hình này cần hàng nghìn GPU chạy liên tục trong nhiều tháng.
+</Callout>
+
+## Bước 1: Tokenization - Máy tính đọc văn bản như thế nào?
+
+Máy tính không hiểu chữ cái hay từ ngữ trực tiếp. Bước đầu tiên là chuyển văn bản thành các **token** - đơn vị nhỏ nhất mà mô hình xử lý.
+
+```python
+# Ví dụ tokenization với tiktoken (tokenizer của OpenAI)
+import tiktoken
+
+encoder = tiktoken.encoding_for_model("gpt-4")
+
+text = "Trí tuệ nhân tạo đang thay đổi thế giới"
+tokens = encoder.encode(text)
+
+print(f"Văn bản gốc: {text}")
+print(f"Số token: {len(tokens)}")
+print(f"Token IDs: {tokens}")
+
+# Xem từng token
+for token_id in tokens:
+    print(f"  {token_id} -> '{encoder.decode([token_id])}'")
+```
+
+<Callout type="tip" title="Token không phải lúc nào cũng là từ">
+Một token có thể là một từ hoàn chỉnh ("hello"), một phần của từ ("un" + "break" + "able"), một ký tự đặc biệt, hoặc thậm chí một dấu cách. Trung bình, 1 token tiếng Anh tương đương khoảng 4 ký tự. Tiếng Việt thường cần nhiều token hơn cho cùng một nội dung.
+</Callout>
+
+### Các phương pháp tokenization phổ biến:
+
+- **Byte-Pair Encoding (BPE):** Được GPT sử dụng, kết hợp các cặp byte phổ biến nhất
+- **WordPiece:** Google BERT sử dụng, tương tự BPE nhưng khác cách chọn cặp
+- **SentencePiece:** Xử lý tốt các ngôn ngữ không dùng dấu cách như tiếng Nhật, tiếng Trung
+
+## Bước 2: Kiến trúc Transformer - Trái tim của LLM
+
+Transformer là kiến trúc mạng nơ-ron được giới thiệu trong bài báo "Attention Is All You Need" (2017) của Google, và nó đã cách mạng hóa lĩnh vực NLP.
+
+<Diagram chart="graph TD\n    A[📝 Input Text] --> B[Tokenization]\n    B --> C[Token Embeddings\n+ Positional Encoding]\n    C --> D[Multi-Head\nSelf-Attention]\n    D --> E[Feed-Forward\nNeural Network]\n    E --> F{Lặp lại N lần\nqua các Transformer Layers}\n    F -->|Tiếp tục| D\n    F -->|Kết thúc| G[Output Probabilities]\n    G --> H[Chọn Token tiếp theo]\n    H --> I[📝 Generated Text]\n    \n    style A fill:#e1f5fe\n    style I fill:#e8f5e9\n    style D fill:#fff3e0\n    style F fill:#fce4ec" />
+
+### Các thành phần chính:
+
+#### 1. Embeddings (Biểu diễn vector)
+Mỗi token được chuyển thành một vector số (thường 768 đến 12288 chiều). Vector này mã hóa "ý nghĩa" của token trong không gian toán học.
+
+```python
+# Minh họa conceptual về embedding
+# Token "mèo" -> vector [0.23, -0.45, 0.89, ..., 0.12]
+# Token "chó" -> vector [0.25, -0.41, 0.85, ..., 0.15]
+# Token "xe"  -> vector [-0.67, 0.33, -0.12, ..., 0.78]
+# "mèo" và "chó" gần nhau trong không gian vector vì liên quan ngữ nghĩa
+```
+
+#### 2. Positional Encoding
+Vì Transformer xử lý tất cả token cùng lúc (không tuần tự như RNN), nó cần biết **vị trí** của mỗi token. Positional Encoding thêm thông tin vị trí vào embedding.
+
+#### 3. Self-Attention (Cơ chế tự chú ý)
+Đây là **thành phần quan trọng nhất**. Self-Attention cho phép mỗi token "nhìn" vào tất cả các token khác trong câu để hiểu ngữ cảnh.
+
+<Callout type="info" title="Self-Attention hoạt động thế nào?">
+Xét câu: "Con **mèo** ngồi trên thảm vì **nó** thích chỗ ấm." Self-Attention giúp mô hình hiểu rằng "nó" ở đây chỉ "con mèo", bằng cách tính điểm tương quan (attention score) giữa "nó" với mọi từ khác trong câu.
+</Callout>
+
+Self-Attention tính toán ba ma trận cho mỗi token:
+- **Query (Q):** "Tôi đang tìm kiếm thông tin gì?"
+- **Key (K):** "Tôi chứa thông tin gì?"
+- **Value (V):** "Đây là thông tin tôi cung cấp"
+
+```
+Attention(Q, K, V) = softmax(QK^T / √d_k) × V
+```
+
+#### 4. Multi-Head Attention
+Thay vì chỉ có một "góc nhìn", Multi-Head Attention chạy nhiều phép Attention song song, mỗi "head" học một khía cạnh khác nhau của ngữ nghĩa (cú pháp, ngữ nghĩa, tham chiếu, v.v.).
+
+#### 5. Feed-Forward Network
+Sau Attention, mỗi token đi qua một mạng nơ-ron feed-forward để xử lý thêm thông tin.
+
+## Bước 3: Quá trình huấn luyện
+
+LLM được huấn luyện qua nhiều giai đoạn:
+
+<Diagram chart="graph LR\n    A[Pre-training\nHọc từ dữ liệu khổng lồ\nNext token prediction] --> B[Supervised Fine-tuning\nHọc từ dữ liệu được gán nhãn\nbởi con người]\n    B --> C[RLHF / RLAIF\nHọc từ phản hồi\ncủa con người hoặc AI]\n    C --> D[Mô hình sẵn sàng\nsử dụng]\n    \n    style A fill:#e3f2fd\n    style B fill:#f3e5f5\n    style C fill:#e8f5e9\n    style D fill:#fff8e1" />
+
+### Pre-training (Huấn luyện trước)
+Mô hình đọc hàng nghìn tỷ token từ internet, sách, Wikipedia, code, v.v. Nhiệm vụ chính: **dự đoán token tiếp theo**.
+
+```
+Input:  "Hà Nội là thủ đô của"
+Target: "Việt"
+
+Input:  "Hà Nội là thủ đô của Việt"
+Target: "Nam"
+```
+
+Bằng cách lặp đi lặp lại hàng tỷ lần, mô hình học được ngữ pháp, kiến thức, lý luận, và nhiều kỹ năng khác.
+
+### Supervised Fine-tuning (SFT)
+Sau pre-training, mô hình biết dự đoán text nhưng chưa biết cách "trò chuyện". SFT sử dụng các cặp (câu hỏi, câu trả lời) do con người viết để dạy mô hình cách phản hồi.
+
+### RLHF (Reinforcement Learning from Human Feedback)
+Con người đánh giá và xếp hạng các câu trả lời của mô hình. Một mô hình reward được huấn luyện từ đánh giá này, sau đó dùng reinforcement learning (PPO hoặc DPO) để tối ưu mô hình chính.
+
+<Callout type="warning" title="Chi phí huấn luyện khổng lồ">
+Huấn luyện GPT-4 ước tính tốn hơn $100 triệu USD. Llama 3 405B cần khoảng 30 triệu GPU-hours. Đây là lý do chỉ có một số ít công ty có thể phát triển các LLM hàng đầu.
+</Callout>
+
+## Bước 4: Inference - Khi bạn hỏi AI
+
+Khi bạn gửi prompt cho một LLM, quá trình inference diễn ra như sau:
+
+1. **Tokenize** prompt thành chuỗi token
+2. **Xử lý** qua tất cả các Transformer layers
+3. **Tính xác suất** cho token tiếp theo
+4. **Chọn token** dựa trên xác suất (sampling)
+5. **Lặp lại** bước 2-4 cho đến khi hoàn thành
+
+### Các chiến lược chọn token:
+
+- **Greedy:** Luôn chọn token có xác suất cao nhất. Kết quả nhất quán nhưng nhàm chán.
+- **Top-k sampling:** Chọn ngẫu nhiên từ k token có xác suất cao nhất.
+- **Top-p (nucleus) sampling:** Chọn từ nhóm token nhỏ nhất có tổng xác suất >= p.
+- **Temperature:** Điều chỉnh "độ sáng tạo". Temperature thấp = bảo thủ, temperature cao = sáng tạo hơn.
+
+```python
+# Minh họa conceptual về temperature
+import numpy as np
+
+logits = [2.0, 1.5, 0.5, 0.3, 0.1]  # Raw scores cho 5 token
+
+def apply_temperature(logits, temperature):
+    scaled = [l / temperature for l in logits]
+    exp_scaled = [np.exp(s) for s in scaled]
+    total = sum(exp_scaled)
+    return [e / total for e in exp_scaled]
+
+# Temperature = 0.1 (rất bảo thủ)
+# -> [0.99, 0.007, 0.0001, ...]  Token đầu gần như chắc chắn được chọn
+
+# Temperature = 1.0 (bình thường)
+# -> [0.45, 0.27, 0.10, 0.08, 0.07]  Phân bố tự nhiên
+
+# Temperature = 2.0 (sáng tạo)
+# -> [0.30, 0.25, 0.18, 0.15, 0.12]  Phân bố đều hơn, nhiều bất ngờ hơn
+```
+
+## Context Window - Bộ nhớ của LLM
+
+**Context window** là số lượng token tối đa mà mô hình có thể xử lý trong một lần. Đây như "bộ nhớ ngắn hạn" của LLM.
+
+<ComparisonTable
+  headers={["Mô hình", "Context Window", "Tương đương"]}
+  rows={[
+    ["GPT-4 Turbo", "128K tokens", "~300 trang sách"],
+    ["Claude 3.5 Sonnet", "200K tokens", "~500 trang sách"],
+    ["Gemini 1.5 Pro", "1M tokens", "~2500 trang sách"],
+    ["Llama 3.1", "128K tokens", "~300 trang sách"]
+  ]}
+/>
+
+<Callout type="tip" title="Context window ảnh hưởng thế nào?">
+Context window lớn hơn cho phép mô hình xử lý tài liệu dài hơn, duy trì ngữ cảnh tốt hơn trong cuộc trò chuyện, và thực hiện các tác vụ phức tạp hơn. Tuy nhiên, chi phí tính toán tăng theo bình phương kích thước context (O(n²) cho standard attention).
+</Callout>
+
+## Hạn chế của LLM
+
+Dù rất ấn tượng, LLM vẫn có nhiều hạn chế quan trọng:
+
+1. **Hallucination (Ảo giác):** LLM có thể tạo ra thông tin sai nhưng nghe rất thuyết phục
+2. **Knowledge cutoff:** Kiến thức giới hạn đến thời điểm huấn luyện
+3. **Không thực sự "hiểu":** LLM dự đoán token tiếp theo dựa trên pattern, không phải hiểu ý nghĩa sâu xa
+4. **Thiên kiến (Bias):** Phản ánh các thiên kiến trong dữ liệu huấn luyện
+5. **Chi phí:** Cả huấn luyện và inference đều tốn kém
+
+## Tổng kết
+
+LLM là một bước tiến vĩ đại trong AI, nhưng về bản chất, chúng là **máy dự đoán token tiếp theo cực kỳ tinh vi**. Hiểu cách chúng hoạt động giúp bạn:
+
+- Sử dụng chúng hiệu quả hơn (viết prompt tốt hơn)
+- Nhận biết khi nào không nên tin tưởng output
+- Đánh giá đúng khả năng và giới hạn của AI
+
+Trong bài viết tiếp theo, chúng ta sẽ tìm hiểu về **Prompt Engineering** - nghệ thuật giao tiếp hiệu quả với LLM.

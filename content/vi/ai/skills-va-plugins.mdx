@@ -1,0 +1,288 @@
+---
+title: "Skills và Plugins trong Claude Code"
+description: "Hướng dẫn chi tiết về hệ thống Skills trong Claude Code - cách sử dụng built-in skills, tạo custom skills, và mở rộng khả năng của Claude Code."
+category: "ai"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 7
+tags: ["claude-code", "skills", "plugins", "automation", "customization"]
+featured: false
+order: 2
+sources:
+  - title: "Claude Code Skills Documentation"
+    url: "https://docs.anthropic.com/en/docs/claude-code/skills"
+  - title: "Claude Code Custom Slash Commands"
+    url: "https://docs.anthropic.com/en/docs/claude-code/slash-commands"
+---
+
+# Skills và Plugins trong Claude Code
+
+## Skills là gì?
+
+Skills trong Claude Code là các **đơn vị chức năng chuyên biệt** được thiết kế để thực thi các tác vụ cụ thể. Mỗi skill đóng gói một tập hợp hướng dẫn (instructions) mà Claude Code sẽ tuân theo khi skill được kích hoạt. Skills giúp chuẩn hóa các quy trình lặp lại và đảm bảo Claude Code thực hiện các tác vụ theo đúng cách bạn mong muốn.
+
+<Callout type="info" title="Khái niệm then chốt">
+Skills hoạt động như các "recipe" - chúng hướng dẫn Claude Code **cách** thực hiện một tác vụ cụ thể, thay vì bạn phải mô tả chi tiết mỗi lần. Bạn kích hoạt skill bằng slash command (ví dụ: `/commit`, `/review-pr`).
+</Callout>
+
+## Built-in Skills
+
+Claude Code đi kèm với một số skills tích hợp sẵn phục vụ các tác vụ lập trình phổ biến:
+
+### /commit - Tạo Git Commit
+
+Skill này phân tích các thay đổi hiện tại, tạo commit message phù hợp và thực hiện commit:
+
+```bash
+# Trong phiên Claude Code
+> /commit
+
+# Claude Code sẽ:
+# 1. Chạy git status và git diff
+# 2. Phân tích các thay đổi
+# 3. Tạo commit message mô tả chính xác
+# 4. Stage và commit các file
+```
+
+### /review-pr - Review Pull Request
+
+Skill này review một pull request, phân tích code changes và đưa ra nhận xét chi tiết:
+
+```bash
+# Review PR hiện tại
+> /review-pr
+
+# Review PR theo số
+> /review-pr 123
+```
+
+### /pr - Tạo Pull Request
+
+Skill tạo PR mới với title và description được sinh tự động dựa trên commit history:
+
+```bash
+> /pr
+# Claude Code sẽ phân tích commits, tạo title, body, rồi dùng gh CLI để tạo PR
+```
+
+## Tạo Custom Skills
+
+Sức mạnh thực sự của hệ thống skills nằm ở khả năng tạo custom skills phù hợp với workflow riêng của bạn.
+
+### Cấu trúc thư mục Skills
+
+Custom skills được lưu trong thư mục `.claude/skills/` tại root của dự án hoặc trong thư mục home:
+
+```
+# Skills cấp dự án
+my-project/
+├── .claude/
+│   └── skills/
+│       ├── generate-api.md
+│       ├── create-component.md
+│       └── deploy-staging.md
+
+# Skills cấp user (global)
+~/.claude/skills/
+├── code-review.md
+└── refactor-pattern.md
+```
+
+### Cú pháp file Skill
+
+Mỗi skill là một file Markdown chứa hướng dẫn mà Claude Code sẽ tuân theo:
+
+```markdown
+# Skill: Generate API Endpoint
+
+## Mô tả
+Tạo một API endpoint mới theo chuẩn RESTful cho dự án.
+
+## Hướng dẫn
+
+1. Hỏi người dùng về tên resource và các operations cần hỗ trợ (CRUD)
+2. Tạo file route handler trong `src/app/api/[resource]/route.ts`
+3. Implement các HTTP methods được yêu cầu
+4. Thêm validation với zod schema
+5. Tạo file test tương ứng trong `__tests__/api/`
+6. Cập nhật file `src/lib/api-routes.ts` với route mới
+
+## Template cho route handler
+
+```typescript
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+const schema = z.object({
+  // Định nghĩa schema ở đây
+});
+
+export async function GET(request: NextRequest) {
+  // Implementation
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  const validated = schema.parse(body);
+  // Implementation
+}
+```
+
+## Quy tắc
+- Luôn sử dụng TypeScript strict mode
+- Thêm error handling với try/catch
+- Response phải theo format { data, error, message }
+- Viết ít nhất 3 test cases cho mỗi endpoint
+```
+
+<Callout type="tip" title="Best Practice">
+Viết skill instructions càng cụ thể càng tốt. Bao gồm templates, quy tắc naming convention, và ví dụ output mong đợi. Claude Code sẽ tuân theo hướng dẫn chính xác hơn khi có context rõ ràng.
+</Callout>
+
+### Ví dụ: Skill tạo React Component
+
+```markdown
+# Skill: Create React Component
+
+## Hướng dẫn
+
+Khi được yêu cầu tạo component mới:
+
+1. Tạo thư mục `src/components/[ComponentName]/`
+2. Tạo các file sau:
+   - `index.tsx` - Component chính
+   - `types.ts` - TypeScript interfaces
+   - `styles.module.css` - CSS Modules (nếu cần)
+   - `[ComponentName].test.tsx` - Unit tests
+   - `[ComponentName].stories.tsx` - Storybook story
+
+3. Component phải sử dụng pattern sau:
+
+```tsx
+"use client"; // Chỉ thêm nếu cần client-side features
+
+import { FC } from "react";
+import type { ComponentNameProps } from "./types";
+
+const ComponentName: FC<ComponentNameProps> = ({ ...props }) => {
+  return (
+    <div data-testid="component-name">
+      {/* Implementation */}
+    </div>
+  );
+};
+
+export default ComponentName;
+```
+
+4. Export component từ barrel file `src/components/index.ts`
+5. Đảm bảo accessibility: thêm aria labels phù hợp
+```
+
+## Luồng hoạt động của Skills
+
+<Diagram chart="graph TD\n    A[User gõ /skill-name] --> B[Claude Code tìm skill file]\n    B --> C{Tìm thấy?}\n    C -->|Có| D[Đọc skill instructions]\n    C -->|Không| E[Báo lỗi: Skill not found]\n    D --> F[Load instructions vào context]\n    F --> G[Claude Code thực thi theo hướng dẫn]\n    G --> H{Cần input từ user?}\n    H -->|Có| I[Hỏi user]\n    I --> G\n    H -->|Không| J[Thực hiện các bước]\n    J --> K[Đọc/Tạo/Sửa files]\n    J --> L[Chạy commands]\n    J --> M[Git operations]\n    K --> N[Báo cáo kết quả]\n    L --> N\n    M --> N" />
+
+## Quản lý Skills
+
+### Liệt kê skills có sẵn
+
+```bash
+# Trong phiên Claude Code
+> /help
+
+# Sẽ hiển thị tất cả built-in và custom skills
+```
+
+### Tổ chức skills theo nhóm
+
+Bạn có thể tổ chức skills vào các thư mục con để dễ quản lý:
+
+```
+.claude/skills/
+├── api/
+│   ├── generate-endpoint.md
+│   ├── generate-middleware.md
+│   └── generate-swagger.md
+├── components/
+│   ├── create-component.md
+│   └── create-page.md
+├── testing/
+│   ├── unit-test.md
+│   └── e2e-test.md
+└── devops/
+    ├── deploy.md
+    └── setup-ci.md
+```
+
+## Skills nâng cao: Sử dụng với Arguments
+
+Skills có thể nhận arguments từ người dùng:
+
+```bash
+# Gọi skill với argument
+> /create-component UserProfile
+
+# Gọi skill với nhiều arguments
+> /generate-api users --methods GET,POST,DELETE
+```
+
+Trong file skill, bạn tham chiếu arguments bằng cách hướng dẫn Claude Code parse input:
+
+```markdown
+# Skill: Generate API
+
+## Hướng dẫn
+Parse input từ user để lấy:
+- Argument 1: Tên resource (bắt buộc)
+- Flag --methods: Danh sách HTTP methods (mặc định: GET, POST)
+
+Sử dụng tên resource để đặt tên file và route.
+Chỉ implement các methods được chỉ định.
+```
+
+<Callout type="warning" title="Giới hạn của Skills">
+Skills không phải là plugins thực thi code riêng biệt - chúng là tập hợp hướng dẫn bằng ngôn ngữ tự nhiên mà Claude Code tuân theo. Độ chính xác phụ thuộc vào chất lượng hướng dẫn và khả năng của model AI đang sử dụng. Luôn review output trước khi chấp nhận.
+</Callout>
+
+## Kết hợp Skills với CLAUDE.md
+
+File `CLAUDE.md` ở root dự án cung cấp context chung cho Claude Code. Kết hợp với skills, bạn tạo được một hệ thống hướng dẫn hai lớp:
+
+```markdown
+<!-- CLAUDE.md - Context chung -->
+# Project: E-commerce Platform
+
+## Tech Stack
+- Next.js 15, TypeScript, Prisma, PostgreSQL
+
+## Conventions
+- Sử dụng kebab-case cho file names
+- Sử dụng PascalCase cho components
+- Mọi API response phải có format chuẩn
+
+## Testing
+- Jest cho unit tests
+- Playwright cho E2E tests
+- Coverage tối thiểu 80%
+```
+
+Khi skill được kích hoạt, Claude Code sẽ kết hợp cả context từ `CLAUDE.md` và instructions từ skill file, đảm bảo output luôn tuân theo conventions của dự án.
+
+## Chia sẻ Skills trong Team
+
+Skills là các file Markdown đơn giản, nên bạn có thể:
+
+1. **Commit vào repo** - Thêm `.claude/skills/` vào version control để cả team sử dụng chung
+2. **Tạo template repo** - Một repo chứa bộ skills chuẩn cho các dự án mới
+3. **Document skills** - Viết README cho thư mục skills để team members mới dễ nắm bắt
+
+```bash
+# Thêm skills vào git
+git add .claude/skills/
+git commit -m "Add team skills for API and component generation"
+```
+
+<Callout type="tip" title="Mẹo productivity">
+Bắt đầu bằng việc quan sát các tác vụ bạn thực hiện lặp lại nhiều nhất. Mỗi khi thấy mình mô tả cùng một quy trình cho Claude Code, đó là lúc nên tạo một skill. Một skill tốt có thể tiết kiệm hàng giờ mỗi tuần.
+</Callout>

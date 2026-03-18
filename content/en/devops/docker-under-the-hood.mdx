@@ -1,0 +1,377 @@
+---
+title: "Docker Under the Hood - What Happens When You Run docker compose up?"
+description: "Explore Docker internals: namespaces, cgroups, OverlayFS, networking, port mapping, and what every line of build and runtime logs actually means."
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 20
+tags: ["docker", "containers", "devops", "networking", "linux", "namespaces", "cgroups"]
+featured: false
+order: 2
+series: "docker"
+seriesOrder: 2
+seriesTitle: "Docker From Zero to Production"
+sources:
+  - title: "Docker Official Documentation - Docker Overview"
+    url: "https://docs.docker.com/get-started/docker-overview/"
+  - title: "Docker Networking Overview"
+    url: "https://docs.docker.com/engine/network/"
+  - title: "Docker Packet Filtering and Firewalls"
+    url: "https://docs.docker.com/engine/network/packet-filtering-firewalls/"
+  - title: "OverlayFS Storage Driver - Docker Docs"
+    url: "https://docs.docker.com/engine/storage/drivers/overlayfs-driver/"
+  - title: "BuildKit in Depth - Depot"
+    url: "https://depot.dev/blog/buildkit-in-depth"
+  - title: "Container Security Fundamentals: Isolation & Namespaces - Datadog"
+    url: "https://securitylabs.datadoghq.com/articles/container-security-fundamentals-part-2/"
+  - title: "Deep Dive into Linux Networking and Docker - Bridge, vETH and IPTables"
+    url: "https://medium.com/techlog/diving-into-linux-networking-and-docker-bridge-veth-and-iptables-a05eb27b1e72"
+  - title: "Docker Engine v29 Release Notes"
+    url: "https://docs.docker.com/engine/release-notes/29/"
+---
+
+# Docker Under the Hood - What Happens When You Run docker compose up?
+
+In the previous article, you learned how to run containers, write Dockerfiles, and use Docker Compose. But have you ever wondered: **what actually happens** when you type `docker compose up`? How can Docker create a completely isolated environment on the same machine? What do those log lines with `#`, `CACHED`, `sha256:...` mean?
+
+This article dissects Docker from the inside out — from isolation mechanisms and the filesystem to networking and port mapping.
+
+## Part 1: Reading Build Logs
+
+When you run `docker compose up --build` or `docker build`, Docker uses **BuildKit** — its modern build engine — to construct images. The log output looks like this:
+
+```
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 227B done
+#1 DONE 0.1s
+
+#2 [internal] load .dockerignore
+#2 transferring context: 35B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:22-alpine
+#3 DONE 1.2s
+
+#4 [1/5] FROM docker.io/library/node:22-alpine@sha256:6125ab...
+#4 DONE 0.0s
+
+#5 [2/5] WORKDIR /app
+#5 CACHED
+
+#6 [3/5] COPY package*.json ./
+#6 sha256:3edb1e...
+#6 DONE 0.1s
+
+#7 [4/5] RUN npm ci --omit=dev
+#7 sha256:a1b2c3...
+#7 DONE 12.3s
+
+#8 [5/5] COPY . .
+#8 DONE 0.2s
+
+#9 exporting to image
+#9 exporting layers 0.3s done
+#9 writing image sha256:f4e5d6... done
+#9 naming to docker.io/library/my-app:latest done
+#9 DONE 0.4s
+```
+
+### Decoding Each Component
+
+#### The `#1`, `#2`, `#3`... — Vertex IDs
+
+Each number after `#` is **BuildKit's internal ID** for an operation in the build graph. BuildKit organizes the build process as a **DAG** (Directed Acyclic Graph), where each operation is a "vertex."
+
+<Callout type="info">The `#` numbers **do not necessarily** follow the order in your Dockerfile. BuildKit can run multiple steps in parallel if they don't depend on each other, so completion order may differ from declaration order.</Callout>
+
+#### `sha256:...` — Content Hashes
+
+Each build operation is represented by a SHA-256 hash. This is a **content-addressable identifier** — meaning if the same operation runs with the same inputs, the hash will always be identical. This is how BuildKit knows exactly which steps have already been executed and can skip them.
+
+#### `CACHED` — Cached Steps
+
+When you see `CACHED`, it means BuildKit detected that this step **was already executed** with the same inputs and the result is still in cache. It skips execution entirely, making builds significantly faster.
+
+In contrast, `DONE 12.3s` means the step was executed and took 12.3 seconds.
+
+#### `[internal]` — Internal Steps
+
+Steps marked `[internal]` are BuildKit housekeeping operations — they don't correspond directly to any Dockerfile instruction. For example:
+- `load build definition from Dockerfile` — reads the Dockerfile
+- `load .dockerignore` — reads the .dockerignore file
+- `load metadata for docker.io/...` — fetches base image metadata from the registry
+
+#### `[1/5]`, `[2/5]`... — Step Numbers Within a Stage
+
+The numbers in square brackets indicate **which step out of the total** you are in within a build stage. If the Dockerfile uses multi-stage builds, you'll see the stage name: `[builder 2/5]` or `[stage-0 1/3]`.
+
+### Build Process Diagram
+
+<Diagram chart="graph TD\n    A[docker build .] --> B[BuildKit receives request]\n    B --> C[Read Dockerfile + .dockerignore]\n    C --> D[Parse into DAG]\n    D --> E{Step cached?}\n    E -->|Yes| F[Skip - CACHED]\n    E -->|No| G[Execute step]\n    G --> H[Create new layer]\n    F --> I[Next step]\n    H --> I\n    I --> J{More steps?}\n    J -->|Yes| E\n    J -->|No| K[Export image + assign tag]" />
+
+## Part 2: What Happens During docker compose up?
+
+When you run `docker compose up -d`, Docker Compose performs these steps sequentially:
+
+<Diagram chart="graph TD\n    A[docker compose up] --> B[1. Read compose.yaml]\n    B --> C[2. Resolve .env variables]\n    C --> D[3. Pull images if needed]\n    D --> E[4. Build images if build directive exists]\n    E --> F[5. Create default network]\n    F --> G[6. Create volumes]\n    G --> H[7. Create containers]\n    H --> I[8. Start in depends_on order]\n    I --> J[9. Run healthchecks]\n    J --> K[10. Stream logs]" />
+
+### Step-by-Step Details
+
+**1. Read and parse `compose.yaml`**
+Compose locates the `compose.yaml` (or `docker-compose.yml`) file in the current directory and reads all services, networks, and volumes configuration.
+
+**2. Resolve environment variables**
+Variables like `${APP_PORT}` are replaced with values from the `.env` file or the current environment.
+
+**3. Pull images**
+For services using `image:` (like `postgres:17-alpine`), Compose checks whether the image exists locally. If not, it pulls from the registry.
+
+**4. Build images**
+For services with `build:`, Compose invokes BuildKit to build the image (the `#` log process from Part 1).
+
+**5. Create network**
+Compose automatically creates a **bridge network** named `<project>_default`. All services in the same compose file can communicate with each other via **service name** (e.g., `db`, `cache`) thanks to Docker's internal DNS.
+
+**6. Create volumes**
+Named volumes are created (e.g., `postgres_data`) for persistent data storage.
+
+**7-8. Create and start containers**
+Containers are created from configuration, then started in `depends_on` order. Dependencies start first.
+
+**9. Health checks**
+If a service has a `healthcheck`, Compose waits for it to reach `healthy` status before starting dependent services.
+
+**10. Stream logs**
+Without `-d`, Compose aggregates logs from all containers and displays them on the terminal, each line prefixed with the service name.
+
+<Callout type="tip">Use `docker compose up --dry-run` to preview what Docker will do without actually executing anything — very useful for debugging.</Callout>
+
+## Part 3: How Does Docker Create Isolated Environments?
+
+This is the core question. Docker **did not invent** its own isolation mechanism. It relies on two features built into the **Linux kernel**: **Namespaces** and **Control Groups (cgroups)**.
+
+<Diagram chart="graph TB\n    subgraph kernel[Linux Kernel]\n    NS[Namespaces\n Visibility isolation] \n    CG[Cgroups\n Resource limits]\n    OFS[OverlayFS\n Layered filesystem]\n    end\n    subgraph docker[Docker]\n    D[Docker Daemon] --> RUNC[runc]\n    RUNC --> NS\n    RUNC --> CG\n    D --> OFS\n    end" />
+
+### Namespaces — "What Can a Container See?"
+
+Namespaces partition kernel resources so each container only **sees** its own portion. Docker uses 5 main namespace types:
+
+<ComparisonTable
+  headers={["Namespace", "What It Isolates", "Effect"]}
+  rows={[
+    ["PID", "Process IDs", "Container only sees its own processes, PID 1 is the main process"],
+    ["NET", "Network stack", "Container has its own IP, interfaces, and routing table"],
+    ["MNT", "Mount points", "Container has its own filesystem, cannot see host files"],
+    ["UTS", "Hostname", "Container has its own hostname, independent of host"],
+    ["IPC", "Inter-process communication", "Shared memory and semaphores are isolated between containers"]
+  ]}
+/>
+
+**Practical example:** When you `docker exec -it myapp bash` and run `ps aux`, you only see processes inside that container — not the host or other containers. This is the **PID namespace** at work.
+
+```bash
+# Inside the container — only sees its own processes
+$ docker exec -it myapp ps aux
+PID   USER     COMMAND
+  1   appuser  node server.js
+ 42   appuser  ps aux
+
+# On the host — sees everything, including container processes
+$ ps aux | grep node
+thangnt  12345  ... node server.js
+```
+
+### Cgroups — "How Much Can a Container Use?"
+
+If namespaces determine what a container **sees**, cgroups determine how much **resources** it can use. When Docker starts a container, it creates a new cgroup and assigns resource limits:
+
+```bash
+# Limit a container to 512MB RAM and 1 CPU
+docker run -d --memory=512m --cpus=1 my-app:1.0
+```
+
+If a container tries to exceed its RAM limit, the Linux kernel **kills** the process (OOM Killer). Cgroups prevent the "noisy neighbor" problem — one container consuming all resources and affecting others.
+
+<Callout type="warning">The Docker daemon does not implement isolation itself. The low-level work is done by **runc** — a container runtime that follows the OCI standard. runc uses the `clone()` system call with flags like `CLONE_NEWPID` and `CLONE_NEWNET` to create processes in new namespaces.</Callout>
+
+### OverlayFS — The Layered Filesystem
+
+Each Docker image consists of multiple **layers** stacked on top of each other. Docker uses **OverlayFS** (a union filesystem in the Linux kernel) to merge these layers into a unified filesystem.
+
+<Diagram chart="graph TB\n    subgraph overlay[OverlayFS - What the container sees]\n    M[merged - Unified view]\n    end\n    subgraph upper[Container Layer - Read/Write]\n    U[upperdir - Container changes]\n    end\n    subgraph lower[Image Layers - Read-only]\n    L1[Layer 3: COPY . .]\n    L2[Layer 2: RUN npm ci]\n    L3[Layer 1: FROM node:22-alpine]\n    end\n    M --> U\n    M --> L1\n    L1 --> L2\n    L2 --> L3" />
+
+**Copy-on-Write (CoW) mechanism:**
+- When a container **reads** a file → OverlayFS serves it directly from the lower layer (read-only), no copy made.
+- When a container **modifies** a file → OverlayFS copies the file to the upperdir first, then applies changes. The original in the lower layer remains unchanged.
+- When a container **deletes** a file → OverlayFS creates a "whiteout file" in the upperdir to hide the original.
+
+This is why when you remove a container, all changes disappear — they only existed in the upperdir. Image layers (lowerdir) are always intact and can be shared across multiple containers.
+
+## Part 4: Networking — How Does Docker Communicate With the Outside World?
+
+### Bridge Network — The Default Network
+
+When Docker is installed, it creates a virtual **bridge network** called `docker0` on the host. This bridge acts as a **virtual network switch**: each container is "plugged into" this switch via a **veth** (virtual ethernet) pair.
+
+<Diagram chart="graph TB\n    subgraph host[Host Machine]\n    ETH[eth0 / en0\n IP: 192.168.1.100]\n    BR[docker0 bridge\n IP: 172.17.0.1]\n    ETH ---|iptables NAT| BR\n    end\n    subgraph containers[Containers]\n    C1[Container 1\n veth → 172.17.0.2]\n    C2[Container 2\n veth → 172.17.0.3]\n    C3[Container 3\n veth → 172.17.0.4]\n    end\n    BR --- C1\n    BR --- C2\n    BR --- C3" />
+
+### veth Pairs — "Virtual Network Cables"
+
+When Docker starts a container, it creates a **veth pair** — think of it as a virtual network cable with two ends:
+- **One end** lives inside the container (typically `eth0`)
+- **The other end** is attached to the `docker0` bridge on the host
+
+```bash
+# View veth interfaces on the host
+ip link show type veth
+
+# View bridge and attached interfaces
+brctl show
+# bridge name    interfaces
+# docker0        veth4a5b6c7
+#                vethd8e9f0a
+```
+
+### Port Mapping — What Happens When You Use `-p 8080:80`?
+
+By default, containers **do not** expose any ports externally. When you use `-p 8080:80`, Docker creates **iptables rules** (or nftables on newer kernels) to forward traffic:
+
+<Diagram chart="graph LR\n    A[External machine\n 192.168.1.50] -->|request to\n 192.168.1.100:8080| B[Host\n iptables PREROUTING]\n    B -->|DNAT: rewrite dest to\n 172.17.0.2:80| C[docker0 bridge]\n    C -->|forward via\n veth pair| D[Container\n 172.17.0.2:80]\n    D -->|response| C\n    C -->|MASQUERADE:\n rewrite source to host IP| B\n    B -->|response| A" />
+
+#### Detailed Packet Flow
+
+**1. Incoming request:**
+- A packet from outside arrives at `host:8080`
+- The iptables **PREROUTING** chain sends it to the **DOCKER** chain
+- A **DNAT** (Destination NAT) rule rewrites the destination: `192.168.1.100:8080` → `172.17.0.2:80`
+- The packet is forwarded across the `docker0` bridge
+- The bridge sends the packet through the correct **veth pair** into the container's network namespace
+
+**2. Response:**
+- The container processes the request and sends a response back
+- The response travels through the veth pair → `docker0` bridge
+- An iptables **MASQUERADE** (SNAT) rule rewrites the source: `172.17.0.2` → host's IP
+- The packet is sent back to the external client
+
+```bash
+# View DNAT rules created by Docker
+sudo iptables -t nat -L DOCKER -n -v
+
+# Example output:
+# Chain DOCKER (2 references)
+# target  prot  dpt      source      destination
+# DNAT    tcp   8080     0.0.0.0/0   0.0.0.0/0   to:172.17.0.2:80
+```
+
+<Callout type="info">Docker also runs a process called **docker-proxy** to handle edge cases like hairpin NAT — when a container tries to access itself through its published port.</Callout>
+
+### Can Other Machines on the Same Network Access the Container?
+
+**Yes.** When you publish a port (`-p 8080:80`), Docker binds that port on **all interfaces** of the host (0.0.0.0:8080). This means:
+
+- `localhost:8080` — accessible from the host
+- `192.168.1.100:8080` — accessible from other machines on the same LAN
+- Even from the internet if the host has a public IP and the firewall allows it
+
+```bash
+# Only allow access from localhost (more secure)
+docker run -d -p 127.0.0.1:8080:80 nginx
+
+# Allow access from everywhere (default)
+docker run -d -p 8080:80 nginx
+
+# Only allow access from a specific host IP
+docker run -d -p 192.168.1.100:8080:80 nginx
+```
+
+<Callout type="warning">Be careful: Docker can **bypass your host firewall** (such as ufw or firewalld). Docker adds iptables rules directly to the DOCKER chain, which is evaluated before ufw rules. If you publish a port, it may be open to the entire network even if ufw has blocked that port.</Callout>
+
+### Internal DNS Between Containers
+
+When using a **user-defined network** (like Docker Compose's default network), Docker provides an **embedded DNS server** at `127.0.0.11`. This allows containers to communicate by **service name** instead of IP addresses:
+
+```yaml
+# compose.yaml
+services:
+  web:
+    environment:
+      # "db" here is resolved by Docker's internal DNS
+      - DATABASE_URL=postgres://user:pass@db:5432/myapp
+  db:
+    image: postgres:17-alpine
+```
+
+Container `web` calls `db:5432` → Docker DNS resolves `db` to IP `172.18.0.3` → connection succeeds.
+
+<Callout type="info">Internal DNS **only works** on user-defined networks. On the default bridge (`docker0`), containers must use IP addresses directly. This is one reason to always use Docker Compose or create custom networks.</Callout>
+
+### Network Driver Overview
+
+<ComparisonTable
+  headers={["Driver", "Description", "Use Case"]}
+  rows={[
+    ["bridge", "Isolated virtual network, containers communicate via bridge", "Default, suitable for most cases"],
+    ["host", "Container uses host's network stack directly", "High performance, no port mapping needed"],
+    ["none", "No networking", "Completely isolated containers"],
+    ["overlay", "Connects containers across multiple Docker hosts", "Docker Swarm, clusters"],
+    ["macvlan", "Container gets its own MAC address, appears as a physical device", "Integration with physical networks"]
+  ]}
+/>
+
+## Part 5: Commands to Explore Docker Internals
+
+You can explore what Docker does behind the scenes yourself:
+
+```bash
+# === Inspect a container in detail ===
+docker inspect myapp
+
+# === View container namespaces ===
+# Find the container's real PID on the host
+docker inspect --format '{{.State.Pid}}' myapp
+# Example output: 12345
+
+# View namespaces for that process
+ls -la /proc/12345/ns/
+# lrwxrwxrwx  ipc -> ipc:[4026532589]
+# lrwxrwxrwx  mnt -> mnt:[4026532587]
+# lrwxrwxrwx  net -> net:[4026532592]
+# lrwxrwxrwx  pid -> pid:[4026532590]
+# lrwxrwxrwx  uts -> uts:[4026532588]
+
+# === View cgroup limits ===
+docker stats myapp --no-stream
+
+# === View OverlayFS layers ===
+docker inspect --format '{{.GraphDriver.Data.MergedDir}}' myapp
+
+# === View networking ===
+docker network ls
+docker network inspect bridge
+
+# === View iptables rules ===
+sudo iptables -t nat -L DOCKER -n -v
+
+# === View veth pairs ===
+ip link show type veth
+brctl show
+
+# === Build with detailed logs ===
+docker build --progress=plain -t my-app .
+```
+
+## Conclusion
+
+Now you understand that Docker is not "magic" — it is built on specific Linux kernel features:
+
+| Question | Answer |
+|----------|--------|
+| Why are containers isolated? | **Namespaces** partition visibility, **cgroups** limit resources |
+| How does the filesystem work? | **OverlayFS** merges multiple layers into a unified view |
+| How do containers communicate over the network? | **Bridge + veth pairs** create a virtual switch, **iptables** handles NAT |
+| How does port mapping work? | **DNAT rules** forward traffic from host ports to containers |
+| What do build logs mean? | **BuildKit DAG** with vertex IDs, content hashes, and layer caching |
+
+<Callout type="warning">Containers share the kernel with the host. If the kernel has a vulnerability, a container could be exploited to escape its sandbox (container escape). This is why you should always keep the kernel and Docker runtime up to date.</Callout>
+
+In the next article, we'll cover **Docker Best Practices** — optimizing Dockerfiles, multi-stage builds, security hardening, and anti-patterns to avoid.

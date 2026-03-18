@@ -40,13 +40,9 @@
     "madeWith": "Built with"
   },
   "categories": {
-    "claude-code": {
-      "name": "Claude Code",
-      "description": "Comprehensive guides for Claude Code - Anthropic's AI coding tool"
-    },
-    "ai-basics": {
-      "name": "AI Basics",
-      "description": "Fundamental concepts of Artificial Intelligence and Machine Learning"
+    "ai": {
+      "name": "AI",
+      "description": "Artificial Intelligence, Machine Learning, Claude Code and AI tools"
     },
     "programming": {
       "name": "Programming",
@@ -61,8 +57,12 @@
       "description": "Computer architecture, chips, circuits, and how hardware works"
     },
     "database": {
-      "name": "Database & Realtime",
-      "description": "Databases, realtime communication, WebSocket, message queues and streaming"
+      "name": "Database",
+      "description": "SQL/NoSQL databases, indexing, transactions and database engines"
+    },
+    "networking": {
+      "name": "Networking",
+      "description": "Network protocols, WebSocket, TCP/IP, message queues and realtime communication"
     },
     "automation": {
       "name": "Automation & Workflow",

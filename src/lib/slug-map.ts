@@ -2,22 +2,21 @@
 // Key format: "category/slug"
 
 const viToEn: Record<string, string> = {
-  // Claude Code
-  "claude-code/gioi-thieu-claude-code": "claude-code/introduction-to-claude-code",
-  "claude-code/skills-va-plugins": "claude-code/skills-and-plugins",
-  "claude-code/models-opus-sonnet-haiku": "claude-code/models-opus-sonnet-haiku",
-  "claude-code/agents-tools-cli": "claude-code/agents-tools-cli",
-  "claude-code/hooks-va-slash-commands": "claude-code/hooks-and-slash-commands",
-  "claude-code/mcp-servers": "claude-code/mcp-servers",
-  "claude-code/cau-hinh-va-tuy-chinh": "claude-code/configuration-and-customization",
-  // AI Basics
-  "ai-basics/ai-la-gi": "ai-basics/what-is-ai",
-  "ai-basics/llm-hoat-dong-nhu-the-nao": "ai-basics/how-llms-work",
-  "ai-basics/prompt-engineering-co-ban": "ai-basics/prompt-engineering-basics",
-  "ai-basics/ai-agents-giai-thich": "ai-basics/ai-agents-explained",
-  "ai-basics/rag-la-gi": "ai-basics/what-is-rag",
-  "ai-basics/so-sanh-cac-ai-models": "ai-basics/comparing-ai-models",
-  "ai-basics/an-toan-va-dao-duc-ai": "ai-basics/ai-safety-and-ethics",
+  // AI (merged from claude-code + ai-basics)
+  "ai/gioi-thieu-claude-code": "ai/introduction-to-claude-code",
+  "ai/skills-va-plugins": "ai/skills-and-plugins",
+  "ai/models-opus-sonnet-haiku": "ai/models-opus-sonnet-haiku",
+  "ai/agents-tools-cli": "ai/agents-tools-cli",
+  "ai/hooks-va-slash-commands": "ai/hooks-and-slash-commands",
+  "ai/mcp-servers": "ai/mcp-servers",
+  "ai/cau-hinh-va-tuy-chinh": "ai/configuration-and-customization",
+  "ai/ai-la-gi": "ai/what-is-ai",
+  "ai/llm-hoat-dong-nhu-the-nao": "ai/how-llms-work",
+  "ai/prompt-engineering-co-ban": "ai/prompt-engineering-basics",
+  "ai/ai-agents-giai-thich": "ai/ai-agents-explained",
+  "ai/rag-la-gi": "ai/what-is-rag",
+  "ai/so-sanh-cac-ai-models": "ai/comparing-ai-models",
+  "ai/an-toan-va-dao-duc-ai": "ai/ai-safety-and-ethics",
   // Programming
   "programming/bat-dau-voi-lap-trinh": "programming/getting-started-with-programming",
   "programming/giai-thuat-co-ban": "programming/basic-algorithms",
@@ -47,12 +46,9 @@ const viToEn: Record<string, string> = {
   "hardware/the-tu-va-nfc": "hardware/magnetic-cards-and-nfc",
   "hardware/gpu-va-xu-ly-song-song": "hardware/gpu-and-parallel-computing",
   "hardware/nang-luong-va-dien-toan": "hardware/energy-and-computing",
-  // Database & Realtime
+  // Database
   "database/sql-va-nosql": "database/sql-vs-nosql",
   "database/supabase-nen-tang-backend": "database/supabase-backend-platform",
-  "database/websocket-va-realtime": "database/websocket-and-realtime",
-  "database/tcp-ip-va-mang": "database/tcp-ip-and-networking",
-  "database/message-queue-rabbitmq-kafka": "database/message-queues-rabbitmq-kafka",
   "database/redis-va-caching": "database/redis-and-caching",
   "database/vector-hoa-va-embeddings": "database/vectorization-and-embeddings",
   "database/vector-database": "database/vector-database",
@@ -60,6 +56,10 @@ const viToEn: Record<string, string> = {
   "database/sql-va-database-engine": "database/sql-and-database-engine",
   "database/transaction-va-rollback": "database/transactions-and-rollback",
   "database/index-trong-database": "database/database-indexing",
+  // Networking
+  "networking/websocket-va-realtime": "networking/websocket-and-realtime",
+  "networking/tcp-ip-va-mang": "networking/tcp-ip-and-networking",
+  "networking/message-queue-rabbitmq-kafka": "networking/message-queues-rabbitmq-kafka",
   // Automation
   "automation/n8n-tu-dong-hoa": "automation/n8n-workflow-automation",
   "automation/apache-airflow": "automation/apache-airflow",
@@ -70,6 +70,7 @@ const viToEn: Record<string, string> = {
   "devops/racknerd-vps-deploy": "devops/racknerd-vps-deploy",
   "devops/rackspace-spot": "devops/rackspace-spot",
   "devops/docker-co-ban": "devops/docker-basics",
+  "devops/docker-sau-hau-truong": "devops/docker-under-the-hood",
   "devops/ci-cd-pipeline": "devops/ci-cd-pipeline",
   "devops/kubernetes-co-ban": "devops/kubernetes-basics",
   "devops/linux-command-line": "devops/linux-command-line",
@@ -86,12 +87,10 @@ export function getTranslatedPath(
   fromLocale: string,
   toLocale: string
 ): string {
-  // Remove the locale prefix: /vi/claude-code/slug -> claude-code/slug
   const pathWithoutLocale = currentPath.replace(`/${fromLocale}`, "").replace(/^\//, "");
 
   if (!pathWithoutLocale || pathWithoutLocale === "") return "/";
 
-  // Check if this is an article path (category/slug)
   const map = fromLocale === "vi" ? viToEn : enToVi;
   const translated = map[pathWithoutLocale];
 
@@ -99,6 +98,5 @@ export function getTranslatedPath(
     return `/${translated}`;
   }
 
-  // For non-article paths (category pages, about, search), keep same path
   return `/${pathWithoutLocale}`;
 }

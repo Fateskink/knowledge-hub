@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { getArticle, getRelatedArticles, getArticleSlugs, getCategories } from "@/lib/content";
+import { getArticle, getRelatedArticles, getArticleSlugs, getCategories, getSeriesArticles, LEVEL_LABELS } from "@/lib/content";
 import ArticleContent from "@/components/ArticleContent";
 import Breadcrumb from "@/components/Breadcrumb";
 import ArticleCard from "@/components/ArticleCard";
@@ -65,6 +65,9 @@ export default async function ArticlePage({
   const t = await getTranslations("article");
   const tc = await getTranslations("categories");
   const related = getRelatedArticles(locale, category, slug);
+  const seriesArticles = article.series
+    ? getSeriesArticles(locale, article.series)
+    : [];
 
   return (
     <>
@@ -88,6 +91,16 @@ export default async function ArticlePage({
               <span className="rounded-lg bg-primary/10 dark:bg-primary/[0.08] px-3 py-1 text-sm font-medium text-primary">
                 {tc(`${category}.name`)}
               </span>
+              {article.level && (
+                <span className="rounded-lg bg-accent/10 dark:bg-accent/[0.08] px-3 py-1 text-sm font-medium text-accent">
+                  Lv.{article.level} - {LEVEL_LABELS[locale]?.[article.level] || ""}
+                </span>
+              )}
+              {article.seriesTitle && (
+                <span className="rounded-lg bg-emerald-100 dark:bg-emerald-900/20 px-3 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                  {article.seriesTitle} ({article.seriesOrder}/{seriesArticles.length})
+                </span>
+              )}
               {article.tags.map((tag) => (
                 <span
                   key={tag}
@@ -150,6 +163,39 @@ export default async function ArticlePage({
                 <ArticleCard key={article.slug} article={article} />
               ))}
             </div>
+          </section>
+        )}
+
+        {/* Series Navigation */}
+        {seriesArticles.length > 1 && (
+          <section className="mt-12 rounded-xl border border-border bg-card p-6">
+            <h3 className="mb-4 text-lg font-bold">
+              {article.seriesTitle || (locale === "vi" ? "Series bài viết" : "Article Series")}
+            </h3>
+            <ol className="space-y-2">
+              {seriesArticles.map((sa, i) => (
+                <li key={sa.slug}>
+                  {sa.slug === slug ? (
+                    <span className="flex items-center gap-2 rounded-lg bg-primary/10 dark:bg-primary/[0.08] px-3 py-2 text-sm font-medium text-primary">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white dark:text-background">
+                        {i + 1}
+                      </span>
+                      {sa.title}
+                    </span>
+                  ) : (
+                    <a
+                      href={`/${locale}/${sa.category}/${sa.slug}`}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-secondary hover:text-foreground"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-muted">
+                        {i + 1}
+                      </span>
+                      {sa.title}
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ol>
           </section>
         )}
 

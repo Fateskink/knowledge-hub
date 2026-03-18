@@ -17,9 +17,9 @@ export default function ArticleCard({ article, compact }: ArticleCardProps) {
         <span className="rounded-md bg-primary/10 dark:bg-primary/[0.08] px-2 py-0.5 text-xs font-medium text-primary">
           {article.category}
         </span>
-        {article.featured && (
+        {article.level && (
           <span className="rounded-md bg-accent/10 dark:bg-accent/[0.08] px-2 py-0.5 text-xs font-medium text-accent">
-            Featured
+            Lv.{article.level}
           </span>
         )}
       </div>

@@ -1,0 +1,353 @@
+---
+title: "Hooks và Slash Commands trong Claude Code"
+description: "Hướng dẫn sử dụng Hooks system để tự động hóa workflows, tạo custom slash commands, và thiết lập automation pipelines trong Claude Code."
+category: "ai"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 7
+tags: ["claude-code", "hooks", "slash-commands", "automation", "workflows"]
+featured: false
+order: 5
+sources:
+  - title: "Claude Code Hooks"
+    url: "https://docs.anthropic.com/en/docs/claude-code/hooks"
+  - title: "Claude Code Slash Commands"
+    url: "https://docs.anthropic.com/en/docs/claude-code/slash-commands"
+---
+
+# Hooks và Slash Commands trong Claude Code
+
+## Hooks System
+
+Hooks trong Claude Code là các **shell commands tự động chạy** tại các thời điểm cụ thể trong vòng đời hoạt động của Claude Code. Chúng cho phép bạn kiểm soát, mở rộng, và tùy biến hành vi của Claude Code mà không cần chỉnh sửa source code.
+
+<Callout type="info" title="Hooks vs Skills">
+**Skills** là hướng dẫn bằng ngôn ngữ tự nhiên cho Claude Code tuân theo. **Hooks** là scripts thực thi tự động tại các lifecycle events. Skills hướng dẫn AI "làm gì", Hooks tự động hóa các bước "xung quanh" quá trình đó.
+</Callout>
+
+### Các Hook Events
+
+Claude Code hỗ trợ các hook events sau:
+
+```typescript
+// Các thời điểm hook có thể chạy
+
+// 1. PreToolUse - Trước khi tool được thực thi
+// Dùng để validate, block, hoặc modify tool calls
+"PreToolUse"
+
+// 2. PostToolUse - Sau khi tool thực thi xong
+// Dùng để log, notify, hoặc post-process kết quả
+"PostToolUse"
+
+// 3. Notification - Khi Claude Code gửi thông báo
+// Dùng để forward notifications đến Slack, email, etc.
+"Notification"
+
+// 4. Stop - Khi agent dừng (hoàn thành hoặc lỗi)
+// Dùng để cleanup, generate reports
+"Stop"
+```
+
+### Cấu hình Hooks
+
+Hooks được cấu hình trong file `.claude/settings.json` hoặc `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "/path/to/validate-command.sh $TOOL_INPUT"
+      },
+      {
+        "matcher": "Edit",
+        "command": "echo 'Editing file...' >> /tmp/claude-log.txt"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "command": "/path/to/format-file.sh $TOOL_INPUT"
+      }
+    ],
+    "Notification": [
+      {
+        "command": "/path/to/notify-slack.sh $NOTIFICATION_MESSAGE"
+      }
+    ],
+    "Stop": [
+      {
+        "command": "/path/to/generate-summary.sh $SESSION_ID"
+      }
+    ]
+  }
+}
+```
+
+### Ví dụ thực tế: Auto-format sau khi Edit
+
+Tạo hook tự động chạy Prettier sau mỗi lần Claude Code chỉnh sửa file:
+
+```bash
+#!/bin/bash
+# .claude/hooks/post-edit-format.sh
+
+# Nhận đường dẫn file từ tool input
+FILE_PATH=$(echo "$TOOL_INPUT" | jq -r '.file_path')
+
+# Kiểm tra extension
+case "$FILE_PATH" in
+  *.ts|*.tsx|*.js|*.jsx|*.json|*.css|*.md)
+    echo "Running Prettier on $FILE_PATH..."
+    npx prettier --write "$FILE_PATH" 2>/dev/null
+    ;;
+esac
+```
+
+Cấu hình trong settings:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "command": "bash .claude/hooks/post-edit-format.sh"
+      },
+      {
+        "matcher": "Write",
+        "command": "bash .claude/hooks/post-edit-format.sh"
+      }
+    ]
+  }
+}
+```
+
+### Ví dụ: Chặn lệnh nguy hiểm
+
+Tạo hook PreToolUse để ngăn Claude Code chạy các lệnh destructive:
+
+```bash
+#!/bin/bash
+# .claude/hooks/validate-bash.sh
+
+COMMAND=$(echo "$TOOL_INPUT" | jq -r '.command')
+
+# Danh sách patterns bị chặn
+BLOCKED_PATTERNS=(
+  "rm -rf /"
+  "DROP TABLE"
+  "DROP DATABASE"
+  "git push.*--force.*main"
+  "git reset --hard"
+  "chmod 777"
+)
+
+for pattern in "${BLOCKED_PATTERNS[@]}"; do
+  if echo "$COMMAND" | grep -qiE "$pattern"; then
+    echo "BLOCKED: Lệnh '$COMMAND' bị chặn bởi security hook"
+    exit 2  # Exit code 2 = block the tool
+  fi
+done
+
+exit 0  # Exit code 0 = allow the tool
+```
+
+<Callout type="warning" title="Exit codes quan trọng">
+Hook exit codes quyết định hành vi: **0** = cho phép tiếp tục, **2** = chặn tool execution. Bất kỳ exit code nào khác sẽ hiển thị warning nhưng vẫn tiếp tục. Hãy test hooks kỹ trước khi áp dụng.
+</Callout>
+
+### Ví dụ: Logging và Monitoring
+
+```bash
+#!/bin/bash
+# .claude/hooks/log-activity.sh
+
+TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+TOOL_NAME="$TOOL_NAME"
+LOG_FILE="$HOME/.claude/activity.log"
+
+echo "[$TIMESTAMP] Tool: $TOOL_NAME | Session: $SESSION_ID" >> "$LOG_FILE"
+
+# Gửi metrics (nếu có monitoring system)
+# curl -s -X POST https://metrics.example.com/api/track \
+#   -H "Content-Type: application/json" \
+#   -d "{\"tool\": \"$TOOL_NAME\", \"timestamp\": \"$TIMESTAMP\"}"
+```
+
+## Slash Commands
+
+Slash commands là các lệnh bắt đầu bằng `/` mà bạn gõ trong phiên Claude Code. Chúng bao gồm built-in commands và custom commands bạn tự tạo.
+
+### Built-in Slash Commands
+
+```bash
+# Quản lý phiên
+/clear          # Xóa lịch sử hội thoại
+/compact        # Nén context để tiết kiệm tokens
+/status         # Hiển thị trạng thái phiên
+
+# Quản lý model
+/model          # Chuyển đổi model (Opus, Sonnet, Haiku)
+/cost           # Xem chi phí phiên hiện tại
+
+# Tools và permissions
+/permissions    # Quản lý tool permissions
+/allowed-tools  # Xem danh sách tools được phép
+
+# Git và development
+/commit         # Tạo git commit
+/pr             # Tạo pull request
+/review-pr      # Review pull request
+
+# Trợ giúp
+/help           # Xem tất cả commands
+```
+
+### Tạo Custom Slash Commands
+
+Custom slash commands là các file Markdown chứa instructions, được đặt trong thư mục `.claude/commands/`:
+
+```
+.claude/commands/
+├── deploy.md
+├── test-all.md
+├── generate-migration.md
+└── review-security.md
+```
+
+#### Ví dụ: /deploy command
+
+```markdown
+<!-- .claude/commands/deploy.md -->
+# Deploy to Staging
+
+## Hướng dẫn
+
+Thực hiện deploy ứng dụng lên staging environment:
+
+1. Chạy linting: `npm run lint`
+2. Chạy tests: `npm run test`
+3. Build ứng dụng: `npm run build`
+4. Nếu tất cả pass, chạy: `npm run deploy:staging`
+5. Verify deployment bằng cách kiểm tra health check endpoint
+6. Báo cáo kết quả cho user
+
+## Xử lý lỗi
+- Nếu lint fails: Tự động fix với `npm run lint:fix`, rồi thử lại
+- Nếu test fails: Báo cáo test nào fail, KHÔNG deploy
+- Nếu build fails: Phân tích lỗi và đề xuất fix
+```
+
+Sử dụng:
+
+```bash
+# Trong phiên Claude Code
+> /deploy
+```
+
+#### Ví dụ: /test-all command với arguments
+
+```markdown
+<!-- .claude/commands/test-all.md -->
+# Run All Tests
+
+Chạy toàn bộ test suite với coverage report.
+
+## Arguments
+User có thể cung cấp module name để chỉ test module cụ thể.
+
+## Steps
+
+1. Nếu có argument (module name):
+   - Chạy: `npm run test -- --testPathPattern=$ARGUMENT`
+2. Nếu không có argument:
+   - Chạy: `npm run test -- --coverage`
+3. Parse kết quả test
+4. Nếu có test fail, đọc source code của test đó và phân tích nguyên nhân
+5. Hiển thị summary: passed, failed, coverage percentage
+```
+
+### Phân biệt Commands cấp Project và User
+
+```
+# Cấp project (chia sẻ trong team)
+my-project/.claude/commands/
+├── deploy.md        -> /deploy
+├── db-migrate.md    -> /db-migrate
+└── gen-api.md       -> /gen-api
+
+# Cấp user (cá nhân, global)
+~/.claude/commands/
+├── my-review.md     -> /my-review
+└── standup.md       -> /standup
+```
+
+<Callout type="tip" title="Naming convention">
+Đặt tên file command theo dạng kebab-case (ví dụ: `generate-api.md`). Slash command tương ứng sẽ là `/generate-api`. Chọn tên ngắn gọn, dễ nhớ, mô tả rõ chức năng.
+</Callout>
+
+## Kết hợp Hooks và Slash Commands
+
+Hooks và slash commands có thể phối hợp để tạo automation workflows mạnh mẽ:
+
+<Diagram chart="graph LR\n    A[User: /deploy] --> B[Slash Command Instructions]\n    B --> C[Claude Code thực thi]\n    C --> D[PreToolUse Hook: Validate]\n    D --> E[Tool: Bash - npm run build]\n    E --> F[PostToolUse Hook: Log result]\n    F --> G[Tool: Bash - deploy script]\n    G --> H[PostToolUse Hook: Notify Slack]\n    H --> I[Stop Hook: Generate report]" />
+
+### Ví dụ Workflow hoàn chỉnh
+
+```json
+// .claude/settings.json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "bash .claude/hooks/validate-bash.sh"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "command": "bash .claude/hooks/post-edit-format.sh"
+      }
+    ],
+    "Stop": [
+      {
+        "command": "bash .claude/hooks/session-summary.sh"
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/bin/bash
+# .claude/hooks/session-summary.sh
+
+TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+SUMMARY_FILE="$HOME/.claude/summaries/$TIMESTAMP.md"
+
+mkdir -p "$HOME/.claude/summaries"
+
+echo "# Session Summary" > "$SUMMARY_FILE"
+echo "Date: $(date)" >> "$SUMMARY_FILE"
+echo "Session ID: $SESSION_ID" >> "$SUMMARY_FILE"
+echo "" >> "$SUMMARY_FILE"
+echo "Session completed." >> "$SUMMARY_FILE"
+
+echo "Summary saved to $SUMMARY_FILE"
+```
+
+<Callout type="info" title="Debugging Hooks">
+Khi hook không hoạt động như mong đợi, hãy kiểm tra: (1) File script có quyền execute (`chmod +x`), (2) Đường dẫn trong settings.json chính xác, (3) Exit codes đúng (0 = allow, 2 = block). Bạn có thể thêm `echo` statements để debug output.
+</Callout>
+
+## Best Practices
+
+1. **Bắt đầu đơn giản** - Tạo hooks và commands cho các tác vụ bạn làm hàng ngày trước
+2. **Version control** - Commit `.claude/commands/` và `.claude/hooks/` vào repo
+3. **Documentation** - Thêm comments trong script giải thích logic
+4. **Error handling** - Luôn xử lý edge cases trong hook scripts
+5. **Team alignment** - Thống nhất conventions cho slash commands trong team

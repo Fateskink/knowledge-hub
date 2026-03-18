@@ -1,0 +1,377 @@
+---
+title: "Docker Sau Hậu Trường - Điều Gì Xảy Ra Khi Bạn Gõ docker compose up?"
+description: "Khám phá cơ chế bên trong Docker: namespace, cgroup, OverlayFS, networking, port mapping, và ý nghĩa từng dòng log khi build và chạy container."
+category: "devops"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 20
+tags: ["docker", "container", "devops", "networking", "linux", "namespace", "cgroup"]
+featured: false
+order: 2
+series: "docker"
+seriesOrder: 2
+seriesTitle: "Docker Từ Zero Đến Production"
+sources:
+  - title: "Docker Official Documentation - Docker Overview"
+    url: "https://docs.docker.com/get-started/docker-overview/"
+  - title: "Docker Networking Overview"
+    url: "https://docs.docker.com/engine/network/"
+  - title: "Docker Packet Filtering and Firewalls"
+    url: "https://docs.docker.com/engine/network/packet-filtering-firewalls/"
+  - title: "OverlayFS Storage Driver - Docker Docs"
+    url: "https://docs.docker.com/engine/storage/drivers/overlayfs-driver/"
+  - title: "BuildKit in Depth - Depot"
+    url: "https://depot.dev/blog/buildkit-in-depth"
+  - title: "Container Security Fundamentals: Isolation & Namespaces - Datadog"
+    url: "https://securitylabs.datadoghq.com/articles/container-security-fundamentals-part-2/"
+  - title: "Deep Dive into Linux Networking and Docker - Bridge, vETH and IPTables"
+    url: "https://medium.com/techlog/diving-into-linux-networking-and-docker-bridge-veth-and-iptables-a05eb27b1e72"
+  - title: "Docker Engine v29 Release Notes"
+    url: "https://docs.docker.com/engine/release-notes/29/"
+---
+
+# Docker Sau Hậu Trường - Điều Gì Xảy Ra Khi Bạn Gõ docker compose up?
+
+Ở bài trước, bạn đã biết cách chạy container, viết Dockerfile, và dùng Docker Compose. Nhưng bạn có bao giờ tự hỏi: **điều gì thực sự xảy ra** khi bạn gõ `docker compose up`? Tại sao Docker có thể tạo một môi trường hoàn toàn độc lập trên cùng một máy tính? Những dòng log liên tục xuất hiện với các ký hiệu `#`, `CACHED`, `sha256:...` nghĩa là gì?
+
+Bài viết này sẽ mổ xẻ Docker từ bên trong — từ cơ chế cách ly, hệ thống file, đến networking và port mapping.
+
+## Phần 1: Đọc Hiểu Log Khi Build Image
+
+Khi bạn chạy `docker compose up --build` hoặc `docker build`, Docker sử dụng **BuildKit** — engine build hiện đại — để xây dựng image. Output log có dạng như sau:
+
+```
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 227B done
+#1 DONE 0.1s
+
+#2 [internal] load .dockerignore
+#2 transferring context: 35B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:22-alpine
+#3 DONE 1.2s
+
+#4 [1/5] FROM docker.io/library/node:22-alpine@sha256:6125ab...
+#4 DONE 0.0s
+
+#5 [2/5] WORKDIR /app
+#5 CACHED
+
+#6 [3/5] COPY package*.json ./
+#6 sha256:3edb1e...
+#6 DONE 0.1s
+
+#7 [4/5] RUN npm ci --omit=dev
+#7 sha256:a1b2c3...
+#7 DONE 12.3s
+
+#8 [5/5] COPY . .
+#8 DONE 0.2s
+
+#9 exporting to image
+#9 exporting layers 0.3s done
+#9 writing image sha256:f4e5d6... done
+#9 naming to docker.io/library/my-app:latest done
+#9 DONE 0.4s
+```
+
+### Giải Mã Từng Thành Phần
+
+#### Ký hiệu `#1`, `#2`, `#3`... — Vertex ID
+
+Mỗi số sau dấu `#` là **ID nội bộ của BuildKit** cho một thao tác (operation) trong đồ thị build. BuildKit tổ chức quá trình build thành một **DAG** (Directed Acyclic Graph — đồ thị có hướng không chu trình), nơi mỗi thao tác là một "đỉnh" (vertex).
+
+<Callout type="info">Các số `#` **không nhất thiết** theo thứ tự trong Dockerfile. BuildKit có thể chạy song song nhiều bước cùng lúc nếu chúng không phụ thuộc nhau, nên thứ tự hoàn thành có thể khác thứ tự khai báo.</Callout>
+
+#### `sha256:...` — Content Hash
+
+Mỗi thao tác build được đại diện bằng một mã hash SHA-256. Đây là **định danh theo nội dung** (content-addressable identifier) — nghĩa là nếu cùng một thao tác với cùng dữ liệu đầu vào, hash sẽ luôn giống nhau. Nhờ đó BuildKit biết chính xác bước nào đã chạy rồi và có thể bỏ qua.
+
+#### `CACHED` — Bước Được Cache
+
+Khi bạn thấy `CACHED`, nghĩa là BuildKit phát hiện bước này **đã chạy trước đó** với cùng input và kết quả vẫn còn trong cache. Nó bỏ qua hoàn toàn, không thực thi lại → build nhanh hơn rất nhiều.
+
+Ngược lại, `DONE 12.3s` nghĩa là bước đó được thực thi và mất 12.3 giây.
+
+#### `[internal]` — Bước Nội Bộ
+
+Các bước đánh dấu `[internal]` là các thao tác nội bộ của BuildKit — không tương ứng trực tiếp với lệnh nào trong Dockerfile. Ví dụ:
+- `load build definition from Dockerfile` — đọc file Dockerfile
+- `load .dockerignore` — đọc file .dockerignore
+- `load metadata for docker.io/...` — tải metadata của base image từ registry
+
+#### `[1/5]`, `[2/5]`... — Số Bước Trong Stage
+
+Con số trong ngoặc vuông cho biết bạn đang ở **bước thứ mấy trong tổng số bước** của một build stage. Nếu Dockerfile dùng multi-stage build, bạn sẽ thấy tên stage: `[builder 2/5]` hoặc `[stage-0 1/3]`.
+
+### Sơ Đồ Quá Trình Build
+
+<Diagram chart="graph TD\n    A[docker build .] --> B[BuildKit nhận request]\n    B --> C[Đọc Dockerfile + .dockerignore]\n    C --> D[Phân tích thành DAG]\n    D --> E{Bước đã cache?}\n    E -->|Có| F[Bỏ qua - CACHED]\n    E -->|Không| G[Thực thi bước]\n    G --> H[Tạo layer mới]\n    F --> I[Bước tiếp theo]\n    H --> I\n    I --> J{Còn bước nào?}\n    J -->|Có| E\n    J -->|Không| K[Export image + gán tag]" />
+
+## Phần 2: Chuyện Gì Xảy Ra Khi docker compose up?
+
+Khi bạn chạy `docker compose up -d`, Docker Compose thực hiện tuần tự các bước sau:
+
+<Diagram chart="graph TD\n    A[docker compose up] --> B[1. Đọc compose.yaml]\n    B --> C[2. Resolve biến môi trường .env]\n    C --> D[3. Pull images nếu cần]\n    D --> E[4. Build images nếu có chỉ thị build]\n    E --> F[5. Tạo network mặc định]\n    F --> G[6. Tạo volumes]\n    G --> H[7. Tạo containers]\n    H --> I[8. Khởi động theo thứ tự depends_on]\n    I --> J[9. Chạy healthchecks]\n    J --> K[10. Stream logs]" />
+
+### Chi Tiết Từng Bước
+
+**1. Đọc và parse file `compose.yaml`**
+Compose tìm file `compose.yaml` (hoặc `docker-compose.yml`) trong thư mục hiện tại, đọc toàn bộ cấu hình services, networks, volumes.
+
+**2. Resolve biến môi trường**
+Các biến dạng `${APP_PORT}` được thay thế bằng giá trị từ file `.env` hoặc environment hiện tại.
+
+**3. Pull images**
+Với các service dùng `image:` (như `postgres:17-alpine`), Compose kiểm tra image đã có trên máy chưa. Nếu chưa → pull từ registry.
+
+**4. Build images**
+Với các service có `build:`, Compose gọi BuildKit để build image (quá trình log `#` ở phần 1).
+
+**5. Tạo network**
+Compose tự động tạo một **bridge network** mặc định có tên `<project>_default`. Tất cả service trong cùng compose file có thể giao tiếp với nhau qua **tên service** (ví dụ: `db`, `cache`) nhờ DNS nội bộ của Docker.
+
+**6. Tạo volumes**
+Các named volumes được tạo (ví dụ: `postgres_data`) để lưu trữ dữ liệu bền vững.
+
+**7-8. Tạo và khởi động containers**
+Containers được tạo theo cấu hình, sau đó khởi động theo thứ tự `depends_on`. Service nào được phụ thuộc sẽ khởi động trước.
+
+**9. Health checks**
+Nếu service có `healthcheck`, Compose chờ service đạt trạng thái `healthy` trước khi khởi động các service phụ thuộc vào nó.
+
+**10. Stream logs**
+Nếu không dùng `-d`, Compose gộp log của tất cả containers và hiển thị trên terminal, mỗi dòng có prefix là tên service.
+
+<Callout type="tip">Dùng `docker compose up --dry-run` để xem Docker sẽ làm gì mà không thực sự thực thi — rất hữu ích khi debug.</Callout>
+
+## Phần 3: Tại Sao Docker Tạo Được Môi Trường Độc Lập?
+
+Đây là câu hỏi cốt lõi. Docker **không** tự phát minh cơ chế cách ly. Nó dựa vào hai tính năng có sẵn của **Linux kernel**: **Namespaces** và **Control Groups (cgroups)**.
+
+<Diagram chart="graph TB\n    subgraph kernel[Linux Kernel]\n    NS[Namespaces\n Cách ly tầm nhìn] \n    CG[Cgroups\n Giới hạn tài nguyên]\n    OFS[OverlayFS\n Hệ thống file phân lớp]\n    end\n    subgraph docker[Docker]\n    D[Docker Daemon] --> RUNC[runc]\n    RUNC --> NS\n    RUNC --> CG\n    D --> OFS\n    end" />
+
+### Namespaces — "Container nhìn thấy gì?"
+
+Namespaces phân vùng tài nguyên kernel để mỗi container chỉ **nhìn thấy** phần tài nguyên của riêng nó. Docker sử dụng 5 loại namespace chính:
+
+<ComparisonTable
+  headers={["Namespace", "Cách ly cái gì", "Hiệu ứng"]}
+  rows={[
+    ["PID", "Process IDs", "Container chỉ thấy process của mình, PID 1 là process chính"],
+    ["NET", "Network stack", "Container có IP riêng, interface riêng, routing table riêng"],
+    ["MNT", "Mount points", "Container có filesystem riêng, không thấy file của host"],
+    ["UTS", "Hostname", "Container có hostname riêng, độc lập với host"],
+    ["IPC", "Inter-process communication", "Shared memory và semaphore bị cách ly giữa các container"]
+  ]}
+/>
+
+**Ví dụ thực tế:** Khi bạn `docker exec -it myapp bash` và gõ `ps aux`, bạn chỉ thấy các process trong container đó — không thấy process của host hay container khác. Đó là nhờ **PID namespace**.
+
+```bash
+# Trong container — chỉ thấy process của mình
+$ docker exec -it myapp ps aux
+PID   USER     COMMAND
+  1   appuser  node server.js
+ 42   appuser  ps aux
+
+# Trên host — thấy tất cả, kể cả process của container
+$ ps aux | grep node
+thangnt  12345  ... node server.js
+```
+
+### Cgroups — "Container được dùng bao nhiêu?"
+
+Nếu namespaces quyết định container **thấy gì**, thì cgroups quyết định container **được dùng bao nhiêu** tài nguyên. Khi Docker khởi động container, nó tạo một cgroup mới và gán giới hạn tài nguyên:
+
+```bash
+# Giới hạn container chỉ dùng 512MB RAM và 1 CPU
+docker run -d --memory=512m --cpus=1 my-app:1.0
+```
+
+Nếu container cố sử dụng vượt quá RAM cho phép, Linux kernel sẽ **kill** process đó (OOM Killer). Cgroups ngăn chặn tình huống "noisy neighbor" — một container chiếm hết tài nguyên khiến các container khác bị ảnh hưởng.
+
+<Callout type="warning">Docker daemon không tự implement cách ly. Công việc cấp thấp được thực hiện bởi **runc** — container runtime tuân thủ chuẩn OCI. runc sử dụng system call `clone()` với các flag như `CLONE_NEWPID`, `CLONE_NEWNET` để tạo process trong namespace mới.</Callout>
+
+### OverlayFS — Hệ Thống File Phân Lớp
+
+Mỗi Docker image bao gồm nhiều **layer** chồng lên nhau. Docker sử dụng **OverlayFS** (một union filesystem trong Linux kernel) để ghép các layer thành một filesystem thống nhất.
+
+<Diagram chart="graph TB\n    subgraph overlay[OverlayFS - Cái container nhìn thấy]\n    M[merged - View thống nhất]\n    end\n    subgraph upper[Container Layer - Đọc/Ghi]\n    U[upperdir - Thay đổi của container]\n    end\n    subgraph lower[Image Layers - Chỉ đọc]\n    L1[Layer 3: COPY . .]\n    L2[Layer 2: RUN npm ci]\n    L3[Layer 1: FROM node:22-alpine]\n    end\n    M --> U\n    M --> L1\n    L1 --> L2\n    L2 --> L3" />
+
+**Cơ chế Copy-on-Write (CoW):**
+- Khi container **đọc** file → OverlayFS phục vụ trực tiếp từ layer dưới (read-only), không copy.
+- Khi container **ghi/sửa** file → OverlayFS copy file lên upperdir rồi mới sửa. Bản gốc ở layer dưới không bị thay đổi.
+- Khi container **xóa** file → OverlayFS tạo một "whiteout file" ở upperdir để ẩn file gốc.
+
+Đây là lý do khi bạn xóa container, mọi thay đổi biến mất — chúng chỉ tồn tại ở upperdir. Image layers (lowerdir) luôn nguyên vẹn và có thể được chia sẻ giữa nhiều container.
+
+## Phần 4: Networking — Docker Giao Tiếp Với Bên Ngoài Như Thế Nào?
+
+### Bridge Network — Mạng Mặc Định
+
+Khi Docker được cài đặt, nó tạo một **bridge network** ảo tên `docker0` trên host. Bridge này hoạt động như một **switch mạng ảo**: mỗi container được "cắm" vào switch này qua một cặp **veth** (virtual ethernet).
+
+<Diagram chart="graph TB\n    subgraph host[Máy Host]\n    ETH[eth0 / en0\n IP: 192.168.1.100]\n    BR[docker0 bridge\n IP: 172.17.0.1]\n    ETH ---|iptables NAT| BR\n    end\n    subgraph containers[Containers]\n    C1[Container 1\n veth → 172.17.0.2]\n    C2[Container 2\n veth → 172.17.0.3]\n    C3[Container 3\n veth → 172.17.0.4]\n    end\n    BR --- C1\n    BR --- C2\n    BR --- C3" />
+
+### veth Pair — "Cáp Mạng Ảo"
+
+Khi Docker khởi động container, nó tạo một **veth pair** — hãy tưởng tượng như một sợi cáp mạng ảo có hai đầu:
+- **Một đầu** nằm trong container (thường là `eth0`)
+- **Đầu kia** gắn vào bridge `docker0` trên host
+
+```bash
+# Xem các veth interface trên host
+ip link show type veth
+
+# Xem bridge và các interface được gắn
+brctl show
+# bridge name    interfaces
+# docker0        veth4a5b6c7
+#                vethd8e9f0a
+```
+
+### Port Mapping — Chuyện Gì Xảy Ra Khi Bạn Dùng `-p 8080:80`?
+
+Mặc định, container **không** mở bất kỳ port nào ra bên ngoài. Khi bạn dùng `-p 8080:80`, Docker tạo các **iptables rules** (hoặc nftables trên kernel mới) để chuyển tiếp traffic:
+
+<Diagram chart="graph LR\n    A[Máy bên ngoài\n 192.168.1.50] -->|request tới\n 192.168.1.100:8080| B[Host\n iptables PREROUTING]\n    B -->|DNAT: đổi đích thành\n 172.17.0.2:80| C[docker0 bridge]\n    C -->|forward qua\n veth pair| D[Container\n 172.17.0.2:80]\n    D -->|response| C\n    C -->|MASQUERADE:\n đổi nguồn thành IP host| B\n    B -->|response| A" />
+
+#### Chi Tiết Packet Flow
+
+**1. Request đến:**
+- Packet từ bên ngoài đến `host:8080`
+- iptables chain **PREROUTING** gửi packet vào chain **DOCKER**
+- Rule **DNAT** (Destination NAT) viết lại địa chỉ đích: `192.168.1.100:8080` → `172.17.0.2:80`
+- Packet được forward qua bridge `docker0`
+- Bridge gửi packet qua đúng **veth pair** vào network namespace của container
+
+**2. Response trả về:**
+- Container xử lý request và gửi response ngược lại
+- Response đi qua veth pair → bridge `docker0`
+- iptables rule **MASQUERADE** (SNAT) viết lại địa chỉ nguồn: `172.17.0.2` → IP của host
+- Packet được gửi về cho client bên ngoài
+
+```bash
+# Xem các DNAT rules Docker tạo
+sudo iptables -t nat -L DOCKER -n -v
+
+# Output ví dụ:
+# Chain DOCKER (2 references)
+# target  prot  dpt      source      destination
+# DNAT    tcp   8080     0.0.0.0/0   0.0.0.0/0   to:172.17.0.2:80
+```
+
+<Callout type="info">Docker cũng chạy một process gọi là **docker-proxy** để xử lý các trường hợp đặc biệt (hairpin NAT — khi container cố truy cập chính mình qua port đã publish).</Callout>
+
+### Máy Khác Trong Cùng Mạng Có Truy Cập Được Không?
+
+**Có.** Khi bạn publish port (`-p 8080:80`), Docker bind port đó trên **tất cả interfaces** của host (0.0.0.0:8080). Nghĩa là:
+
+- `localhost:8080` — máy host truy cập được
+- `192.168.1.100:8080` — máy khác cùng mạng LAN truy cập được
+- Thậm chí từ internet nếu host có public IP và firewall cho phép
+
+```bash
+# Chỉ cho phép truy cập từ localhost (bảo mật hơn)
+docker run -d -p 127.0.0.1:8080:80 nginx
+
+# Cho phép truy cập từ mọi nơi (mặc định)
+docker run -d -p 8080:80 nginx
+
+# Chỉ cho phép truy cập từ một IP cụ thể trên host
+docker run -d -p 192.168.1.100:8080:80 nginx
+```
+
+<Callout type="warning">Cẩn thận: Docker có thể **bypass firewall** của host (như ufw hoặc firewalld). Docker thêm iptables rules trực tiếp vào chain DOCKER, nằm trước các rules của ufw. Nếu bạn publish port, nó có thể mở ra cho toàn bộ mạng ngay cả khi ufw đã block port đó.</Callout>
+
+### DNS Nội Bộ Giữa Các Container
+
+Khi sử dụng **user-defined network** (như network mặc định của Docker Compose), Docker cung cấp một **embedded DNS server** tại `127.0.0.11`. Nhờ đó các container có thể giao tiếp bằng **tên service** thay vì IP:
+
+```yaml
+# compose.yaml
+services:
+  web:
+    environment:
+      # "db" ở đây được resolve bởi DNS nội bộ Docker
+      - DATABASE_URL=postgres://user:pass@db:5432/myapp
+  db:
+    image: postgres:17-alpine
+```
+
+Container `web` gọi `db:5432` → DNS Docker resolve `db` thành IP `172.18.0.3` → kết nối thành công.
+
+<Callout type="info">DNS nội bộ **chỉ hoạt động** trên user-defined network. Trên default bridge (`docker0`), container phải dùng IP trực tiếp. Đây là một lý do nên luôn dùng Docker Compose hoặc tạo network riêng.</Callout>
+
+### Tổng Quan Các Network Driver
+
+<ComparisonTable
+  headers={["Driver", "Mô tả", "Use case"]}
+  rows={[
+    ["bridge", "Network ảo cô lập, container giao tiếp qua bridge", "Mặc định, phù hợp đa số trường hợp"],
+    ["host", "Container dùng trực tiếp network stack của host", "Performance cao, không cần port mapping"],
+    ["none", "Không có network", "Container hoàn toàn cô lập"],
+    ["overlay", "Kết nối containers giữa nhiều Docker host", "Docker Swarm, cluster"],
+    ["macvlan", "Container có MAC address riêng, xuất hiện như thiết bị vật lý", "Tích hợp với mạng vật lý"]
+  ]}
+/>
+
+## Phần 5: Các Lệnh Khám Phá Docker Internals
+
+Bạn có thể tự khám phá những gì Docker làm bên trong:
+
+```bash
+# === Xem chi tiết một container ===
+docker inspect myapp
+
+# === Xem namespace của container ===
+# Tìm PID thật của container trên host
+docker inspect --format '{{.State.Pid}}' myapp
+# Kết quả ví dụ: 12345
+
+# Xem namespaces của process đó
+ls -la /proc/12345/ns/
+# lrwxrwxrwx  ipc -> ipc:[4026532589]
+# lrwxrwxrwx  mnt -> mnt:[4026532587]
+# lrwxrwxrwx  net -> net:[4026532592]
+# lrwxrwxrwx  pid -> pid:[4026532590]
+# lrwxrwxrwx  uts -> uts:[4026532588]
+
+# === Xem cgroup limits ===
+docker stats myapp --no-stream
+
+# === Xem OverlayFS layers ===
+docker inspect --format '{{.GraphDriver.Data.MergedDir}}' myapp
+
+# === Xem networking ===
+docker network ls
+docker network inspect bridge
+
+# === Xem iptables rules ===
+sudo iptables -t nat -L DOCKER -n -v
+
+# === Xem veth pairs ===
+ip link show type veth
+brctl show
+
+# === Build với log chi tiết ===
+docker build --progress=plain -t my-app .
+```
+
+## Kết Luận
+
+Bây giờ bạn đã hiểu Docker không phải "magic" — nó được xây dựng trên các tính năng cụ thể của Linux kernel:
+
+| Câu hỏi | Câu trả lời |
+|----------|-------------|
+| Tại sao container độc lập? | **Namespaces** phân vùng tầm nhìn, **cgroups** giới hạn tài nguyên |
+| File system hoạt động thế nào? | **OverlayFS** ghép nhiều layer thành một view thống nhất |
+| Container giao tiếp qua mạng thế nào? | **Bridge + veth pairs** tạo switch ảo, **iptables** xử lý NAT |
+| Port mapping hoạt động thế nào? | **DNAT rules** chuyển tiếp traffic từ host port vào container |
+| Log build nghĩa là gì? | **BuildKit DAG** với vertex IDs, content hashes, và layer caching |
+
+<Callout type="warning">Container chia sẻ kernel với host. Nếu kernel có lỗ hổng, container có thể bị khai thác để thoát ra ngoài (container escape). Đây là lý do cần luôn cập nhật kernel và Docker runtime.</Callout>
+
+Trong bài tiếp theo, chúng ta sẽ đi vào **Docker Best Practices** — cách viết Dockerfile tối ưu, multi-stage builds, security hardening, và các anti-pattern cần tránh.

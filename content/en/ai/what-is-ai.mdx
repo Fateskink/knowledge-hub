@@ -1,0 +1,137 @@
+---
+title: "What Is Artificial Intelligence? A Beginner's Guide"
+description: "Learn the fundamentals of Artificial Intelligence, Machine Learning, and Deep Learning — their history, how they differ, and real-world applications that affect your daily life."
+category: "ai"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 8
+tags: ["artificial-intelligence", "machine-learning", "deep-learning", "beginners"]
+featured: true
+order: 1
+sources:
+  - title: "What Is Artificial Intelligence? — IBM"
+    url: "https://www.ibm.com/topics/artificial-intelligence"
+  - title: "A Brief History of Artificial Intelligence — Harvard University"
+    url: "https://sitn.hms.harvard.edu/flash/2017/history-artificial-intelligence/"
+  - title: "Machine Learning — Stanford Encyclopedia of Philosophy"
+    url: "https://plato.stanford.edu/entries/machine-learning/"
+---
+
+# What Is Artificial Intelligence?
+
+Artificial Intelligence (AI) is one of the most transformative technologies of our time, yet the term is often misunderstood. At its core, AI refers to computer systems designed to perform tasks that typically require human intelligence — such as understanding language, recognizing images, making decisions, and solving problems.
+
+<Callout type="info">
+You already use AI every day: when your phone unlocks with your face, when Netflix recommends a show, or when Google Maps finds the fastest route home.
+</Callout>
+
+## AI, Machine Learning, and Deep Learning: What Is the Difference?
+
+These three terms are often used interchangeably, but they represent different layers of the same field. Think of them as nested circles — AI is the broadest concept, Machine Learning sits inside it, and Deep Learning is a specialized subset of Machine Learning.
+
+<Diagram chart="graph TD\n    A[Artificial Intelligence] --> B[Machine Learning]\n    B --> C[Deep Learning]\n    A --> D[Rule-Based Systems]\n    A --> E[Expert Systems]\n    B --> F[Supervised Learning]\n    B --> G[Unsupervised Learning]\n    B --> H[Reinforcement Learning]\n    C --> I[Neural Networks]\n    C --> J[Transformers]\n    C --> K[CNNs]" />
+
+### Artificial Intelligence (AI)
+
+AI is the broadest term. It encompasses any technique that enables machines to mimic human-like intelligence. This includes everything from simple rule-based programs ("if temperature > 30, turn on the AC") to sophisticated systems that can write essays and generate artwork.
+
+AI can be divided into two categories:
+
+- **Narrow AI (Weak AI):** Systems designed for a specific task. Every AI system that exists today falls into this category — Siri, ChatGPT, self-driving car software, and chess engines are all narrow AI.
+- **General AI (Strong AI):** A hypothetical system that could perform any intellectual task a human can. This does not yet exist and remains an active area of research and debate.
+
+### Machine Learning (ML)
+
+Machine Learning is a subset of AI where systems learn from data rather than being explicitly programmed with rules. Instead of a developer writing "if the email contains 'free money,' mark it as spam," an ML system analyzes thousands of emails and learns the patterns that distinguish spam from legitimate messages on its own.
+
+There are three main types of Machine Learning:
+
+1. **Supervised Learning:** The model learns from labeled examples. You show it thousands of photos labeled "cat" or "dog," and it learns to tell them apart.
+2. **Unsupervised Learning:** The model finds patterns in unlabeled data. It might group customers into segments based on purchasing behavior without being told what the groups should be.
+3. **Reinforcement Learning:** The model learns by trial and error, receiving rewards for good actions and penalties for bad ones — much like training a dog with treats.
+
+### Deep Learning
+
+Deep Learning is a subset of Machine Learning that uses artificial neural networks with many layers (hence "deep"). These networks are loosely inspired by the structure of the human brain. Deep Learning excels at tasks involving unstructured data like images, audio, and text.
+
+<Callout type="tip">
+The "deep" in Deep Learning refers to the number of layers in the neural network, not the depth of understanding. A network with many layers can learn increasingly abstract representations of data.
+</Callout>
+
+## A Brief History of AI
+
+AI has a rich history spanning more than seven decades, marked by periods of intense optimism and frustrating setbacks.
+
+<Diagram chart="graph LR\n    A[1950s: Birth of AI] --> B[1960s-70s: Early Enthusiasm]\n    B --> C[1974-80: First AI Winter]\n    C --> D[1980s: Expert Systems Boom]\n    D --> E[1987-93: Second AI Winter]\n    E --> F[1997: Deep Blue Beats Kasparov]\n    F --> G[2012: Deep Learning Revolution]\n    G --> H[2017: Transformer Architecture]\n    H --> I[2022-Now: Generative AI Era]" />
+
+**1950s — The Beginning.** British mathematician Alan Turing published his landmark paper "Computing Machinery and Intelligence" in 1950, proposing the famous Turing Test. In 1956, the term "Artificial Intelligence" was coined at the Dartmouth Conference.
+
+**1960s-1970s — Early Optimism.** Researchers built programs that could solve algebra problems and play checkers. There was widespread belief that human-level AI was just around the corner.
+
+**1974-1980 — The First AI Winter.** Progress stalled. Computers were too slow, data was scarce, and early promises went unfulfilled. Funding dried up dramatically.
+
+**1980s — Expert Systems.** AI rebounded with rule-based "expert systems" used in business and medicine. Companies invested billions.
+
+**1987-1993 — The Second AI Winter.** Expert systems proved expensive to maintain and limited in scope. Funding collapsed again.
+
+**1997 — A Turning Point.** IBM's Deep Blue defeated world chess champion Garry Kasparov, capturing global attention.
+
+**2012 — The Deep Learning Revolution.** A neural network called AlexNet won the ImageNet competition by a huge margin, proving that deep learning with large datasets and GPUs could achieve remarkable results.
+
+**2017 — The Transformer.** Google researchers published "Attention Is All You Need," introducing the Transformer architecture that would become the foundation for modern large language models.
+
+**2022-Present — The Generative AI Era.** ChatGPT launched in November 2022, bringing AI into mainstream conversation. Since then, AI assistants, image generators, and coding tools have transformed how millions of people work and create.
+
+## How Does AI Actually Work?
+
+At a high level, most modern AI follows a pattern: learn from data, build a model, then use that model to make predictions or generate outputs.
+
+<Diagram chart="graph LR\n    A[Collect Data] --> B[Prepare & Clean Data]\n    B --> C[Choose a Model]\n    C --> D[Train the Model]\n    D --> E[Evaluate Performance]\n    E -->|Not Good Enough| C\n    E -->|Good Enough| F[Deploy & Use]" />
+
+1. **Data Collection:** Gather large amounts of relevant data — text, images, numbers, or other information.
+2. **Data Preparation:** Clean and organize the data so the model can learn from it effectively.
+3. **Model Selection:** Choose an appropriate algorithm or architecture for the task.
+4. **Training:** Feed the data into the model so it can learn patterns and relationships.
+5. **Evaluation:** Test the model on data it has not seen before to measure its accuracy.
+6. **Deployment:** Put the model into production where it can make predictions on new, real-world data.
+
+<Callout type="warning">
+AI models are only as good as the data they are trained on. Biased or incomplete data leads to biased or unreliable outputs. This is one of the most important challenges in AI today.
+</Callout>
+
+## Real-World Applications of AI
+
+AI is not a futuristic concept — it is woven into the fabric of everyday life.
+
+### Healthcare
+AI helps doctors detect diseases earlier. Deep learning models can identify cancerous cells in medical images with accuracy that rivals experienced pathologists. AI also accelerates drug discovery by predicting how molecules will interact.
+
+### Transportation
+Self-driving cars use a combination of computer vision, sensor fusion, and reinforcement learning to navigate roads. Even in non-autonomous vehicles, AI powers features like lane departure warnings and adaptive cruise control.
+
+### Finance
+Banks use ML models to detect fraudulent transactions in real time, assess credit risk, and automate trading strategies. AI chatbots handle millions of customer service inquiries each day.
+
+### Entertainment
+Streaming platforms like Spotify and Netflix use recommendation algorithms to suggest content. AI also generates music, writes scripts, and creates visual art.
+
+### Education
+AI-powered tutoring systems adapt to each student's learning pace. Language learning apps use speech recognition to evaluate pronunciation, and AI tools help teachers grade assignments and identify students who need extra help.
+
+## Common Misconceptions About AI
+
+**"AI thinks like humans."** Current AI does not think, feel, or understand. It processes data and identifies patterns. Even the most impressive language models are performing sophisticated pattern matching, not reasoning in the way humans do.
+
+**"AI will replace all jobs."** AI will transform many jobs, but history shows that technology tends to create new roles even as it automates old ones. The key is adaptation and lifelong learning.
+
+**"AI is always right."** AI systems can and do make mistakes. They can produce incorrect information (called hallucinations), reflect biases in their training data, and fail on tasks that fall outside their training distribution.
+
+## Where to Go From Here
+
+If this article sparked your curiosity, the rest of this series will take you deeper. Next, you will learn how Large Language Models (LLMs) like ChatGPT and Claude actually work — from tokenization to the Transformer architecture that powers them.
+
+<Callout type="info">
+AI literacy is becoming as important as computer literacy was in the 1990s. Understanding the basics of how AI works helps you use these tools more effectively and think critically about their outputs.
+</Callout>
+
+Understanding AI is no longer optional for professionals in any field. Whether you are a developer, a marketer, a teacher, or a student, the ability to work alongside AI systems will be one of the most valuable skills of the coming decades. The good news is that you do not need a PhD to get started — just curiosity and a willingness to learn.

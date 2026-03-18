@@ -1,0 +1,189 @@
+---
+title: "Giới thiệu Claude Code - Trợ lý lập trình AI trên Terminal"
+description: "Tìm hiểu Claude Code là gì, cách cài đặt, sử dụng lần đầu và so sánh với các công cụ AI coding phổ biến như Cursor và GitHub Copilot."
+category: "ai"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 8
+tags: ["claude-code", "ai-coding", "terminal", "anthropic", "getting-started"]
+featured: true
+order: 1
+sources:
+  - title: "Claude Code Documentation"
+    url: "https://docs.anthropic.com/en/docs/claude-code/overview"
+  - title: "Claude Code Getting Started"
+    url: "https://docs.anthropic.com/en/docs/claude-code/getting-started"
+---
+
+# Giới thiệu Claude Code - Trợ lý lập trình AI trên Terminal
+
+## Claude Code là gì?
+
+Claude Code là công cụ lập trình AI dạng **agentic coding tool** do Anthropic phát triển, hoạt động trực tiếp trong terminal của bạn. Khác với các extension IDE truyền thống, Claude Code mang đến trải nghiệm tương tác tự nhiên qua dòng lệnh, cho phép bạn đọc, chỉnh sửa code, chạy command, và thực hiện các tác vụ phức tạp trên toàn bộ codebase.
+
+<Callout type="info" title="Điểm khác biệt cốt lõi">
+Claude Code không chỉ gợi ý code - nó có khả năng **tự chủ thực thi** các tác vụ: đọc file, tìm kiếm pattern, chạy test, commit code, và thậm chí tạo pull request. Đây là một AI agent thực thụ cho lập trình viên.
+</Callout>
+
+## Kiến trúc hoạt động
+
+Claude Code hoạt động theo mô hình agent loop - nhận lệnh từ người dùng, phân tích ngữ cảnh, sử dụng các tool có sẵn để thực thi, và trả về kết quả.
+
+<Diagram chart="graph TB\n    A[Developer Terminal] -->|Nhập lệnh| B[Claude Code CLI]\n    B --> C{Agent Loop}\n    C --> D[Read Files]\n    C --> E[Search Codebase]\n    C --> F[Edit Code]\n    C --> G[Run Commands]\n    C --> H[Git Operations]\n    D --> C\n    E --> C\n    F --> C\n    G --> C\n    H --> C\n    C -->|Kết quả| A\n    B --> I[Anthropic API]\n    I --> J[Claude Opus / Sonnet / Haiku]\n    J --> I\n    I --> B" />
+
+## Cài đặt Claude Code
+
+### Yêu cầu hệ thống
+
+- **Node.js** phiên bản 18 trở lên
+- **macOS**, **Linux**, hoặc **Windows** (qua WSL)
+- Tài khoản Anthropic với API key hoặc đăng ký Claude Max/Team/Enterprise
+
+### Cài đặt qua npm
+
+```bash
+# Cài đặt global
+npm install -g @anthropic-ai/claude-code
+
+# Kiểm tra phiên bản
+claude --version
+
+# Khởi chạy lần đầu
+claude
+```
+
+### Xác thực
+
+Khi chạy Claude Code lần đầu, bạn sẽ được hướng dẫn xác thực. Có hai cách chính:
+
+```bash
+# Cách 1: Đăng nhập qua Anthropic Console (khuyến nghị)
+claude
+# -> Chọn "Log in with Anthropic" và làm theo hướng dẫn
+
+# Cách 2: Sử dụng API key
+export ANTHROPIC_API_KEY="sk-ant-..."
+claude
+```
+
+<Callout type="tip" title="Mẹo tiết kiệm">
+Nếu bạn có gói Claude Max ($100/tháng hoặc $200/tháng), bạn có thể sử dụng Claude Code mà không cần trả thêm phí API. Đây là lựa chọn kinh tế nhất cho người dùng cá nhân.
+</Callout>
+
+## Sử dụng lần đầu
+
+### Bắt đầu một phiên làm việc
+
+```bash
+# Mở Claude Code trong thư mục dự án
+cd my-project
+claude
+
+# Hoặc chạy lệnh đơn lẻ (headless mode)
+claude -p "Giải thích cấu trúc thư mục của dự án này"
+
+# Tiếp tục phiên làm việc trước
+claude --continue
+```
+
+### Các lệnh cơ bản trong phiên tương tác
+
+Khi đã vào phiên Claude Code, bạn có thể giao tiếp bằng ngôn ngữ tự nhiên:
+
+```
+> Hãy tìm tất cả các file TypeScript có sử dụng useEffect
+
+> Sửa lỗi TypeScript trong file src/components/Header.tsx
+
+> Viết unit test cho function calculateTotal trong utils/math.ts
+
+> Giải thích luồng xác thực trong dự án này
+```
+
+### Slash commands hữu ích
+
+```
+/help          - Xem danh sách các lệnh
+/model         - Chuyển đổi giữa các model (Opus, Sonnet, Haiku)
+/compact       - Nén lịch sử hội thoại để tiết kiệm context
+/clear         - Xóa lịch sử hội thoại
+/status        - Kiểm tra trạng thái hiện tại
+/cost          - Xem chi phí phiên làm việc hiện tại
+```
+
+## Luồng làm việc điển hình
+
+Dưới đây là một luồng làm việc thực tế khi sử dụng Claude Code cho một tính năng mới:
+
+<Diagram chart="sequenceDiagram\n    participant Dev as Developer\n    participant CC as Claude Code\n    participant FS as File System\n    participant Git as Git\n    Dev->>CC: Mô tả tính năng cần xây dựng\n    CC->>FS: Đọc codebase để hiểu cấu trúc\n    CC->>Dev: Đề xuất kế hoạch triển khai\n    Dev->>CC: Đồng ý và yêu cầu bắt đầu\n    CC->>FS: Tạo/sửa các file cần thiết\n    CC->>FS: Chạy tests\n    CC->>Dev: Báo cáo kết quả\n    Dev->>CC: Yêu cầu tạo commit\n    CC->>Git: Tạo commit với message phù hợp\n    CC->>Dev: Hoàn tất" />
+
+## So sánh với các công cụ AI Coding khác
+
+Để hiểu rõ vị trí của Claude Code trong hệ sinh thái AI coding, hãy so sánh với hai công cụ phổ biến khác:
+
+<ComparisonTable
+  headers={["Tiêu chí", "Claude Code", "GitHub Copilot", "Cursor"]}
+  rows={[
+    ["Giao diện", "Terminal / CLI", "IDE Extension", "IDE (Fork VS Code)"],
+    ["Mô hình AI", "Claude Opus, Sonnet, Haiku", "GPT-4o, Claude", "GPT-4o, Claude, Gemini"],
+    ["Agentic Mode", "Mặc định (full agent)", "Copilot Chat Agent", "Composer Agent"],
+    ["Đọc toàn bộ codebase", "Tự động", "Giới hạn", "Có (indexing)"],
+    ["Chạy terminal commands", "Có", "Giới hạn", "Có"],
+    ["Git operations", "Tích hợp sâu", "Cơ bản", "Cơ bản"],
+    ["MCP Support", "Có (native)", "Không", "Có (plugin)"],
+    ["Giá", "API usage / Claude Max", "$10-39/tháng", "$20-40/tháng"],
+    ["Tùy biến", "CLAUDE.md, hooks, skills", "Giới hạn", "Rules, .cursorrules"],
+    ["IDE Integration", "VS Code, JetBrains", "Đa IDE", "Riêng Cursor IDE"]
+  ]}
+/>
+
+### Khi nào chọn Claude Code?
+
+**Chọn Claude Code khi bạn:**
+
+- Thích làm việc trong terminal và muốn tốc độ tương tác nhanh
+- Cần AI agent có khả năng tự chủ cao, thực hiện các tác vụ phức tạp trên toàn codebase
+- Muốn tích hợp sâu với Git workflow (commit, PR, code review)
+- Cần mở rộng khả năng qua MCP servers và custom tools
+- Làm việc với các dự án lớn cần đọc hiểu nhiều file cùng lúc
+
+**Chọn Cursor/Copilot khi bạn:**
+
+- Ưu tiên trải nghiệm IDE trực quan với inline suggestions
+- Cần autocomplete real-time khi đang gõ code
+- Team đã quen với workflow IDE-centric
+
+<Callout type="warning" title="Lưu ý về bảo mật">
+Claude Code có quyền truy cập vào file system và chạy các lệnh terminal. Luôn review các thao tác mà Claude Code đề xuất trước khi cho phép thực thi, đặc biệt với các lệnh có thể thay đổi hoặc xóa dữ liệu. Claude Code sẽ luôn hỏi xác nhận trước khi thực hiện các thao tác có rủi ro.
+</Callout>
+
+## Các tính năng nổi bật
+
+### 1. Context-aware
+
+Claude Code tự động đọc và phân tích codebase của bạn để hiểu cấu trúc dự án, dependencies, coding conventions. Bạn không cần cung cấp context thủ công.
+
+### 2. Multi-file editing
+
+Khác với autocomplete đơn lẻ, Claude Code có thể chỉnh sửa nhiều file đồng thời, đảm bảo tính nhất quán xuyên suốt dự án khi thực hiện refactoring hay thêm tính năng mới.
+
+### 3. Memory hệ thống
+
+Thông qua file `CLAUDE.md`, bạn có thể lưu trữ các quy tắc, conventions, và context quan trọng mà Claude Code sẽ tự động đọc mỗi khi khởi chạy.
+
+### 4. Extended thinking
+
+Claude Code hỗ trợ chế độ extended thinking, cho phép model suy nghĩ sâu hơn trước khi trả lời, đặc biệt hữu ích với các bài toán kiến trúc phức tạp.
+
+## Bước tiếp theo
+
+Sau khi đã cài đặt và làm quen với Claude Code, bạn nên tìm hiểu thêm về:
+
+- **Skills và Plugins** - Mở rộng khả năng của Claude Code
+- **Models** - Chọn model phù hợp cho từng tác vụ
+- **MCP Servers** - Kết nối Claude Code với các dịch vụ bên ngoài
+- **Cấu hình và tùy chỉnh** - Tối ưu hóa Claude Code cho workflow của bạn
+
+<Callout type="tip" title="Tài nguyên học tập">
+Anthropic cung cấp tài liệu chính thức đầy đủ tại [docs.anthropic.com](https://docs.anthropic.com/en/docs/claude-code/overview). Đây là nguồn tham khảo đáng tin cậy nhất để cập nhật các tính năng mới.
+</Callout>

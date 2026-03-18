@@ -4,15 +4,15 @@ import { getAllArticles, getFeaturedArticles, getCategories, getCategoryArticleC
 import ArticleCard from "@/components/ArticleCard";
 import ReadingHistory from "@/components/ReadingHistory";
 import FeaturedOrRecent from "@/components/FeaturedOrRecent";
-import { ArrowRight, Terminal, Brain, Code, Container, Globe, Cpu, Database, Workflow } from "lucide-react";
+import { ArrowRight, Brain, Code, Container, Globe, Cpu, Database, Radio, Workflow } from "lucide-react";
 
 const categoryIcons: Record<string, React.ReactNode> = {
-  "claude-code": <Terminal className="h-8 w-8" />,
-  "ai-basics": <Brain className="h-8 w-8" />,
+  ai: <Brain className="h-8 w-8" />,
   programming: <Code className="h-8 w-8" />,
   "web-development": <Globe className="h-8 w-8" />,
   hardware: <Cpu className="h-8 w-8" />,
   database: <Database className="h-8 w-8" />,
+  networking: <Radio className="h-8 w-8" />,
   automation: <Workflow className="h-8 w-8" />,
   devops: <Container className="h-8 w-8" />,
 };

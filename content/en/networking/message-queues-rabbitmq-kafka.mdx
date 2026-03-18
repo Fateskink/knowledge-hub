@@ -1,0 +1,271 @@
+---
+title: "Message Queues - RabbitMQ and Kafka"
+description: "Learn what Message Queues are, why you need them, compare RabbitMQ, Apache Kafka, and MQTT, plus Pub/Sub patterns and event-driven architecture."
+category: "networking"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 13
+tags: ["message-queue", "rabbitmq", "kafka", "mqtt", "pub-sub", "event-driven", "microservices"]
+featured: false
+order: 5
+sources:
+  - title: "RabbitMQ Official Documentation"
+    url: "https://www.rabbitmq.com/docs"
+  - title: "Apache Kafka Documentation"
+    url: "https://kafka.apache.org/documentation/"
+  - title: "MQTT.org"
+    url: "https://mqtt.org/"
+  - title: "CloudAMQP - RabbitMQ Tutorials"
+    url: "https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.html"
+---
+
+# Message Queues - RabbitMQ and Kafka
+
+In microservices architectures and distributed systems, services need to communicate with each other reliably and asynchronously. Message Queues solve this problem by acting as intermediaries that receive and distribute messages between system components.
+
+## What is a Message Queue?
+
+A Message Queue is an asynchronous communication mechanism between software components. Instead of making synchronous calls, Service A sends a message to the queue and Service B processes it when ready.
+
+<Diagram chart="graph LR\n    A[Producer\nService A] -->|Send message| B[Message Queue]\n    B -->|Consume message| C[Consumer\nService B]\n    B -->|Consume message| D[Consumer\nService C]" />
+
+### Why Use Message Queues?
+
+1. **Decoupling**: Producers do not need to know who the Consumers are
+2. **Load Leveling**: The queue acts as a buffer when request volume spikes
+3. **Reliability**: Messages are not lost even if a Consumer goes down temporarily
+4. **Scalability**: Add more Consumers to process messages in parallel
+
+<Callout type="info">Think of a restaurant: customers (Producers) place orders, the order tickets are posted on a board (Queue), and chefs (Consumers) pick tickets to cook in order. Customers do not wait at the kitchen, and the restaurant can add more chefs when it gets busy.</Callout>
+
+## Communication Patterns
+
+### Point-to-Point (Queue)
+
+Each message is processed by exactly one Consumer. When multiple Consumers exist, messages are distributed round-robin.
+
+<Diagram chart="graph LR\n    A[Producer] --> B[Queue]\n    B --> C[Consumer 1]\n    B --> D[Consumer 2]\n    B --> E[Consumer 3]" />
+
+### Publish/Subscribe (Pub/Sub)
+
+A message is delivered to multiple Consumers simultaneously through topics or exchanges.
+
+<Diagram chart="graph LR\n    A[Publisher] --> B[Topic/Exchange]\n    B --> C[Subscriber 1]\n    B --> D[Subscriber 2]\n    B --> E[Subscriber 3]" />
+
+## RabbitMQ
+
+RabbitMQ is the most popular message broker, supporting multiple protocols (AMQP, MQTT, STOMP) and communication patterns.
+
+### RabbitMQ Architecture
+
+<Diagram chart="graph LR\n    A[Producer] -->|Publish| B[Exchange]\n    B -->|Routing| C[Queue 1]\n    B -->|Routing| D[Queue 2]\n    C -->|Consume| E[Consumer A]\n    D -->|Consume| F[Consumer B]" />
+
+### RabbitMQ with Node.js
+
+```javascript
+// === Producer ===
+const amqp = require('amqplib');
+
+async function sendMessage() {
+  const connection = await amqp.connect('amqp://localhost');
+  const channel = await connection.createChannel();
+
+  const queue = 'order-processing';
+  await channel.assertQueue(queue, { durable: true });
+
+  const order = {
+    orderId: 'ORD-001',
+    userId: 'user-123',
+    items: [
+      { productId: 'P1', quantity: 2, price: 29.99 },
+      { productId: 'P2', quantity: 1, price: 49.99 }
+    ],
+    createdAt: new Date().toISOString()
+  };
+
+  channel.sendToQueue(queue, Buffer.from(JSON.stringify(order)), {
+    persistent: true  // Message survives broker restart
+  });
+
+  console.log('Order sent:', order.orderId);
+  await channel.close();
+  await connection.close();
+}
+```
+
+```javascript
+// === Consumer ===
+const amqp = require('amqplib');
+
+async function processOrders() {
+  const connection = await amqp.connect('amqp://localhost');
+  const channel = await connection.createChannel();
+
+  const queue = 'order-processing';
+  await channel.assertQueue(queue, { durable: true });
+
+  // Process one message at a time (fair dispatch)
+  channel.prefetch(1);
+
+  console.log('Waiting for orders...');
+  channel.consume(queue, async (msg) => {
+    const order = JSON.parse(msg.content.toString());
+    console.log('Processing order:', order.orderId);
+
+    try {
+      // Process the order (save to DB, send email, etc.)
+      await processOrder(order);
+
+      // Acknowledge successful processing
+      channel.ack(msg);
+      console.log('Order completed:', order.orderId);
+    } catch (error) {
+      // Reject and requeue for retry
+      channel.nack(msg, false, true);
+      console.error('Error processing order:', error);
+    }
+  });
+}
+
+processOrders();
+```
+
+<Callout type="tip">Always use `persistent: true` for messages and `durable: true` for queues in production. This ensures messages and queues survive RabbitMQ restarts.</Callout>
+
+## Apache Kafka
+
+Kafka is a distributed event streaming platform designed for high-throughput data processing. Kafka is not just a message queue -- it is a platform for storing and processing events.
+
+### Kafka Architecture
+
+<Diagram chart="graph TD\n    A[Producer] --> B[Kafka Cluster]\n    subgraph Kafka Cluster\n    B --> C[Topic: orders]\n    C --> D[Partition 0]\n    C --> E[Partition 1]\n    C --> F[Partition 2]\n    end\n    D --> G[Consumer Group A]\n    E --> G\n    F --> G\n    D --> H[Consumer Group B]\n    E --> H\n    F --> H" />
+
+### Kafka with Node.js
+
+```javascript
+// === Producer ===
+const { Kafka } = require('kafkajs');
+
+const kafka = new Kafka({
+  clientId: 'order-service',
+  brokers: ['localhost:9092']
+});
+
+const producer = kafka.producer();
+
+async function sendEvent() {
+  await producer.connect();
+
+  await producer.send({
+    topic: 'order-events',
+    messages: [
+      {
+        key: 'order-001',
+        value: JSON.stringify({
+          eventType: 'ORDER_CREATED',
+          orderId: 'order-001',
+          userId: 'user-123',
+          total: 109.97,
+          timestamp: Date.now()
+        }),
+        headers: {
+          'event-type': 'ORDER_CREATED'
+        }
+      }
+    ]
+  });
+
+  console.log('Event sent successfully');
+  await producer.disconnect();
+}
+```
+
+```javascript
+// === Consumer ===
+const consumer = kafka.consumer({ groupId: 'payment-service' });
+
+async function startConsumer() {
+  await consumer.connect();
+  await consumer.subscribe({
+    topic: 'order-events',
+    fromBeginning: false
+  });
+
+  await consumer.run({
+    eachMessage: async ({ topic, partition, message }) => {
+      const event = JSON.parse(message.value.toString());
+      console.log(`[Partition ${partition}] Event: ${event.eventType}`);
+
+      switch (event.eventType) {
+        case 'ORDER_CREATED':
+          await processPayment(event);
+          break;
+        case 'ORDER_CANCELLED':
+          await refundPayment(event);
+          break;
+      }
+    }
+  });
+}
+
+startConsumer();
+```
+
+## MQTT
+
+MQTT (Message Queuing Telemetry Transport) is a lightweight protocol designed for IoT and resource-constrained devices.
+
+```javascript
+// MQTT with Node.js
+const mqtt = require('mqtt');
+
+const client = mqtt.connect('mqtt://broker.example.com');
+
+// Subscribe to a topic
+client.on('connect', () => {
+  client.subscribe('sensors/temperature/#', (err) => {
+    if (!err) console.log('Subscribed successfully');
+  });
+});
+
+// Receive messages
+client.on('message', (topic, message) => {
+  const data = JSON.parse(message.toString());
+  console.log(`${topic}: ${data.value}°C`);
+});
+
+// Publish sensor data
+client.publish('sensors/temperature/room-1', JSON.stringify({
+  value: 25.5,
+  unit: 'celsius',
+  timestamp: Date.now()
+}));
+```
+
+## Comparing Message Queue Systems
+
+<ComparisonTable
+  headers={["Criteria", "RabbitMQ", "Apache Kafka", "MQTT"]}
+  rows={[
+    ["Type", "Message Broker", "Event Streaming Platform", "IoT Protocol"],
+    ["Protocol", "AMQP, MQTT, STOMP", "Kafka Protocol", "MQTT"],
+    ["Message Storage", "Deleted after processing", "Stored by retention period", "Not stored"],
+    ["Ordering", "Per queue", "Per partition", "Not guaranteed"],
+    ["Throughput", "Medium (thousands msg/s)", "Very high (millions msg/s)", "Low"],
+    ["Use Case", "Task queues, RPC, routing", "Event sourcing, logs, streaming", "IoT, sensors, mobile"],
+    ["Complexity", "Medium", "High", "Low"],
+    ["Consumer Groups", "Yes (different mechanism)", "Yes (native)", "No"]
+  ]}
+/>
+
+## Event-Driven Architecture
+
+Message Queues are the foundation of event-driven architecture, where services communicate through events instead of direct calls:
+
+<Diagram chart="graph LR\n    A[Order Service] -->|OrderCreated| B[Event Bus\nKafka/RabbitMQ]\n    B --> C[Payment Service]\n    B --> D[Inventory Service]\n    B --> E[Notification Service]\n    B --> F[Analytics Service]\n    C -->|PaymentProcessed| B\n    D -->|StockUpdated| B" />
+
+<Callout type="warning">Event-driven architecture increases system complexity. Carefully consider before adopting: managing event ordering, error handling and retries, and ensuring eventual consistency. Start with a simple architecture and migrate to event-driven when you truly need it.</Callout>
+
+## Conclusion
+
+Message Queues are essential components in modern microservices architectures. RabbitMQ excels at task queues and complex routing, Kafka shines for high-volume data processing and event streaming, and MQTT is purpose-built for IoT. Choose the tool that matches your project's specific requirements.

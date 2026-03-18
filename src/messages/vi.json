@@ -40,13 +40,9 @@
     "madeWith": "Được xây dựng với"
   },
   "categories": {
-    "claude-code": {
-      "name": "Claude Code",
-      "description": "Hướng dẫn chi tiết về Claude Code - công cụ AI coding của Anthropic"
-    },
-    "ai-basics": {
-      "name": "AI Cơ Bản",
-      "description": "Các khái niệm cơ bản về Trí tuệ Nhân tạo và Machine Learning"
+    "ai": {
+      "name": "AI",
+      "description": "Trí tuệ Nhân tạo, Machine Learning, Claude Code và các công cụ AI"
     },
     "programming": {
       "name": "Lập Trình",
@@ -61,8 +57,12 @@
       "description": "Kiến trúc máy tính, chip, mạch điện tử, và nguyên lý hoạt động phần cứng"
     },
     "database": {
-      "name": "Database & Realtime",
-      "description": "Cơ sở dữ liệu, giao tiếp realtime, WebSocket, message queue và streaming"
+      "name": "Database",
+      "description": "Cơ sở dữ liệu, SQL/NoSQL, indexing, transaction và database engine"
+    },
+    "networking": {
+      "name": "Networking",
+      "description": "Giao thức mạng, WebSocket, TCP/IP, message queue và giao tiếp realtime"
     },
     "automation": {
       "name": "Automation & Workflow",

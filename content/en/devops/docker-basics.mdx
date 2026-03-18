@@ -1,154 +1,211 @@
 ---
-title: "Docker Basics"
-description: "Learn the fundamentals of Docker: containers, images, Dockerfile, and docker-compose to get started with application containerization."
+title: "Docker Basics - From Concepts to Your First Container"
+description: "Learn Docker from zero: what containers are, Docker architecture, installation, writing Dockerfiles, and running your first app with Docker Compose."
 category: "devops"
 author: "Knowledge Hub"
 date: "2026-03-18"
-readingTime: 12
-tags: ["docker", "containers", "devops", "dockerfile", "docker-compose", "deployment"]
+readingTime: 15
+tags: ["docker", "containers", "devops", "dockerfile", "docker-compose"]
 featured: false
 order: 1
+series: "docker"
+seriesOrder: 1
+seriesTitle: "Docker From Zero to Production"
 sources:
-  - title: "Docker Official Documentation"
-    url: "https://docs.docker.com/"
+  - title: "Docker Official Documentation - Docker Overview"
+    url: "https://docs.docker.com/get-started/docker-overview/"
+  - title: "Docker Engine v29 Release Notes"
+    url: "https://docs.docker.com/engine/release-notes/29/"
+  - title: "Docker Compose - Application Model"
+    url: "https://docs.docker.com/compose/intro/compose-application-model/"
   - title: "Docker Hub"
     url: "https://hub.docker.com/"
-  - title: "Docker Curriculum - Prakhar Srivastav"
-    url: "https://docker-curriculum.com/"
-  - title: "Play with Docker"
-    url: "https://labs.play-with-docker.com/"
 ---
 
-# Docker Basics
+# Docker Basics - From Concepts to Your First Container
 
-Docker is an open-source platform that enables you to package, distribute, and run applications inside containers. Instead of manually configuring complex environments on each machine, Docker lets you create isolated, consistent environments that can be reproduced on any system. This article will help you understand the core concepts of Docker and start using it effectively.
+"It works on my machine!" — If you have ever heard (or said) this, Docker is the solution. Docker is an open-source platform that lets you package an application along with its entire environment into a unit called a **container**, ensuring it runs consistently on any system — from your dev laptop to production servers.
+
+This article will take you from core concepts to running your first container.
 
 ## What Is a Container?
 
-A container is a lightweight, standalone unit of software that includes everything needed to run an application: source code, libraries, system tools, and configuration. Containers share the host operating system's kernel, making them far lighter than traditional virtual machines.
+A container is a lightweight unit of software that includes everything needed to run an application: source code, libraries, system tools, and configuration. The key difference from virtual machines (VMs): containers **share the host OS kernel**, so they start in seconds and consume very few resources.
 
-<Diagram chart="graph LR\n    subgraph Traditional VM\n    A[Hardware] --> B[Host OS]\n    B --> C[Hypervisor]\n    C --> D1[Guest OS 1]\n    C --> D2[Guest OS 2]\n    D1 --> E1[App 1]\n    D2 --> E2[App 2]\n    end" />
-
-<Diagram chart="graph LR\n    subgraph Docker Containers\n    F[Hardware] --> G[Host OS]\n    G --> H[Docker Engine]\n    H --> I1[Container 1 - App 1]\n    H --> I2[Container 2 - App 2]\n    H --> I3[Container 3 - App 3]\n    end" />
+<Diagram chart="graph TB\n    subgraph vm[Traditional Virtual Machines]\n    A1[Hardware] --> B1[Host OS]\n    B1 --> C1[Hypervisor]\n    C1 --> D1[Guest OS] --> E1[App 1]\n    C1 --> D2[Guest OS] --> E2[App 2]\n    end\n    subgraph docker[Docker Containers]\n    A2[Hardware] --> B2[Host OS]\n    B2 --> C2[Docker Engine]\n    C2 --> E3[App 1]\n    C2 --> E4[App 2]\n    C2 --> E5[App 3]\n    end" />
 
 ### Containers vs Virtual Machines
 
-| Criteria | Containers | Virtual Machines |
-|----------|-----------|-----------------|
-| Size | Megabytes | Gigabytes |
-| Startup time | Seconds | Minutes |
-| Performance | Near native | Has overhead |
-| Isolation | Process level | OS level |
-| RAM usage | Low | High |
-| Portability | Very high | Medium |
+<ComparisonTable
+  headers={["Criteria", "Containers", "Virtual Machines"]}
+  rows={[
+    ["Size", "A few MB to a few hundred MB", "Several GB or more"],
+    ["Startup", "Seconds", "Minutes"],
+    ["Performance", "Near native", "Overhead from Hypervisor"],
+    ["Isolation", "Process level (namespaces, cgroups)", "Full OS-level isolation"],
+    ["RAM usage", "Low — only the app + libraries", "High — includes Guest OS"],
+    ["Portability", "Very high — runs anywhere Docker is installed", "Medium — depends on Hypervisor"]
+  ]}
+/>
 
-<Callout type="info">Containers do not fully replace virtual machines. Each is suited for different use cases. Containers are ideal for microservices, while VMs are better when you need complete OS-level isolation.</Callout>
+<Callout type="info">Containers and VMs are not mutually exclusive. In practice, many systems run Docker **inside** VMs. Containers are ideal for microservices and CI/CD, while VMs are better when you need complete OS-level isolation.</Callout>
 
-## Core Docker Concepts
+## Docker Architecture
 
-<Diagram chart="graph TD\n    A[Dockerfile] -->|docker build| B[Docker Image]\n    B -->|docker run| C[Docker Container]\n    B -->|docker push| D[Docker Registry]\n    D -->|docker pull| B\n    C -->|docker commit| B" />
+Docker follows a **client-server** model with three main components:
 
-### Docker Image
+<Diagram chart="graph LR\n    A[Docker Client\n docker CLI] -->|REST API| B[Docker Daemon\n dockerd]\n    B --> C[Images]\n    B --> D[Containers]\n    B --> E[Networks]\n    B --> F[Volumes]\n    B <-->|pull/push| G[Docker Registry\n Docker Hub]" />
 
-An image is the blueprint of a container. It contains the base operating system, application source code, libraries, and configuration. Images are immutable -- once built, they cannot be changed.
+### Docker Daemon (dockerd)
 
-### Docker Container
+A background process that manages all Docker objects: images, containers, networks, and volumes. The daemon listens for requests from the Docker Client via REST API.
 
-A container is a running instance of an image. You can create multiple containers from the same image, and each operates independently.
+### Docker Client (docker)
 
-### Dockerfile
-
-A Dockerfile is a text file containing instructions for building a Docker image.
+The command-line tool you use daily. When you type `docker run`, the client sends the command to the daemon for execution.
 
 ### Docker Registry
 
-A registry is a storage and distribution system for Docker images. Docker Hub is the most popular public registry.
+A storage and distribution system for Docker images. **Docker Hub** is the largest public registry, hosting millions of ready-to-use images. You can also set up a private registry for your organization.
+
+## Core Concepts
+
+<Diagram chart="graph TD\n    A[Dockerfile] -->|docker build| B[Image]\n    B -->|docker run| C[Container]\n    B -->|docker push| D[Registry]\n    D -->|docker pull| B" />
+
+### Image
+
+An image is an **immutable blueprint** of a container. It is built from multiple layers stacked on top of each other — each instruction in a Dockerfile creates a new layer. When you change a layer, only that layer and those above it need to be rebuilt.
+
+### Container
+
+A container is a **running instance** of an image. You can create multiple containers from the same image, each operating independently with its own filesystem.
+
+### Dockerfile
+
+A text file containing a set of instructions for building an image. It is the "recipe" that tells Docker how to package your application.
+
+### Volume
+
+A mechanism for persistent data storage. Data inside a container is lost when the container is removed, but volumes preserve important data such as databases.
 
 ## Installing Docker
 
-```bash
-# On macOS: use Docker Desktop
-# Download from: https://www.docker.com/products/docker-desktop/
+### macOS / Windows
 
-# On Ubuntu/Debian
+Download and install **Docker Desktop** — it includes Docker Engine, CLI, Compose, and a graphical interface.
+
+```bash
+# Download from: https://www.docker.com/products/docker-desktop/
+# After installation, verify:
+docker --version
+# Docker version 29.x.x
+```
+
+### Ubuntu / Debian
+
+```bash
+# Install Docker Engine
 sudo apt-get update
-sudo apt-get install docker-ce docker-ce-cli containerd.io
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Allow your user to run Docker without sudo
+sudo usermod -aG docker $USER
+# Log out and log back in for the change to take effect
 
 # Verify installation
 docker --version
 docker run hello-world
 ```
 
-<Callout type="tip">On macOS and Windows, Docker Desktop is the easiest way to install Docker. It includes Docker Engine, Docker CLI, Docker Compose, and a graphical interface.</Callout>
+<Callout type="tip">The `docker run hello-world` command pulls the `hello-world` image from Docker Hub and runs it. If you see a welcome message, Docker is working.</Callout>
 
-## Essential Docker Commands
+## Hands-on: Your First Container
+
+Let's run an Nginx web server in a container:
 
 ```bash
-# Pull an image from Docker Hub
+# Step 1: Pull the nginx image from Docker Hub
 docker pull nginx
 
-# List downloaded images
-docker images
-
-# Run a container
+# Step 2: Run a container
 docker run -d --name webserver -p 8080:80 nginx
+```
 
+Open your browser at `http://localhost:8080` — you should see the Nginx welcome page.
+
+### Understanding docker run
+
+```bash
+docker run -d --name webserver -p 8080:80 -v ./html:/usr/share/nginx/html nginx
+#          │   │                │           │                                 │
+#          │   │                │           │                                 └─ Image
+#          │   │                │           └─ Mount local directory into container
+#          │   │                └─ Map port: host 8080 → container 80
+#          │   └─ Name the container
+#          └─ Run in background (detached mode)
+```
+
+### Container Management Commands
+
+```bash
 # List running containers
 docker ps
 
 # List all containers (including stopped)
 docker ps -a
 
-# View container logs
+# View logs
 docker logs webserver
 
-# Execute a command inside a container
+# Access a running container
 docker exec -it webserver bash
 
 # Stop a container
 docker stop webserver
 
-# Remove a container
-docker rm webserver
+# Start it again
+docker start webserver
+
+# Remove a container (must stop first)
+docker stop webserver && docker rm webserver
+```
+
+### Image Management
+
+```bash
+# List downloaded images
+docker images
+
+# Pull a specific image
+docker pull node:22-alpine
 
 # Remove an image
 docker rmi nginx
 ```
 
-### Understanding docker run
+## Writing Your First Dockerfile
 
-```bash
-docker run -d --name webserver -p 8080:80 -v ./html:/usr/share/nginx/html nginx
-#          |   |                |           |                                 |
-#          |   |                |           |                                 +-- Image name
-#          |   |                |           +-- Mount volume (host dir : container dir)
-#          |   |                +-- Map port (host port : container port)
-#          |   +-- Give the container a name
-#          +-- Run in detached mode (background)
-```
-
-## Writing a Dockerfile
-
-A Dockerfile defines the environment for your application. Here is an example for a Node.js application.
+Let's containerize a simple Node.js application:
 
 ```dockerfile
-# Use Node.js as the base image
-FROM node:20-alpine
+# Base image — Alpine Linux keeps the image small (~50MB vs ~300MB)
+FROM node:22-alpine
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Copy package files first to leverage Docker layer cache
+# If dependencies haven't changed, this layer is cached → faster builds
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
-# Copy application source code
+# Copy source code (after dependencies to leverage cache)
 COPY . .
 
-# Declare the port the app will listen on
+# Declare the port the app listens on
 EXPOSE 3000
 
-# Create a non-root user for security
+# Create a non-root user — basic security practice
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
@@ -156,29 +213,21 @@ USER appuser
 CMD ["node", "server.js"]
 ```
 
-### Python Flask Dockerfile Example
+<Callout type="warning">Always create a `.dockerignore` file to keep unnecessary files out of the image. This makes images smaller, builds faster, and improves security.</Callout>
 
-```dockerfile
-FROM python:3.12-slim
-
-WORKDIR /app
-
-# Install dependencies first to leverage Docker cache
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-EXPOSE 5000
-
-# Use Gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "app:app"]
+```text
+# .dockerignore
+node_modules
+.git
+.env
+*.md
+Dockerfile
 ```
 
-### Building and Running Your Image
+### Build and Run
 
 ```bash
-# Build an image from the Dockerfile
+# Build the image with tag my-app version 1.0
 docker build -t my-app:1.0 .
 
 # Run a container from the newly built image
@@ -188,30 +237,16 @@ docker run -d --name my-app -p 3000:3000 my-app:1.0
 curl http://localhost:3000
 ```
 
-<Callout type="warning">Always use a .dockerignore file to prevent unnecessary files from being copied into the image (such as node_modules, .git, .env). This keeps images smaller and more secure.</Callout>
+## Docker Compose — Running Multiple Containers
 
-```text
-# .dockerignore
-node_modules
-.git
-.gitignore
-.env
-*.md
-docker-compose*.yml
-.dockerignore
-Dockerfile
-```
+Real-world applications usually need multiple components: a web server, database, and cache. **Docker Compose** lets you define and manage all of them in a single `compose.yaml` file.
 
-## Docker Compose
+<Callout type="info">Docker Compose v5 (the current version) no longer requires the `version` field in compose files. The recommended filename is `compose.yaml` instead of `docker-compose.yml`.</Callout>
 
-Docker Compose lets you define and manage multiple containers simultaneously using a single YAML file. It is the ideal tool for applications with multiple components such as a web server, database, and cache.
-
-### Example: Web Application with Database
+### Example: Web App + PostgreSQL + Redis
 
 ```yaml
-# docker-compose.yml
-version: "3.8"
-
+# compose.yaml
 services:
   # Web application
   web:
@@ -228,28 +263,24 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  # PostgreSQL Database
+  # PostgreSQL
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: myapp
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d myapp"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # Redis Cache
+  # Redis
   cache:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
 
@@ -258,71 +289,43 @@ volumes:
   redis_data:
 ```
 
-### Essential Docker Compose Commands
+### Common Compose Commands
 
 ```bash
-# Start all services
+# Start all services (build if needed)
 docker compose up -d
 
-# View service status
+# View status
 docker compose ps
 
-# View logs for all services
+# View logs in real time
 docker compose logs -f
 
-# View logs for a specific service
+# Logs for a specific service
 docker compose logs -f web
 
 # Stop all services
 docker compose down
 
-# Stop and remove volumes (destroys data!)
+# Stop and remove volumes (⚠️ destroys data!)
 docker compose down -v
 
-# Rebuild and restart
+# Rebuild when code changes
 docker compose up -d --build
 ```
 
-<Callout type="tip">Use `docker compose up -d --build` when you have changed your code or Dockerfile. The `--build` flag forces a rebuild of the image before starting the container.</Callout>
-
-## Best Practices
-
-### 1. Use Multi-Stage Builds
-
-Multi-stage builds significantly reduce image size:
-
-```dockerfile
-# Stage 1: Build
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# Stage 2: Production
-FROM node:20-alpine
-WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-EXPOSE 3000
-CMD ["node", "dist/server.js"]
-```
-
-### 2. Key Guidelines
-
-- **One process per container**: Each container should run a single main process.
-- **Use specific tags**: Use `node:20-alpine` instead of `node:latest` to ensure consistency.
-- **Never store secrets in images**: Use environment variables or Docker secrets.
-- **Leverage layer caching**: Place infrequently changing instructions (like installing dependencies) before frequently changing ones (like copying source code).
-- **Use Alpine images**: Alpine Linux-based images are much smaller than full-sized alternatives.
-
-<Callout type="warning">Never store passwords, API keys, or sensitive information in your Dockerfile or image. Use environment variables or secrets management tools like Docker Secrets or HashiCorp Vault.</Callout>
-
 ## Docker Workflow
 
-<Diagram chart="graph LR\n    A[Write Code] --> B[Write Dockerfile]\n    B --> C[Build Image]\n    C --> D[Test Locally]\n    D --> E{Pass?}\n    E -->|No| A\n    E -->|Yes| F[Push to Registry]\n    F --> G[Deploy to Server]\n    G --> H[Monitoring]" />
+<Diagram chart="graph LR\n    A[Write Code] --> B[Write Dockerfile]\n    B --> C[Build Image]\n    C --> D[Test Locally]\n    D --> E{Pass?}\n    E -->|No| A\n    E -->|Yes| F[Push to Registry]\n    F --> G[Deploy]\n    G --> H[Monitor]" />
 
 ## Conclusion
 
-Docker has transformed the way we develop, package, and deploy software. With a solid understanding of containers, images, Dockerfiles, and Docker Compose, you have the tools to start containerizing your applications. The next step is to practice by Dockerizing one of your real projects.
+You now have a solid foundation in Docker:
+
+- What **containers** are and how they differ from VMs
+- The **client-server architecture** of Docker
+- How to **install** Docker and **run your first container**
+- Writing a **Dockerfile** to package your application
+- Using **Docker Compose** to manage multiple containers
+
+Next step: Dockerize one of your own projects. In the next article in this series, we will dive deeper into Docker Compose with more complex multi-container applications.

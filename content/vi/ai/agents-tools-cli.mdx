@@ -1,0 +1,292 @@
+---
+title: "Agents, Tools và CLI trong Claude Code"
+description: "Hiểu rõ về kiến trúc Agent, hệ thống Tools, và CLI interface trong Claude Code. Tìm hiểu Agent SDK và cách các thành phần phối hợp với nhau."
+category: "ai"
+author: "Knowledge Hub"
+date: "2026-03-18"
+readingTime: 8
+tags: ["claude-code", "agents", "tools", "cli", "agent-sdk", "architecture"]
+featured: false
+order: 4
+sources:
+  - title: "Claude Code Agent Architecture"
+    url: "https://docs.anthropic.com/en/docs/claude-code/overview"
+  - title: "Claude Agent SDK"
+    url: "https://docs.anthropic.com/en/docs/agents/claude-agent-sdk"
+  - title: "Claude Code Tools"
+    url: "https://docs.anthropic.com/en/docs/claude-code/security"
+---
+
+# Agents, Tools và CLI trong Claude Code
+
+## Phân biệt Agent, Tool, và CLI
+
+Trong hệ sinh thái Claude Code, ba khái niệm Agent, Tool, và CLI có vai trò riêng biệt nhưng liên kết chặt chẽ. Hiểu rõ sự khác biệt giúp bạn tận dụng tối đa sức mạnh của Claude Code.
+
+<ComparisonTable
+  headers={["Khái niệm", "Vai trò", "Ví dụ"]}
+  rows={[
+    ["CLI", "Giao diện dòng lệnh - điểm tương tác giữa user và hệ thống", "claude command, flags, slash commands"],
+    ["Agent", "Bộ não AI điều phối - quyết định dùng tool nào, khi nào, và cách phối hợp", "Agent loop xử lý yêu cầu phức tạp qua nhiều bước"],
+    ["Tool", "Khả năng cụ thể mà agent có thể sử dụng để tương tác với môi trường", "Read file, Edit file, Bash, Grep, Git"]
+  ]}
+/>
+
+## Kiến trúc Agent trong Claude Code
+
+Claude Code hoạt động theo mô hình **agentic loop** - một vòng lặp liên tục trong đó AI agent nhận input, suy luận, chọn và thực thi tools, quan sát kết quả, rồi quyết định bước tiếp theo.
+
+<Diagram chart="graph TB\n    subgraph CLI Layer\n        A[User Input] --> B[CLI Parser]\n        B --> C[Session Manager]\n    end\n    subgraph Agent Layer\n        C --> D[Agent Loop]\n        D --> E{Phân tích yêu cầu}\n        E --> F[Lập kế hoạch]\n        F --> G[Chọn Tool]\n        G --> H[Thực thi Tool]\n        H --> I[Quan sát kết quả]\n        I --> J{Hoàn thành?}\n        J -->|Chưa| E\n        J -->|Rồi| K[Tổng hợp kết quả]\n    end\n    subgraph Tool Layer\n        H --> T1[Read]\n        H --> T2[Edit]\n        H --> T3[Bash]\n        H --> T4[Grep]\n        H --> T5[Glob]\n        H --> T6[Write]\n        H --> T7[MCP Tools]\n    end\n    K --> L[Response cho User]\n    L --> A" />
+
+### Agent Loop chi tiết
+
+Mỗi khi bạn nhập một yêu cầu, agent loop thực hiện các bước sau:
+
+1. **Parse** - Phân tích yêu cầu ngôn ngữ tự nhiên
+2. **Plan** - Lên kế hoạch thực hiện (có thể dùng extended thinking)
+3. **Select** - Chọn tool phù hợp nhất cho bước hiện tại
+4. **Execute** - Gọi tool với parameters cụ thể
+5. **Observe** - Đọc kết quả trả về từ tool
+6. **Decide** - Quyết định tiếp tục hay đã hoàn thành
+7. **Respond** - Trả lời user khi hoàn tất
+
+```bash
+# Ví dụ: Yêu cầu "Tìm và sửa tất cả memory leaks trong dự án"
+# Agent sẽ tự động:
+# 1. Grep tìm patterns gây memory leak
+# 2. Read các file nghi ngờ
+# 3. Phân tích code
+# 4. Edit để sửa lỗi
+# 5. Chạy tests để verify
+# 6. Báo cáo kết quả
+```
+
+## Hệ thống Tools
+
+### Built-in Tools
+
+Claude Code cung cấp một tập hợp tools tích hợp sẵn:
+
+```typescript
+// Các tools chính trong Claude Code
+
+// 1. Read - Đọc file
+// Có thể đọc code, images, PDFs, notebooks
+Tool: Read({ file_path: "/src/app/page.tsx" })
+
+// 2. Edit - Chỉnh sửa file (tìm và thay thế)
+Tool: Edit({
+  file_path: "/src/utils/helper.ts",
+  old_string: "const x = 1",
+  new_string: "const x = 2"
+})
+
+// 3. Write - Tạo file mới hoặc ghi đè
+Tool: Write({
+  file_path: "/src/new-file.ts",
+  content: "export const hello = 'world';"
+})
+
+// 4. Bash - Chạy lệnh terminal
+Tool: Bash({ command: "npm run test" })
+
+// 5. Grep - Tìm kiếm trong code
+Tool: Grep({
+  pattern: "useState",
+  path: "/src/components",
+  type: "tsx"
+})
+
+// 6. Glob - Tìm file theo pattern
+Tool: Glob({ pattern: "**/*.test.ts" })
+
+// 7. WebFetch - Lấy nội dung web
+Tool: WebFetch({
+  url: "https://api.example.com/docs",
+  prompt: "Tóm tắt API endpoints"
+})
+```
+
+### Tool Permissions
+
+Claude Code có hệ thống phân quyền cho tools để đảm bảo an toàn:
+
+```
+┌─────────────────────────────────────────┐
+│           Permission Levels             │
+├─────────────────────────────────────────┤
+│ Auto-approved (không cần xác nhận):     │
+│ - Read files                            │
+│ - Grep/Glob search                      │
+│ - List directories                      │
+│                                         │
+│ Requires approval (hỏi trước khi chạy): │
+│ - Edit/Write files                      │
+│ - Bash commands                         │
+│ - Git operations                        │
+│ - Web fetch                             │
+└─────────────────────────────────────────┘
+```
+
+<Callout type="warning" title="Bash Tool cần cẩn thận">
+Tool Bash cho phép Claude Code chạy bất kỳ lệnh nào trong terminal. Luôn đọc kỹ lệnh được đề xuất trước khi approve, đặc biệt với các lệnh rm, git reset, hoặc các lệnh thay đổi system configuration. Bạn có thể cấu hình danh sách lệnh được auto-approve trong settings.
+</Callout>
+
+## CLI Interface
+
+### Các chế độ chạy
+
+Claude Code CLI hỗ trợ nhiều chế độ chạy khác nhau:
+
+```bash
+# 1. Interactive mode (mặc định)
+claude
+# Mở phiên tương tác, gõ lệnh trực tiếp
+
+# 2. One-shot mode với -p flag
+claude -p "Giải thích function calculateTax trong utils.ts"
+# Chạy một lệnh, trả kết quả, thoát
+
+# 3. Pipe mode - nhận input từ stdin
+cat error.log | claude -p "Phân tích lỗi trong log này"
+
+# 4. Continue mode - tiếp tục phiên trước
+claude --continue
+claude -c
+
+# 5. Resume mode - tiếp tục phiên cụ thể
+claude --resume <session-id>
+```
+
+### CLI Flags quan trọng
+
+```bash
+# Chọn model
+claude --model claude-opus-4-6
+
+# Chỉ định allowed tools
+claude --allowedTools "Read,Grep,Glob"
+
+# Disable tools cụ thể
+claude --disallowedTools "Bash,Write"
+
+# Output format cho scripting
+claude -p "List all TODO comments" --output-format json
+
+# Verbose mode để debug
+claude --verbose
+
+# Giới hạn số turns
+claude --max-turns 10
+```
+
+## Claude Agent SDK
+
+Anthropic cung cấp **Claude Agent SDK** cho phép bạn xây dựng các AI agent tùy chỉnh dựa trên cùng kiến trúc với Claude Code.
+
+### Cài đặt SDK
+
+```bash
+npm install @anthropic-ai/claude-code-sdk
+```
+
+### Sử dụng SDK trong code
+
+```typescript
+import { ClaudeCode } from "@anthropic-ai/claude-code-sdk";
+
+// Tạo instance
+const claude = new ClaudeCode({
+  model: "claude-sonnet-4-6",
+});
+
+// Chạy một tác vụ
+const result = await claude.run({
+  prompt: "Tìm tất cả các file có lỗi TypeScript và liệt kê",
+  workingDirectory: "./my-project",
+  allowedTools: ["Read", "Grep", "Glob", "Bash"],
+});
+
+console.log(result.output);
+console.log(`Cost: $${result.cost}`);
+console.log(`Turns: ${result.turns}`);
+```
+
+### Tích hợp vào CI/CD
+
+```yaml
+# .github/workflows/code-review.yml
+name: AI Code Review
+on: [pull_request]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Claude Code Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          npx claude-code -p "Review the changes in this PR. \
+            Focus on: security issues, performance problems, \
+            and code quality. Output as markdown." \
+            --output-format json > review.json
+```
+
+<Callout type="tip" title="Agent SDK vs CLI">
+Sử dụng **CLI** cho tương tác trực tiếp hàng ngày. Sử dụng **Agent SDK** khi cần tích hợp Claude Code vào pipelines tự động, scripts, hoặc ứng dụng tùy chỉnh. SDK cho phép kiểm soát chi tiết hơn về tools, permissions, và output format.
+</Callout>
+
+## Sub-agents
+
+Trong quá trình thực thi, Claude Code có thể tạo **sub-agents** - các agent nhỏ hơn chạy song song để thực hiện các tác vụ phụ. Ví dụ khi bạn yêu cầu refactor nhiều file, agent chính có thể spawn sub-agents để xử lý từng file đồng thời.
+
+```
+Main Agent
+├── Sub-agent 1: Refactor file auth.ts
+├── Sub-agent 2: Refactor file user.ts
+├── Sub-agent 3: Refactor file payment.ts
+└── Main Agent: Tổng hợp và verify kết quả
+```
+
+<Diagram chart="graph LR\n    A[Main Agent] --> B[Sub-agent: Search]\n    A --> C[Sub-agent: Analyze]\n    A --> D[Sub-agent: Edit]\n    B -->|Kết quả tìm kiếm| A\n    C -->|Phân tích| A\n    D -->|Files đã sửa| A\n    A --> E[Tổng hợp và Response]" />
+
+## Best Practices
+
+### 1. Cung cấp context rõ ràng
+
+```bash
+# Kém - quá mơ hồ
+> Fix the bug
+
+# Tốt - cung cấp context
+> Sửa lỗi TypeError: Cannot read property 'map' of undefined
+> trong component UserList khi API trả về empty response
+```
+
+### 2. Tận dụng multi-turn conversations
+
+Agent giữ context xuyên suốt cuộc hội thoại. Hãy xây dựng từng bước:
+
+```bash
+> Phân tích cấu trúc thư mục dự án
+# ... Claude phân tích ...
+
+> Dựa trên cấu trúc này, thêm module authentication
+# Claude đã hiểu context, implement phù hợp
+
+> Viết tests cho module vừa tạo
+# Claude biết chính xác cần test gì
+```
+
+### 3. Giới hạn tools khi cần
+
+```bash
+# Chỉ cho phép đọc, không sửa - an toàn cho exploration
+claude --allowedTools "Read,Grep,Glob" -p "Phân tích codebase"
+```
+
+<Callout type="info" title="Tìm hiểu thêm">
+Kiến trúc Agent của Claude Code được thiết kế modular, cho phép mở rộng thông qua MCP servers và custom tools. Xem bài viết về MCP Servers để biết cách mở rộng khả năng của agent.
+</Callout>

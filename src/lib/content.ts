@@ -14,6 +14,10 @@ export interface ArticleMeta {
   order: number;
   slug: string;
   locale: string;
+  level?: number;
+  series?: string;
+  seriesOrder?: number;
+  seriesTitle?: string;
   sources?: { title: string; url: string }[];
 }
 
@@ -55,6 +59,10 @@ export function getArticle(
     order: data.order || 99,
     slug,
     locale,
+    level: data.level || undefined,
+    series: data.series || undefined,
+    seriesOrder: data.seriesOrder || undefined,
+    seriesTitle: data.seriesTitle || undefined,
     sources: data.sources || [],
     content,
   };
@@ -96,6 +104,15 @@ export function getRelatedArticles(
     .slice(0, limit);
 }
 
+export function getSeriesArticles(
+  locale: string,
+  seriesSlug: string
+): ArticleMeta[] {
+  return getAllArticles(locale)
+    .filter((a) => a.series === seriesSlug)
+    .sort((a, b) => (a.seriesOrder ?? 99) - (b.seriesOrder ?? 99));
+}
+
 export interface Category {
   slug: string;
   icon: string;
@@ -103,12 +120,12 @@ export interface Category {
 
 export function getCategories(): Category[] {
   return [
-    { slug: "claude-code", icon: "Terminal" },
-    { slug: "ai-basics", icon: "Brain" },
+    { slug: "ai", icon: "Brain" },
     { slug: "programming", icon: "Code" },
     { slug: "web-development", icon: "Globe" },
     { slug: "hardware", icon: "Cpu" },
     { slug: "database", icon: "Database" },
+    { slug: "networking", icon: "Radio" },
     { slug: "automation", icon: "Workflow" },
     { slug: "devops", icon: "Container" },
   ];
@@ -120,3 +137,20 @@ export function getCategoryArticleCount(
 ): number {
   return getArticleSlugs(locale, categorySlug).length;
 }
+
+export const LEVEL_LABELS: Record<string, Record<number, string>> = {
+  vi: {
+    1: "Khái niệm",
+    2: "Bắt đầu",
+    3: "Phát triển",
+    4: "Chuyên sâu",
+    5: "Vận hành",
+  },
+  en: {
+    1: "Concept",
+    2: "Getting Started",
+    3: "Building",
+    4: "Best Practices",
+    5: "Production",
+  },
+};
