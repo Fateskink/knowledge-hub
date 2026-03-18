@@ -9,18 +9,27 @@ interface ArticleContentProps {
   content: string;
 }
 
-function extractHeadings(content: string) {
+function extractHeadings(mdContent: string) {
   const headingRegex = /^(#{2,3})\s+(.+)$/gm;
   const headings: { id: string; text: string; level: number }[] = [];
-  let match;
+  const idCounts = new Map<string, number>();
+  let m;
 
-  while ((match = headingRegex.exec(content)) !== null) {
-    const level = match[1].length;
-    const text = match[2].replace(/[`*_~]/g, "");
-    const id = text
+  while ((m = headingRegex.exec(mdContent)) !== null) {
+    const level = m[1].length;
+    const text = m[2].replace(/[`*_~]/g, "");
+    let id = text
       .toLowerCase()
       .replace(/[^\w\s-]/g, "")
       .replace(/\s+/g, "-");
+
+    // Deduplicate IDs by appending a suffix
+    const count = idCounts.get(id) || 0;
+    idCounts.set(id, count + 1);
+    if (count > 0) {
+      id = `${id}-${count}`;
+    }
+
     headings.push({ id, text, level });
   }
 

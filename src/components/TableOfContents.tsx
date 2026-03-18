@@ -47,8 +47,8 @@ export default function TableOfContents({ items }: TableOfContentsProps) {
         {t("toc")}
       </h4>
       <ul className="space-y-1 border-l border-border">
-        {items.map((item) => (
-          <li key={item.id}>
+        {items.map((item, idx) => (
+          <li key={`${item.id}-${idx}`}>
             <a
               href={`#${item.id}`}
               className={`block border-l-2 py-1 text-sm transition-colors ${

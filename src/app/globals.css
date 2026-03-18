@@ -220,10 +220,43 @@ body {
   margin: 2.5em 0;
 }
 
-/* ===== rehype-pretty-code overrides ===== */
+/* ===== Terminal-style code blocks ===== */
+[data-rehype-pretty-code-figure] {
+  position: relative;
+  margin: 1.5em 0;
+}
+
 [data-rehype-pretty-code-figure] pre {
   background: #1e1e2e !important;
   border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  padding-top: 2.5rem !important;
+}
+
+/* Terminal traffic lights */
+[data-rehype-pretty-code-figure] pre::before {
+  content: "";
+  position: absolute;
+  top: 0.85rem;
+  left: 1rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+  box-shadow: 20px 0 0 #febc2e, 40px 0 0 #28c840;
+}
+
+/* Language label */
+[data-rehype-pretty-code-figure] [data-rehype-pretty-code-title],
+[data-rehype-pretty-code-figure] pre::after {
+  position: absolute;
+  top: 0.7rem;
+  right: 1rem;
+  font-size: 0.7rem;
+  font-family: var(--font-mono), monospace;
+  color: #6b7280;
+  letter-spacing: 0.05em;
 }
 
 [data-rehype-pretty-code-figure] code {
@@ -234,10 +267,13 @@ body {
   padding: 0 1rem;
 }
 
-/* ===== Utilities ===== */
-html {
-  scroll-behavior: smooth;
+/* Line highlight */
+[data-rehype-pretty-code-figure] code [data-highlighted-line] {
+  background: rgba(99, 102, 241, 0.1);
+  border-left: 2px solid var(--primary);
 }
+
+/* ===== Utilities ===== */
 
 .toc-active {
   color: var(--primary);

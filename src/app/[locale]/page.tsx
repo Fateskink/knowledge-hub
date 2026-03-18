@@ -2,6 +2,8 @@ import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/routing";
 import { getAllArticles, getFeaturedArticles, getCategories, getCategoryArticleCount } from "@/lib/content";
 import ArticleCard from "@/components/ArticleCard";
+import ReadingHistory from "@/components/ReadingHistory";
+import FeaturedOrRecent from "@/components/FeaturedOrRecent";
 import { ArrowRight, Terminal, Brain, Code, Container, Globe, Cpu, Database, Workflow } from "lucide-react";
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -48,22 +50,12 @@ export default async function HomePage({
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        {/* Decorative blobs */}
         <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-primary/10 dark:bg-primary/[0.04] blur-3xl" />
         <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-accent/10 dark:bg-accent/[0.04] blur-3xl" />
       </section>
 
-      {/* Featured Articles */}
-      {featured.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 py-16">
-          <h2 className="mb-8 text-2xl font-bold">{t("featured")}</h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {featured.slice(0, 3).map((article) => (
-              <ArticleCard key={article.slug} article={article} />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Reading History (replaces Featured when >= 3 articles read) or Featured */}
+      <FeaturedOrRecent featured={featured} featuredLabel={t("featured")} />
 
       {/* Categories */}
       <section className="bg-secondary/30 py-16">
