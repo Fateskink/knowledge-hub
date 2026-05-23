@@ -1,0 +1,503 @@
+---
+title: "Riverpod Architecture - State Management Chuẩn Production 2026"
+description: "Riverpod 3.x từ góc nhìn architect: provider graph, AsyncValue, auto-dispose, code generation, testability. So sánh với Bloc/Provider và best practice production cho backend engineer."
+category: "flutter"
+author: "Knowledge Hub"
+date: "2026-05-23"
+readingTime: 25
+tags: ["flutter", "riverpod", "state-management", "architecture", "async", "clean-architecture"]
+featured: true
+order: 5
+level: 4
+series: "flutter-mental-model"
+seriesOrder: 5
+seriesTitle: "Flutter Cho Backend Engineer"
+sources:
+  - title: "Riverpod official docs"
+    url: "https://riverpod.dev/"
+  - title: "riverpod_generator package"
+    url: "https://pub.dev/packages/riverpod_generator"
+  - title: "AsyncValue API"
+    url: "https://pub.dev/documentation/riverpod/latest/riverpod/AsyncValue-class.html"
+  - title: "Flutter Bloc - so sánh"
+    url: "https://bloclibrary.dev/"
+---
+
+# Riverpod Architecture - State Management Chuẩn Production 2026
+
+Nếu bạn đến từ backend, hãy coi Riverpod là một **DI container + reactive compute graph** chạy trên Flutter. Mỗi provider là một "service" — có dependency, có lifecycle, có thể test độc lập, và **không** phụ thuộc vào `BuildContext`. Đây là điểm khác biệt cốt lõi với `Provider` (package cũ) và là lý do Riverpod được khuyến nghị cho production 2026.
+
+## Tại Sao Riverpod, Không Phải Cái Khác
+
+<ComparisonTable
+  headers={["Tiêu chí", "setState", "Provider", "Bloc", "Riverpod 3"]}
+  rows={[
+    ["Phụ thuộc BuildContext", "Có", "Có (`Provider.of`)", "Có (`BlocProvider`)", "Không"],
+    ["Compile-time safety", "Cơ bản", "Trung bình", "Trung bình", "Cao (codegen)"],
+    ["Auto-dispose", "Thủ công", "Thủ công", "Thủ công (BlocProvider)", "Tự động + control"],
+    ["Test không cần widget", "Không", "Khó", "Trung bình", "Dễ"],
+    ["Async support", "Thủ công", "Thủ công", "Pattern Bloc/Cubit", "AsyncValue first-class"],
+    ["Boilerplate", "Thấp app nhỏ", "Trung bình", "Cao", "Thấp với codegen"],
+    ["Maintainability scale lớn", "Kém", "Trung bình", "Tốt", "Rất tốt"],
+    ["Ecosystem 2026", "—", "Đang phai", "Active", "Active, recommended"]
+  ]}
+/>
+
+Ranking cho production 2026 (theo thứ tự ưu tiên user yêu cầu):
+
+1. **Riverpod 3.x với code generation** — best maintainability + scalability + DX.
+2. **Bloc/Cubit** — tốt khi team đã quen, event sourcing rõ ràng.
+3. **Provider** — chỉ cho legacy hoặc app rất nhỏ.
+4. **setState** — local state widget cụ thể (form, animation controller).
+
+<Callout type="info">
+Riverpod KHÔNG thay thế `setState`. Local widget state (animation, focus, scroll) vẫn nên dùng `setState`. Riverpod là cho **shared state**, **business logic**, **async data**.
+</Callout>
+
+## Mental Model
+
+```dart
+// Provider = pure function của (ref) → value
+@riverpod
+String greeting(GreetingRef ref) => 'Hello';
+
+// Consumer = widget đăng ký vào graph
+final greeting = ref.watch(greetingProvider);
+```
+
+Provider graph là **DAG (Directed Acyclic Graph)**. Khi A phụ thuộc B (`ref.watch(B)`), nếu B đổi → A invalidate → A re-compute. Hoàn toàn giống reactive computation engine, hay **dependency graph trong Bazel/Make**.
+
+<Diagram chart="graph LR\n    A[authProvider] --> B[userIdProvider]\n    B --> C[userProfileProvider]\n    B --> D[userOrdersProvider]\n    C --> E[ProfileScreen]\n    D --> F[OrdersScreen]" />
+
+Khi user logout → `authProvider` đổi → `userIdProvider` invalidate → `userProfileProvider`/`userOrdersProvider` invalidate → UI rebuild. Toàn bộ chain tự động.
+
+## Code Generation - Cách Viết 2026
+
+Trước 3.x (legacy):
+
+```dart
+final greetingProvider = Provider<String>((ref) => 'Hello');
+final userProvider = FutureProvider<User>((ref) async => api.fetchUser());
+```
+
+2026 với codegen:
+
+```dart
+@riverpod
+String greeting(GreetingRef ref) => 'Hello';
+
+@riverpod
+Future<User> user(UserRef ref) async => ref.read(apiProvider).fetchUser();
+
+@riverpod
+class Counter extends _$Counter {
+  @override
+  int build() => 0;
+
+  void increment() => state++;
+}
+```
+
+Lợi ích:
+- **Type-safe** với generic params (gọi `userProvider(userId)` với compile-time check).
+- **IDE refactor** an toàn.
+- **Auto-dispose by default**, control bằng `@Riverpod(keepAlive: true)`.
+- Ít boilerplate.
+
+Setup `build_runner`:
+
+```yaml
+dev_dependencies:
+  build_runner: ^2.4.0
+  riverpod_generator: ^3.0.0
+  riverpod_lint: ^3.0.0
+  custom_lint: ^0.6.0
+```
+
+```bash
+dart run build_runner watch -d
+```
+
+## AsyncValue - Async First-Class
+
+Async state thật sự không chỉ có "loading/data/error". Trong production có:
+
+- **Idle** (chưa fetch).
+- **Loading** (đang fetch lần đầu).
+- **Refreshing** (đã có data, đang fetch lại — pull-to-refresh).
+- **Error nhưng có data cũ** (refresh fail nhưng cache còn).
+- **Error không có data**.
+
+`AsyncValue<T>` cover hầu hết:
+
+```dart
+AsyncValue<User> userState = ref.watch(userProvider);
+
+return userState.when(
+  data: (user) => UserView(user),
+  loading: () => const Loading(),
+  error: (err, st) => ErrorView(err),
+);
+```
+
+Production pattern tốt hơn dùng `valueOrNull` + `isLoading`/`isRefreshing`:
+
+```dart
+final user = ref.watch(userProvider);
+return Stack(children: [
+  if (user.valueOrNull case final u?) UserView(u)
+  else if (user.isLoading) const Loading()
+  else if (user.hasError) ErrorView(user.error!),
+  if (user.isRefreshing) const TopProgressBar(),
+]);
+```
+
+`AsyncValue.guard` — wrap async action không cần try/catch:
+
+```dart
+class _$Profile extends _$Profile {
+  @override
+  Future<User> build() async => ref.read(apiProvider).getProfile();
+
+  Future<void> updateName(String name) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(apiProvider).updateName(name);
+      return ref.read(apiProvider).getProfile();
+    });
+  }
+}
+```
+
+## Auto-Dispose - Memory Hygiene
+
+Provider auto-dispose khi không còn ai `watch` (sau một frame). Đây là **default an toàn** — khác với `Provider` (cũ) nơi state rò rỉ khi navigate.
+
+```dart
+@riverpod  // auto-dispose by default
+Future<List<Order>> orders(OrdersRef ref, String userId) async {
+  return ref.read(apiProvider).orders(userId);
+}
+```
+
+Control:
+
+```dart
+@Riverpod(keepAlive: true)  // sống đến khi container dispose
+Future<AppConfig> appConfig(AppConfigRef ref) async => ...;
+```
+
+`ref.keepAlive()` runtime để tự quyết:
+
+```dart
+@riverpod
+Future<List<Order>> orders(OrdersRef ref, String userId) async {
+  final result = await ref.read(apiProvider).orders(userId);
+  if (result.length > 100) {
+    ref.keepAlive();  // cache vì cost lớn
+  }
+  return result;
+}
+```
+
+**Anti-pattern:** đặt `keepAlive: true` mặc định "để cache" → memory leak. Để framework dispose, dùng `ref.keepAlive()` thông minh.
+
+## ref.watch vs ref.read vs ref.listen
+
+Quan trọng nhất cần phân biệt:
+
+| API | Reactive? | Khi nào dùng |
+|---|---|---|
+| `ref.watch(p)` | Có, rebuild khi p đổi | Trong `build` provider hoặc widget consumer |
+| `ref.read(p)` | Không | Trong event handler (onTap, init) — đọc 1 lần |
+| `ref.listen(p, cb)` | Có, callback khi đổi | Side-effect (navigation, snackbar, log) |
+
+```dart
+class _$LoginScreen extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Reactive: rebuild khi authState đổi
+    final isLoading = ref.watch(authNotifierProvider).isLoading;
+
+    // Side-effect: navigate khi login thành công
+    ref.listen(authNotifierProvider, (prev, next) {
+      if (next.value?.isAuthenticated == true) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
+      if (next.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.error.toString())),
+        );
+      }
+    });
+
+    return Scaffold(
+      body: ElevatedButton(
+        onPressed: isLoading ? null : () {
+          // One-shot read
+          ref.read(authNotifierProvider.notifier).login(email, password);
+        },
+        child: const Text('Login'),
+      ),
+    );
+  }
+}
+```
+
+<Callout type="warning">
+**Bug class:** dùng `ref.watch` trong onPressed → tạo dependency mỗi lần click → infinite rebuild loop. Luôn `ref.read` cho one-shot action, `ref.watch` cho reactive value.
+</Callout>
+
+## Family Provider - Parameterized
+
+Khi provider cần argument:
+
+```dart
+@riverpod
+Future<User> userById(UserByIdRef ref, String id) async {
+  return ref.read(apiProvider).getUser(id);
+}
+
+// Sử dụng:
+final user = ref.watch(userByIdProvider('abc123'));
+```
+
+Mỗi argument unique → instance provider riêng (cached). Auto-dispose hoạt động per-instance.
+
+**Production gotcha:** argument phải implement `==` đúng. Nếu pass object phức tạp, Riverpod không cache được. Tốt nhất dùng `String`/`int` ID, hoặc class với `Equatable`/`freezed`.
+
+## Notifier Pattern (Thay BLoC)
+
+Cho mutable state với business logic:
+
+```dart
+@riverpod
+class CartNotifier extends _$CartNotifier {
+  @override
+  List<CartItem> build() => [];
+
+  void add(Product p) {
+    state = [...state, CartItem(product: p, quantity: 1)];
+  }
+
+  void remove(String productId) {
+    state = state.where((i) => i.product.id != productId).toList();
+  }
+
+  Future<void> checkout() async {
+    final api = ref.read(apiProvider);
+    await api.placeOrder(state);
+    state = [];
+  }
+}
+```
+
+Test trực tiếp, không cần widget:
+
+```dart
+test('add product to cart', () {
+  final container = ProviderContainer(overrides: [
+    apiProvider.overrideWithValue(MockApi()),
+  ]);
+  addTearDown(container.dispose);
+
+  final notifier = container.read(cartNotifierProvider.notifier);
+  notifier.add(testProduct);
+
+  expect(container.read(cartNotifierProvider), hasLength(1));
+});
+```
+
+## Clean Architecture với Riverpod
+
+Layer hóa codebase production:
+
+```
+lib/
+├── core/
+│   ├── network/         # Dio, interceptors
+│   ├── errors/          # Failure types
+│   └── utils/
+├── data/
+│   ├── datasources/     # Remote (API), local (Hive/Isar/Drift)
+│   ├── models/          # DTO with json_serializable
+│   └── repositories/    # Implement domain contract
+├── domain/
+│   ├── entities/        # Pure Dart, no Flutter
+│   ├── repositories/    # Abstract contract
+│   └── usecases/        # Optional: per use-case classes
+├── presentation/
+│   ├── providers/       # Riverpod providers
+│   ├── screens/         # ConsumerWidget
+│   └── widgets/
+└── main.dart
+```
+
+Provider graph minh họa:
+
+```dart
+// data layer
+@riverpod
+ApiClient apiClient(ApiClientRef ref) => DioApiClient(baseUrl: ...);
+
+@riverpod
+UserRemoteDataSource userRemoteDataSource(UserRemoteDataSourceRef ref) =>
+    UserRemoteDataSourceImpl(ref.watch(apiClientProvider));
+
+@riverpod
+UserLocalDataSource userLocalDataSource(UserLocalDataSourceRef ref) =>
+    HiveUserDataSource();
+
+@riverpod
+UserRepository userRepository(UserRepositoryRef ref) => UserRepositoryImpl(
+  remote: ref.watch(userRemoteDataSourceProvider),
+  local: ref.watch(userLocalDataSourceProvider),
+);
+
+// domain layer (đôi khi không cần usecase class, gọi repo trực tiếp)
+
+// presentation
+@riverpod
+Future<User> currentUser(CurrentUserRef ref) async {
+  final repo = ref.watch(userRepositoryProvider);
+  return repo.getCurrentUser();
+}
+```
+
+**Trade-off:** layer rõ ràng vs boilerplate. Cho app medium-large (>10 screen): worth. App nhỏ (<5 screen): có thể skip domain layer.
+
+## Production Patterns Quan Trọng
+
+### Pattern 1: Repository với Cache + Network
+
+```dart
+class UserRepositoryImpl implements UserRepository {
+  UserRepositoryImpl({required this.remote, required this.local});
+  final UserRemoteDataSource remote;
+  final UserLocalDataSource local;
+
+  @override
+  Future<User> getCurrentUser({bool forceRefresh = false}) async {
+    if (!forceRefresh) {
+      final cached = await local.get();
+      if (cached != null && !cached.isStale) return cached;
+    }
+    final fresh = await remote.fetch();
+    await local.save(fresh);
+    return fresh;
+  }
+}
+```
+
+### Pattern 2: Pagination Notifier
+
+```dart
+@riverpod
+class FeedNotifier extends _$FeedNotifier {
+  int _page = 1;
+  bool _isLoadingMore = false;
+
+  @override
+  Future<List<Post>> build() async {
+    final repo = ref.read(postRepositoryProvider);
+    return repo.fetch(page: _page);
+  }
+
+  Future<void> loadMore() async {
+    if (_isLoadingMore) return;
+    _isLoadingMore = true;
+    try {
+      final repo = ref.read(postRepositoryProvider);
+      final next = await repo.fetch(page: ++_page);
+      final current = state.valueOrNull ?? [];
+      state = AsyncData([...current, ...next]);
+    } finally {
+      _isLoadingMore = false;
+    }
+  }
+}
+```
+
+### Pattern 3: Optimistic Update với Rollback
+
+```dart
+Future<void> toggleLike(String postId) async {
+  final api = ref.read(apiProvider);
+  final previous = state.valueOrNull ?? [];
+
+  // Optimistic
+  state = AsyncData(previous.map((p) =>
+    p.id == postId ? p.copyWith(liked: !p.liked) : p
+  ).toList());
+
+  try {
+    await api.toggleLike(postId);
+  } catch (e) {
+    // Rollback
+    state = AsyncData(previous);
+    rethrow;
+  }
+}
+```
+
+## Anti-Pattern Production
+
+| Anti-pattern | Hậu quả | Cách đúng |
+|---|---|---|
+| `ref.watch` trong event handler | Rebuild loop | `ref.read` cho one-shot |
+| `Provider` thay vì auto-dispose | Memory leak khi navigate | Default codegen auto-dispose |
+| Notifier có state quá lớn | Rebuild đắt | Tách thành nhiều notifier nhỏ |
+| Business logic trong widget | Khó test, coupling | Move vào notifier/repository |
+| `BuildContext` truyền vào provider | Vi phạm separation | Provider không biết về UI |
+| Override provider runtime trong build | Race condition | Override ở `ProviderScope` root |
+| Không dispose `ProviderContainer` test | Test leak | `addTearDown(container.dispose)` |
+| Cùng API call ở nhiều provider | Duplicate fetch | Compose qua `ref.watch` |
+
+## Migration Provider → Riverpod (Legacy)
+
+Nếu codebase đang dùng `provider` package:
+
+1. Thêm Riverpod cạnh, **không gỡ Provider ngay**.
+2. Wrap app trong `ProviderScope` (Riverpod) bên trong `MultiProvider` (cũ).
+3. Migrate từng feature một, từ leaf đến root.
+4. Khi feature stable, gỡ Provider tương ứng.
+5. Khi 0 widget còn dùng `Provider.of`, gỡ `provider` package.
+
+## Mindset Backend → Riverpod
+
+| Backend | Riverpod |
+|---|---|
+| Dependency Injection (Spring, fx) | Provider graph |
+| Service singleton | `@Riverpod(keepAlive: true)` |
+| Request-scoped service | Auto-dispose family provider |
+| `@Cacheable` | `ref.keepAlive()` + `cacheTime` logic |
+| Reactive stream (Reactor, RxJava) | `StreamProvider` + `ref.listen` |
+| Pure unit test (no Spring context) | Test với `ProviderContainer` override |
+| Circuit breaker | Repository layer (Riverpod không lo) |
+
+Quan trọng: Riverpod là **container + reactive graph**. Business logic thật vẫn ở repository/usecase layer. Đừng nhồi mọi thứ vào notifier.
+
+## Checklist Production
+
+- [ ] Dùng `riverpod_generator` (codegen) cho mọi provider mới.
+- [ ] Enable `riverpod_lint` + `custom_lint` trong analyzer.
+- [ ] `ProviderScope` ở root `runApp`.
+- [ ] Override provider trong test bằng `ProviderContainer` riêng + `dispose` tearDown.
+- [ ] Mỗi `Notifier` có unit test riêng (không cần widget).
+- [ ] `AsyncValue.guard` cho mọi async action có thể throw.
+- [ ] `ref.listen` cho side-effect (navigation/snackbar), không `ref.watch`.
+- [ ] Không gọi `ref.read` trong `build` (chỉ `ref.watch`).
+- [ ] Family parameter có `==`/`hashCode` ổn định (freezed/equatable).
+- [ ] DevTools Provider tab để inspect graph khi debug.
+
+## Kết Series
+
+Năm bài mental model này cover phần khó hiểu nhất của Flutter cho backend engineer:
+
+1. [[flutter-rendering-pipeline]] — ba cây, một frame.
+2. [[widget-lifecycle]] — Element vs State vs RenderObject lifecycle.
+3. [[buildcontext]] — handle vào Element tree.
+4. [[constraint-layout-system]] — single-pass layout.
+5. **Riverpod architecture** — state management chuẩn.
+
+Series tiếp theo sẽ đi vào production patterns: Networking, Offline-first, Performance optimization, CI/CD mobile, Testing strategy. Yêu cầu sẽ là **app maintainable ở scale 50k+ DAU** — đây là nơi backend instinct của bạn thực sự phát huy.

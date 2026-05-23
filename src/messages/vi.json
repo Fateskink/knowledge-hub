@@ -71,6 +71,10 @@
     "devops": {
       "name": "DevOps",
       "description": "Công cụ và quy trình DevOps hiện đại"
+    },
+    "flutter": {
+      "name": "Flutter",
+      "description": "Flutter cho backend engineer: mental model, architecture, performance và production patterns"
     }
   }
 }

@@ -1,0 +1,274 @@
+---
+title: "Flutter Rendering Pipeline - Ba Cây Và Một Frame"
+description: "Bản chất kỹ thuật của Flutter rendering pipeline: Widget/Element/RenderObject, frame scheduling, repaint boundary, Impeller. Góc nhìn cho backend engineer chuyển sang mobile."
+category: "flutter"
+author: "Knowledge Hub"
+date: "2026-05-23"
+readingTime: 22
+tags: ["flutter", "rendering", "pipeline", "performance", "impeller", "architecture"]
+featured: true
+order: 1
+level: 4
+series: "flutter-mental-model"
+seriesOrder: 1
+seriesTitle: "Flutter Cho Backend Engineer"
+sources:
+  - title: "Flutter Architectural Overview"
+    url: "https://docs.flutter.dev/resources/architectural-overview"
+  - title: "Flutter Inside View - rendering pipeline (flutter.dev)"
+    url: "https://docs.flutter.dev/resources/inside-flutter"
+  - title: "Impeller Rendering Engine"
+    url: "https://docs.flutter.dev/perf/impeller"
+  - title: "RenderObject API - master channel"
+    url: "https://api.flutter.dev/flutter/rendering/RenderObject-class.html"
+  - title: "SchedulerBinding API"
+    url: "https://api.flutter.dev/flutter/scheduler/SchedulerBinding-mixin.html"
+---
+
+# Flutter Rendering Pipeline - Ba Cây Và Một Frame
+
+Nếu bạn là backend engineer, hãy nghĩ về Flutter rendering pipeline như một **request pipeline cực kỳ low-latency**: mỗi 16.67ms (60Hz) hoặc 8.33ms (120Hz) framework phải xử lý xong một "request" để dựng frame mới. Khác với HTTP request, deadline là cứng — miss deadline đồng nghĩa với jank (giật hình) mà user thấy bằng mắt thường.
+
+Bài này không dạy bạn "viết widget". Bài này giải thích **cái gì thực sự chạy** khi `setState` được gọi, tại sao Flutter có ba cây thay vì một, và những anti-pattern khiến app drop frame ở production.
+
+## Mental Model Cho Backend Engineer
+
+Coi UI là một **declarative function** `f(state) → UI`. Với backend bạn quen viết handler `f(request) → response`. Sự khác biệt cốt lõi:
+
+- **Backend:** mỗi request độc lập, response phát ra rồi quên đi.
+- **Flutter:** state thay đổi liên tục, framework phải tính ra **diff** giữa UI cũ và UI mới rồi áp dụng diff đó lên màn hình — không phải dựng lại từ đầu mỗi frame.
+
+Để làm được diff hiệu quả, Flutter tách kiến trúc thành **ba cây song song**, mỗi cây có vòng đời và trách nhiệm khác nhau.
+
+<Diagram chart="graph LR\n    A[Widget Tree<br/>Immutable config] -->|inflate| B[Element Tree<br/>Mutable, stateful, lifecycle]\n    B -->|owns| C[RenderObject Tree<br/>Layout, paint, hit-test]\n    C -->|composite| D[Engine / Impeller<br/>GPU surface]" />
+
+### Widget - Cấu Hình Bất Biến
+
+Widget là **immutable description**. Nó không vẽ gì, không giữ state, không có vị trí trên màn hình. Mỗi `build()` trả về widget tree mới hoàn toàn — đây là điểm nhiều backend engineer bị shock: "Tạo object mới mỗi frame? Không phải kém hiệu năng à?".
+
+Câu trả lời: **không**, vì Widget chỉ là descriptor rẻ tiền (vài chục bytes), tương tự như tạo struct config trong Go. Cái đắt là RenderObject — và Flutter cố hết sức để **không** tạo lại RenderObject.
+
+### Element - Cây Sống
+
+Element là **instance đang chạy** của widget tại một vị trí cụ thể trong cây. Element giữ:
+- Reference tới Widget hiện tại
+- Parent/child relationship
+- `State` object (với `StatefulWidget`)
+- Reference tới `RenderObject` tương ứng (với `RenderObjectElement`)
+
+Khi `build()` chạy lại và tạo widget tree mới, framework **reconcile** widget mới với element cây cũ:
+
+1. Nếu widget mới cùng `runtimeType` và `key` với widget cũ → **update element**, không tạo lại RenderObject.
+2. Nếu khác → **dispose element**, tạo element + RenderObject mới.
+
+Đây là lý do `Key` quan trọng — nó quyết định element có được tái sử dụng hay không.
+
+### RenderObject - Layout & Paint
+
+RenderObject là nơi **việc thật** diễn ra: tính kích thước, tính vị trí, vẽ pixel. Nó đắt để tạo và đắt để layout. Mục tiêu kiến trúc của Flutter là **giữ nguyên RenderObject** càng nhiều càng tốt qua các frame, chỉ thay đổi properties khi cần.
+
+<ComparisonTable
+  headers={["Cây", "Vòng đời", "Mutable?", "Chi phí tạo", "Vai trò"]}
+  rows={[
+    ["Widget", "Mỗi build()", "Không", "Rất rẻ", "Mô tả UI"],
+    ["Element", "Theo cây cấu trúc", "Có", "Trung bình", "Lifecycle + reconciliation"],
+    ["RenderObject", "Theo cây cấu trúc", "Có", "Đắt", "Layout, paint, hit-test"]
+  ]}
+/>
+
+## Một Frame Trông Ra Sao
+
+Khi vsync signal đến từ OS (mỗi 16.67ms ở 60Hz), `SchedulerBinding` chạy frame pipeline qua các phase tuần tự:
+
+<Diagram chart="graph TB\n    V[Vsync signal] --> A[1- Animate<br/>Tickers chạy]\n    A --> B[2- Build<br/>Rebuild dirty elements]\n    B --> C[3- Layout<br/>RenderObject.performLayout]\n    C --> D[4- Compositing bits<br/>Repaint boundary check]\n    D --> E[5- Paint<br/>RenderObject.paint]\n    E --> F[6- Compositing<br/>Layer tree to Scene]\n    F --> G[7- Semantics<br/>Accessibility tree]\n    G --> H[8- Finalize<br/>Cleanup, post-frame callbacks]\n    H --> I[Engine submit to GPU]" />
+
+Hiểu pipeline này quan trọng vì:
+
+- **Build phase chỉ đụng đến Widget/Element tree.** Nếu code build của bạn nặng (gọi network, parse JSON, sort list lớn) → block luôn cả pipeline.
+- **Layout là single-pass** từ trên xuống dưới với constraint từ cha và size từ con. Đây là điểm khác biệt căn bản với CSS multi-pass — chi tiết ở bài [[constraint-layout-system]].
+- **Paint không phải lúc nào cũng chạy** cho mọi RenderObject. Framework dùng **dirty flags** (`_needsPaint`, `_needsLayout`) để chỉ chạy lại phần đã đổi.
+
+### Frame Budget Thực Tế
+
+| Refresh rate | Budget | Buffer thực tế (cho code app) |
+|---|---|---|
+| 60Hz | 16.67ms | ~10-12ms |
+| 90Hz | 11.11ms | ~7-8ms |
+| 120Hz | 8.33ms | ~5-6ms |
+
+Phần còn lại bị engine, GC, platform channels "ăn". Trên thiết bị low-end (RAM 2-3GB, chip Cortex-A53) budget có thể còn thấp hơn vì GC pause dài hơn.
+
+<Callout type="warning">
+**Production reality:** Đừng tin số liệu profile mode trên flagship device. Test trên thiết bị tệ nhất user của bạn có thể dùng (ví dụ Samsung A series 2-3 năm tuổi). Jank ở đây mới là jank thật.
+</Callout>
+
+## Skia vs Impeller - Engine Bên Dưới
+
+Trước Flutter 3.10, engine mặc định là **Skia** với shader compilation **runtime** (JIT). Vấn đề: lần đầu một shader được dùng (ví dụ blur, gradient), engine phải compile → **shader jank**, frame đó có thể tốn 100-300ms.
+
+**Impeller** (mặc định trên iOS từ 3.10, Android từ 3.27) giải quyết bằng cách **precompile** một tập shader cố định lúc build. Trade-off:
+
+<ComparisonTable
+  headers={["Tiêu chí", "Skia (legacy)", "Impeller (2026 default)"]}
+  rows={[
+    ["Shader jank lần đầu", "Có, đáng kể", "Không"],
+    ["Binary size", "Nhỏ hơn", "Lớn hơn ~5-10MB"],
+    ["GPU API", "OpenGL/Metal", "Metal (iOS), Vulkan (Android)"],
+    ["Complex effects", "Tốt", "Tốt, đang cải thiện"],
+    ["Custom shaders", "Linh hoạt", "Hạn chế hơn"]
+  ]}
+/>
+
+Production concern: nếu app có **shader custom** (fragment shader cho hiệu ứng), test kỹ trên Impeller. Vài effect (backdrop filter phức tạp, particle system custom) có thể behavior khác. Có thể fallback Skia trên Android qua `android:hardwareAccelerated` hoặc flag `--no-enable-impeller`, nhưng đây là giải pháp tạm.
+
+## Repaint Boundary - Tối Ưu Thực Sự Hiệu Quả
+
+`RepaintBoundary` tạo một **layer riêng** trên GPU. Khi RenderObject bên trong cần repaint, engine chỉ vẽ lại layer đó thay vì cả màn hình.
+
+### Khi Nào Dùng
+
+Nên đặt `RepaintBoundary` ở:
+
+1. **Animation chạy liên tục** (lottie, custom painter động) — tránh repaint cả parent.
+2. **List item với content phức tạp** trong `ListView` — `ListView` đã tự thêm cho mỗi child, nhưng custom scroll thì chưa.
+3. **Element nặng (chart, video preview)** mà nội dung xung quanh thay đổi thường xuyên.
+
+### Khi Nào KHÔNG Dùng
+
+Mỗi `RepaintBoundary` là một **GPU texture riêng** — tốn VRAM. Lạm dụng (đặt khắp nơi) làm tệ hơn vì:
+
+- Composite cost tăng.
+- VRAM pressure trên thiết bị low-end gây dropped frame hoặc OOM.
+
+Kiểm chứng bằng DevTools → Performance → **Highlight Repaint Rainbow**. Đây là công cụ duy nhất nên dùng để quyết định có thêm boundary hay không. Đoán mò là anti-pattern.
+
+```dart
+class HeavyAnimatedWidget extends StatelessWidget {
+  const HeavyAnimatedWidget({super.key, required this.controller});
+  final AnimationController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (_, __) => CustomPaint(
+          painter: _ParticlePainter(progress: controller.value),
+        ),
+      ),
+    );
+  }
+}
+```
+
+## Build Phase - Nơi Tạo Ra Jank
+
+Build chạy trên **UI thread** (Dart isolate chính). Mọi thứ nặng trong `build()` đều tính vào frame budget.
+
+### Anti-Pattern Production Hay Gặp
+
+**1. Allocation nặng trong build:**
+
+```dart
+// BAD: parse JSON mỗi frame
+@override
+Widget build(BuildContext context) {
+  final config = jsonDecode(rawConfig);  // 5-20ms trên list lớn
+  return Text(config['title']);
+}
+```
+
+```dart
+// GOOD: parse trong initState hoặc provider
+late final Map<String, dynamic> config;
+
+@override
+void initState() {
+  super.initState();
+  config = jsonDecode(rawConfig);
+}
+```
+
+**2. Inline function/list trong props của widget có `const` constructor:**
+
+```dart
+// BAD: tạo lambda mới mỗi build → child không thể const → rebuild
+ListView(
+  children: items.map((i) => ItemTile(onTap: () => doSomething(i))).toList(),
+);
+```
+
+Lambda là object mới mỗi frame → equality check fail → child rebuild dù không cần. Giải pháp: kéo callback ra thành method instance, hoặc dùng `ValueKey` + memoization.
+
+**3. Đọc `MediaQuery.of(context)` ở root widget:**
+
+`MediaQuery.of()` đăng ký dependency → khi keyboard popup hoặc xoay màn hình, **toàn bộ subtree rebuild**. Dùng `MediaQuery.sizeOf(context)` (Flutter 3.10+) để chỉ subscribe đúng phần cần.
+
+```dart
+// BAD: rebuild cả cây khi padding/keyboard thay đổi
+final size = MediaQuery.of(context).size;
+
+// GOOD: scope dependency
+final size = MediaQuery.sizeOf(context);
+final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+```
+
+**4. `setState` ở widget cha quá lớn:**
+
+```dart
+// BAD: counter thay đổi → cả màn hình rebuild
+class Screen extends StatefulWidget {
+  @override
+  State<Screen> createState() => _ScreenState();
+}
+
+class _ScreenState extends State<Screen> {
+  int count = 0;
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(children: [
+        ExpensiveHeader(),
+        ExpensiveSidebar(),
+        Text('$count'),  // chỉ cái này cần rebuild
+        ElevatedButton(onPressed: () => setState(() => count++)),
+      ]),
+    );
+  }
+}
+```
+
+Giải pháp: **co nhỏ scope rebuild** bằng `ValueListenableBuilder`, hoặc tách thành widget con với state riêng, hoặc dùng provider/Riverpod (xem [[riverpod-architecture]]).
+
+## Linking Tới Backend Mindset
+
+| Backend concept | Flutter analogue |
+|---|---|
+| Stateless HTTP handler | `StatelessWidget.build` |
+| Middleware pipeline | Frame pipeline phases |
+| DB query plan caching | Widget reuse via Key + Element reconciliation |
+| Response streaming | Streaming widget tree partial (slivers, lazy lists) |
+| p99 latency SLA | Frame budget (16.67ms = "p100" SLA cứng) |
+| Hot path profiling | DevTools Timeline + Performance overlay |
+| Connection pool | Image cache, ImageProvider, painting cache |
+
+Điểm khác lớn nhất: backend bạn được phép **chậm có lý do** (database lock, retry, etc.) miễn trong SLA p99. Flutter **không có p99 forgiveness** — mỗi miss đều là jank user thấy.
+
+## Checklist Thực Chiến
+
+- [ ] Profile mode (`flutter run --profile`) trên thiết bị thật, KHÔNG dùng debug mode để đánh giá hiệu năng.
+- [ ] Enable Performance Overlay (`showPerformanceOverlay: true`) khi test — quan sát 2 thanh: build/raster.
+- [ ] Repaint Rainbow để xác định scope repaint không cần thiết.
+- [ ] Không gọi `MediaQuery.of()` ở root → dùng các `*Of()` cụ thể.
+- [ ] Không parse JSON / sort / filter trong `build()`.
+- [ ] `const` constructor ở mọi nơi có thể (giúp Element reconciliation skip nhanh).
+- [ ] Test trên thiết bị low-end (Cortex-A55, 3GB RAM) trước release.
+- [ ] Theo dõi **raster time** ngoài build time — raster thường là thủ phạm ẩn (effect, shader, hình lớn).
+
+## Câu Hỏi Để Tự Test
+
+1. Một `StatelessWidget` có `const` constructor được dùng nhiều nơi trong cây — framework có tái sử dụng cùng một instance không? *(Có. Identical const instances được canonicalize.)*
+2. `Element.deactivate` và `Element.dispose` khác nhau ở điểm nào? *(Deactivate có thể được "reactivate" trong cùng frame nếu element được move với cùng key — chi tiết ở [[widget-lifecycle]].)*
+3. Tại sao `RepaintBoundary` quanh `ListView.builder` thường vô nghĩa? *(`ListView` đã wrap mỗi item trong `RepaintBoundary` rồi.)*
+
+Bài tiếp theo trong series sẽ đi sâu vào [[widget-lifecycle]] — đặc biệt là `didChangeDependencies`, `didUpdateWidget`, và các bẫy phổ biến với async operation trong `initState`.

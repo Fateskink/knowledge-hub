@@ -1,0 +1,244 @@
+---
+title: "BuildContext - Handle Mỏng Nhất, Bẫy Sâu Nhất"
+description: "BuildContext thực ra là gì, tại sao nó chính là Element, cơ chế InheritedWidget lookup O(1), và những lỗi context sau await/across navigator trong production."
+category: "flutter"
+author: "Knowledge Hub"
+date: "2026-05-23"
+readingTime: 16
+tags: ["flutter", "buildcontext", "inherited-widget", "element-tree", "anti-pattern"]
+featured: false
+order: 3
+level: 3
+series: "flutter-mental-model"
+seriesOrder: 3
+seriesTitle: "Flutter Cho Backend Engineer"
+sources:
+  - title: "BuildContext API"
+    url: "https://api.flutter.dev/flutter/widgets/BuildContext-class.html"
+  - title: "InheritedWidget API"
+    url: "https://api.flutter.dev/flutter/widgets/InheritedWidget-class.html"
+  - title: "Element class"
+    url: "https://api.flutter.dev/flutter/widgets/Element-class.html"
+  - title: "use_build_context_synchronously lint"
+    url: "https://dart.dev/tools/linter-rules/use_build_context_synchronously"
+---
+
+# BuildContext - Handle Mỏng Nhất, Bẫy Sâu Nhất
+
+`BuildContext` trông như tham số tầm thường. Thực ra đây là **một trong những object quan trọng nhất** của Flutter — và là nguồn của nhiều bug khó debug ở production. Hiểu BuildContext = hiểu Element tree.
+
+## Bản Chất Kỹ Thuật
+
+```dart
+abstract class BuildContext {
+  Widget get widget;
+  // ... các method dependOnInheritedWidget*, visitAncestor*, etc.
+}
+```
+
+`BuildContext` là **interface** mà `Element` implement. Khi bạn nhận `context` trong `build(BuildContext context)`, bạn đang nhận **chính cái Element** đang gọi `build`. Không phải reference, không phải proxy — đúng là Element đó, được expose qua interface giới hạn.
+
+<Callout type="info">
+**Mental model:** BuildContext = handle tới vị trí trong Element tree. Mọi câu hỏi "vị trí" (ancestor là gì? theme nào? scaffold ở đâu?) đều được trả lời bằng cách đi ngược cây từ Element này lên trên.
+</Callout>
+
+Backend analogue: tương tự `ctx context.Context` trong Go — nó mỏng, nó là handle, nó được pass đi khắp nơi và mang theo metadata về "tôi đang ở đâu".
+
+## InheritedWidget Lookup — Tại Sao Nhanh
+
+Khi bạn gọi `Theme.of(context)`, framework chạy thuật toán:
+
+1. Element hiện tại nhìn vào `_inheritedElements` (`HashMap<Type, InheritedElement>`).
+2. Lookup `Theme` type → trả về `InheritedElement` tương ứng.
+3. Đăng ký dependency (element này sẽ rebuild khi `Theme` thay đổi).
+4. Trả về widget data.
+
+**Phức tạp O(1)** sau lần đầu, vì mỗi Element cache map các `InheritedWidget` mà nó "thấy được" từ ancestor. Map này được build incremental khi element được mount — chi phí amortized.
+
+```dart
+// Trong InheritedElement
+@override
+void updateChild(Element child, ...) {
+  // mỗi child inherit parent map + InheritedWidget của chính nó
+}
+```
+
+Không phải scan linear ngược cây. Đây là lý do `Provider`/`Riverpod` (built trên InheritedWidget) scale tốt với cây sâu.
+
+## `dependOnInheritedWidgetOfExactType` vs `getInheritedWidgetOfExactType`
+
+Có hai loại lookup:
+
+```dart
+// 1. Đăng ký dependency — rebuild khi data đổi
+Theme.of(context);  // dùng dependOnInheritedWidgetOfExactType
+MediaQuery.of(context);
+
+// 2. Chỉ đọc, không subscribe
+context.getInheritedWidgetOfExactType<MyInherited>();
+```
+
+Loại 2 dùng khi đọc 1 lần (ví dụ trong `initState` callback, button onPressed). Loại 1 dùng trong `build` khi UI cần phản ánh state.
+
+<Callout type="warning">
+**Production bug:** dùng `.of(context)` trong `initState` → crash hoặc không subscribe đúng. Dùng `getInheritedWidgetOfExactType` hoặc move sang `didChangeDependencies`.
+</Callout>
+
+## MediaQuery Đã Tách Nhỏ — Flutter 3.10+
+
+Trước 3.10, `MediaQuery.of(context)` trả về toàn bộ `MediaQueryData` → bất kỳ field nào đổi (orientation, keyboard, viewInsets) → toàn bộ subscriber rebuild.
+
+Sau 3.10, các API mới scope hẹp:
+
+```dart
+MediaQuery.sizeOf(context);          // chỉ subscribe size
+MediaQuery.paddingOf(context);       // chỉ subscribe padding
+MediaQuery.viewInsetsOf(context);    // chỉ subscribe viewInsets (keyboard)
+MediaQuery.platformBrightnessOf(context);
+MediaQuery.devicePixelRatioOf(context);
+MediaQuery.textScalerOf(context);
+```
+
+Best practice 2026: **không bao giờ dùng `MediaQuery.of(context)` nữa**. Luôn dùng `*Of(context)` hẹp nhất có thể. Lint `use_named_constants` và các custom lint trong `flutter_lints` 4.x sẽ flag.
+
+## Context Sau Await — Bug Class Nguy Hiểm
+
+Element có thể bị **deactivated** hoặc **disposed** giữa await. Dùng context sau await là sai về mặt nguyên lý:
+
+```dart
+// BAD
+Future<void> _onSave() async {
+  await api.save();
+  Navigator.of(context).pop();  // ❌
+  ScaffoldMessenger.of(context).showSnackBar(...);  // ❌
+}
+```
+
+```dart
+// GOOD — capture trước await
+Future<void> _onSave() async {
+  final navigator = Navigator.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  await api.save();
+  if (!mounted) return;
+  navigator.pop();
+  messenger.showSnackBar(...);
+}
+```
+
+Dart analyzer rule `use_build_context_synchronously` sẽ flag — đừng tắt nó. Trade-off:
+
+| Approach | Pros | Cons |
+|---|---|---|
+| Capture trước await | An toàn, rõ ràng | Verbose nếu cần nhiều thứ |
+| Check `mounted` rồi dùng context | Ngắn hơn | Vẫn dễ sai nếu sub-tree dispose |
+| Move side-effect ra ngoài widget | Architecture sạch | Cần state management chỉnh |
+
+Production best: kết hợp Riverpod/Bloc → side-effect (snackbar, navigation) trigger qua listener, không dùng context trực tiếp.
+
+## ScaffoldMessenger vs Scaffold.of(context)
+
+Một lỗi cổ điển:
+
+```dart
+// Trong Scaffold body
+ElevatedButton(
+  onPressed: () {
+    Scaffold.of(context).showSnackBar(...);  // ❌ crash
+  },
+);
+```
+
+`Scaffold.of(context)` đi tìm Scaffold ancestor. Nhưng button đang ở **trong** Scaffold đó — context của button là **descendant của Scaffold's body**, không thấy được Scaffold của chính route hiện tại. Wait — thực ra là thấy. Vấn đề khác: nếu button ở root build method **cùng cấp với Scaffold**, không thấy.
+
+Giải pháp 2026: `ScaffoldMessenger.of(context)` — singleton ở `MaterialApp` level, luôn truy cập được:
+
+```dart
+ScaffoldMessenger.of(context).showSnackBar(...);
+```
+
+Tương tự cho `showBottomSheet`: dùng `Builder` để wrap, hoặc dùng `showModalBottomSheet` (top-level function, không cần Scaffold ancestor).
+
+## visitAncestor / visitChildren
+
+Ngoài lookup InheritedWidget, BuildContext cho phép walk cây thủ công:
+
+```dart
+context.visitAncestorElements((element) {
+  print(element.widget);
+  return true;  // continue
+});
+```
+
+**Khi nào dùng?** Hiếm. Nhưng có trường hợp hợp lệ:
+- Plugin/lib cần inspect widget tree (ví dụ devtools extension).
+- Tìm ancestor không phải `InheritedWidget` (rất hiếm; nên thiết kế khác).
+
+Anti-pattern: dùng `visitAncestorElements` để giao tiếp parent-child. Đó là việc của callback/InheritedWidget/state management.
+
+## Anti-Pattern Production
+
+**1. Lưu context vào field instance:**
+
+```dart
+class _MyState extends State<MyWidget> {
+  late BuildContext _ctx;  // ❌
+  
+  @override
+  Widget build(BuildContext context) {
+    _ctx = context;  // ❌
+    return ...;
+  }
+  
+  void someCallback() {
+    Navigator.of(_ctx).push(...);  // có thể stale
+  }
+}
+```
+
+Context bạn capture lúc build có thể trở thành stale khi widget rebuild ở vị trí khác hoặc bị dispose. Dùng `mounted` + `context` ngay trong callback nếu State còn alive.
+
+**2. Truyền context qua nhiều layer:**
+
+Nếu helper function cần `context`, ok. Nhưng nếu **service layer / repository** cần context → architecture sai. Service không nên biết về UI.
+
+**3. Dùng `context.findRenderObject()` để query size trong build:**
+
+`RenderObject` chưa được layout xong khi `build` chạy. Muốn đọc size → dùng `LayoutBuilder` (cha truyền constraint xuống) hoặc `WidgetsBinding.instance.addPostFrameCallback`.
+
+```dart
+@override
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final box = _key.currentContext?.findRenderObject() as RenderBox?;
+    if (box != null) {
+      print(box.size);
+    }
+  });
+}
+```
+
+## Mindset Backend → BuildContext
+
+| Backend | Flutter |
+|---|---|
+| `context.Context` trong Go | `BuildContext` (handle, không lưu trữ) |
+| Request-scoped DI container | `InheritedWidget` lookup |
+| `context.WithCancel` | `mounted` check pattern |
+| Middleware đọc header | Widget gọi `.of(context)` để lấy ambient config |
+| Goroutine leak (context không cancel) | `setState after dispose` |
+
+Quan trọng: **đừng coi BuildContext là "object thần kỳ"**. Nó là một interface trên Element. Mọi thứ nó làm có thể giải thích bằng "đi ngược cây Element và tìm".
+
+## Checklist
+
+- [ ] Không dùng `MediaQuery.of(context)` — chuyển sang `*Of(context)` cụ thể.
+- [ ] Không gọi `.of(context)` (subscribe pattern) trong `initState`.
+- [ ] Capture `Navigator`/`Messenger`/`Theme` trước `await`.
+- [ ] Lint `use_build_context_synchronously` enable + treat as error.
+- [ ] Không lưu `BuildContext` vào field.
+- [ ] Service layer **không** nhận `BuildContext`.
+- [ ] Khi cần size widget → `LayoutBuilder` hoặc `addPostFrameCallback`.
+
+Bài tiếp theo: [[constraint-layout-system]] — cơ chế layout single-pass của Flutter và lý do CSS instinct của bạn sẽ phản chủ.

@@ -4,7 +4,7 @@ import { getAllArticles, getFeaturedArticles, getCategories, getCategoryArticleC
 import ArticleCard from "@/components/ArticleCard";
 import ReadingHistory from "@/components/ReadingHistory";
 import FeaturedOrRecent from "@/components/FeaturedOrRecent";
-import { ArrowRight, Brain, Code, Container, Globe, Cpu, Database, Radio, Workflow } from "lucide-react";
+import { ArrowRight, Brain, Code, Container, Globe, Cpu, Database, Radio, Workflow, Smartphone } from "lucide-react";
 
 const categoryIcons: Record<string, React.ReactNode> = {
   ai: <Brain className="h-8 w-8" />,
@@ -15,6 +15,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
   networking: <Radio className="h-8 w-8" />,
   automation: <Workflow className="h-8 w-8" />,
   devops: <Container className="h-8 w-8" />,
+  flutter: <Smartphone className="h-8 w-8" />,
 };
 
 export default async function HomePage({

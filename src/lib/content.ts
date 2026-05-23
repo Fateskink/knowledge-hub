@@ -128,6 +128,7 @@ export function getCategories(): Category[] {
     { slug: "networking", icon: "Radio" },
     { slug: "automation", icon: "Workflow" },
     { slug: "devops", icon: "Container" },
+    { slug: "flutter", icon: "Smartphone" },
   ];
 }
 

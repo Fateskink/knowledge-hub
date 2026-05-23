@@ -71,6 +71,10 @@
     "devops": {
       "name": "DevOps",
       "description": "Modern DevOps tools and practices"
+    },
+    "flutter": {
+      "name": "Flutter",
+      "description": "Flutter for backend engineers: mental model, architecture, performance and production patterns"
     }
   }
 }

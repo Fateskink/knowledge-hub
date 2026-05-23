@@ -1,0 +1,295 @@
+---
+title: "Constraint Layout System - Tại Sao CSS Instinct Sẽ Phản Chủ"
+description: "Cơ chế layout single-pass của Flutter: constraint go down, size go up, parent set position. Hiểu BoxConstraints, Intrinsics, Slivers và lý do RenderFlex overflow xảy ra."
+category: "flutter"
+author: "Knowledge Hub"
+date: "2026-05-23"
+readingTime: 19
+tags: ["flutter", "layout", "constraints", "renderobject", "performance", "responsive"]
+featured: false
+order: 4
+level: 3
+series: "flutter-mental-model"
+seriesOrder: 4
+seriesTitle: "Flutter Cho Backend Engineer"
+sources:
+  - title: "Understanding constraints (flutter.dev)"
+    url: "https://docs.flutter.dev/ui/layout/constraints"
+  - title: "BoxConstraints API"
+    url: "https://api.flutter.dev/flutter/rendering/BoxConstraints-class.html"
+  - title: "Inside Flutter - linear layout performance"
+    url: "https://docs.flutter.dev/resources/inside-flutter#linear-reconciliation"
+  - title: "Slivers - flutter.dev"
+    url: "https://docs.flutter.dev/ui/layout/scrolling/slivers"
+---
+
+# Constraint Layout System - Tại Sao CSS Instinct Sẽ Phản Chủ
+
+CSS dạy bạn nghĩ theo "kích thước element" — `width: 300px`, `height: auto`. Flutter dạy bạn nghĩ ngược: **constraint** đến từ cha, **size** quyết bởi con, **position** do cha set. Đây là single-pass layout — hiệu năng O(n) thực sự, không phải reflow truyền thống của browser.
+
+## Quy Tắc Vàng
+
+Mọi widget tuân theo ba bước:
+
+1. Widget **nhận `BoxConstraints` từ cha** (min/max width + min/max height).
+2. Widget **trả `Size` thỏa constraint** lên cho cha.
+3. Cha **set vị trí** của widget trong vùng của cha.
+
+> *"Constraints go down. Sizes go up. Parent sets position."*
+
+Đây không phải slogan — đây là **rule cứng** của framework. Mọi RenderObject phải tuân thủ, kể cả custom RenderObject bạn viết.
+
+<Diagram chart="graph TD\n    Parent -->|BoxConstraints<br/>min/max w,h| Child\n    Child -->|Size| Parent\n    Parent -->|Offset position| Child" />
+
+## BoxConstraints - Bốn Số Quyết Định Mọi Thứ
+
+```dart
+class BoxConstraints {
+  final double minWidth;
+  final double maxWidth;
+  final double minHeight;
+  final double maxHeight;
+}
+```
+
+Bốn trạng thái đặc biệt:
+
+| Loại constraint | Ý nghĩa | Ví dụ widget tạo ra |
+|---|---|---|
+| **Tight** | min == max | `SizedBox(width: 100)` |
+| **Loose** | min == 0, max hữu hạn | `Padding`, `Center` |
+| **Bounded** | max hữu hạn | Container thông thường |
+| **Unbounded** | max = `double.infinity` | `ListView` (axis chính), `Column` con `SingleChildScrollView` |
+
+**Bug class #1 của Flutter:** đặt widget muốn "fill" (như `Expanded`, `Row`) trong parent unbounded → throw `RenderFlex` exception. Vì widget không biết "infinity" nghĩa là bao nhiêu pixel để chia.
+
+```dart
+// BAD
+SingleChildScrollView(
+  child: Column(
+    children: [
+      Expanded(child: ListView(...))  // ❌ unbounded vertical
+    ],
+  ),
+);
+```
+
+```dart
+// GOOD: cho ListView bounded height
+SingleChildScrollView(
+  child: Column(
+    children: [
+      SizedBox(height: 300, child: ListView(...))
+    ],
+  ),
+);
+```
+
+## So Sánh Với CSS
+
+<ComparisonTable
+  headers={["Khía cạnh", "CSS / Browser", "Flutter"]}
+  rows={[
+    ["Layout passes", "Multi-pass (reflow)", "Single-pass"],
+    ["Content-based size", "Có (intrinsic)", "Đắt, cần `Intrinsic*` widget"],
+    ["% width", "Default percentage", "Cần `LayoutBuilder` hoặc `FractionallySizedBox`"],
+    ["Overflow handling", "scroll/clip default", "Throw error nếu không xử lý"],
+    ["Box model", "margin + border + padding + content", "Padding widget riêng, margin = padding của parent"],
+    ["Complexity", "O(n²) worst case", "O(n) by design"]
+  ]}
+/>
+
+## Intrinsics - Đắt Và Tránh Nếu Có Thể
+
+`IntrinsicWidth` / `IntrinsicHeight` cho phép widget hỏi child: "Nếu mày được unbounded, mày to bao nhiêu?". Đây là **second-pass layout** — phá vỡ single-pass guarantee.
+
+```dart
+// Mỗi item trong Row có cùng height = max height của các item
+IntrinsicHeight(
+  child: Row(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [...],
+  ),
+);
+```
+
+**Production cost:** child có thể bị layout **2 lần** (intrinsic query + actual layout). Trên list dài → cubic blow-up trong worst case.
+
+Alternative tốt hơn:
+
+| Vấn đề | Giải pháp không cần Intrinsic |
+|---|---|
+| Cell height bằng nhau | Set height tĩnh hoặc `LayoutBuilder` + max trước |
+| Row với child cùng width | `Expanded` flex factor |
+| Auto-size text | `FittedBox` (scale, không layout 2 lần) |
+
+## LayoutBuilder - Đo Trước, Dựng Sau
+
+Khi bạn cần biết constraint **trước khi** dựng child:
+
+```dart
+LayoutBuilder(
+  builder: (context, constraints) {
+    if (constraints.maxWidth > 600) {
+      return _TabletLayout();
+    }
+    return _MobileLayout();
+  },
+);
+```
+
+**Trade-off:** `LayoutBuilder` rebuild khi constraint đổi. Đừng đặt ở root mỗi screen — gây rebuild thừa. Dùng ở **đúng layer cần phân nhánh**.
+
+Anti-pattern: dùng `LayoutBuilder` chỉ để lấy `MediaQuery.sizeOf` — nhầm tool. `LayoutBuilder` cho constraint cục bộ của parent, không phải screen size.
+
+## Flex Layout - Row/Column
+
+`Row`/`Column` chia không gian theo hai phase:
+
+1. **Layout child không flex** (không có `Expanded`/`Flexible`) với constraint loose.
+2. **Tính space còn lại**, chia cho child flex theo flex factor.
+
+```dart
+Row(
+  children: [
+    Icon(Icons.star),         // size cố định
+    Expanded(flex: 2, child: A()),
+    Expanded(flex: 1, child: B()),
+  ],
+);
+```
+
+Tính toán: total space = max_width. Sau khi Icon (24px) lấy phần của nó, remainder chia theo 2:1.
+
+### `Flexible` vs `Expanded`
+
+- `Expanded` = `Flexible(fit: FlexFit.tight)` — child **bắt buộc** fill space được cấp.
+- `Flexible` = `Flexible(fit: FlexFit.loose)` — child có thể nhỏ hơn space.
+
+Production: dùng `Flexible` khi child có size tự nhiên (Text dài có thể wrap), dùng `Expanded` khi muốn fill chắc chắn.
+
+### Overflow - Nguyên Nhân Hàng Đầu
+
+```
+A RenderFlex overflowed by 42 pixels on the right.
+```
+
+Nguyên nhân: tổng size con > size cha. Common causes:
+
+- `Text` dài trong `Row` không wrap → cần wrap bằng `Expanded`/`Flexible`.
+- Image lớn không constrain → cần `BoxFit`.
+- Padding/Margin cộng dồn vượt khung.
+
+```dart
+// BAD
+Row(children: [Icon(...), Text('A very long string...')]);
+
+// GOOD
+Row(children: [Icon(...), Expanded(child: Text('...', overflow: TextOverflow.ellipsis))]);
+```
+
+## Stack - Khi Quy Tắc Không Đủ
+
+`Stack` cho phép positioned children (`Positioned`, `Align`). Constraint behavior:
+- **Non-positioned children**: nhận loose constraint của Stack.
+- **Positioned children**: tự định vị, không tham gia size Stack.
+- Stack size = lớn nhất của non-positioned children, hoặc fill nếu `fit: StackFit.expand`.
+
+Use case production: overlay (badge, loading), shimmer effect, custom popover.
+
+## Slivers - Layout Của Scroll
+
+`ListView`, `GridView`, `CustomScrollView` dùng **sliver protocol** — biến thể của constraint system cho cuộn:
+
+- `SliverConstraints` thay cho `BoxConstraints` — thêm `scrollOffset`, `remainingPaintExtent`, `viewportMainAxisExtent`.
+- `SliverGeometry` thay cho `Size` — có `scrollExtent`, `paintExtent`, `cacheExtent`.
+
+Tại sao tách biệt? Vì scroll layout cần biết **vùng nào đang visible** để chỉ build phần đó (lazy build) — không thể làm với BoxConstraints thuần.
+
+```dart
+CustomScrollView(
+  slivers: [
+    SliverAppBar(expandedHeight: 200, pinned: true),
+    SliverList(delegate: SliverChildBuilderDelegate(...)),
+    SliverGrid(...),
+  ],
+);
+```
+
+Best practice: dùng `CustomScrollView` khi cần kết hợp nhiều scroll content. Đừng wrap `ListView` trong `SingleChildScrollView` (nested scroll = perf disaster).
+
+## Responsive Layout 2026
+
+| Cách | Khi nào dùng | Hạn chế |
+|---|---|---|
+| `LayoutBuilder` | Phân nhánh layout theo container size | Rebuild khi constraint đổi |
+| `MediaQuery.sizeOf` | Phân nhánh theo screen size | Subscribe screen-level changes |
+| `Adaptive` widgets (`flutter_adaptive_scaffold`) | Material 3 navigation rail/drawer | Coupling với Material |
+| `FractionallySizedBox` | Child = % của parent | Chỉ % đơn giản |
+| Breakpoints package | Logic phức tạp multi-screen | Thêm dependency |
+
+Ranking 2026 (maintainability → scalability → DX → performance → ecosystem):
+
+1. **`LayoutBuilder` + small breakpoints** (xs/sm/md/lg) — không thêm dependency, control rõ ràng.
+2. **`flutter_adaptive_scaffold`** (Google official) — khi cần Material 3 adaptive navigation.
+3. **Tự viết responsive helper** — pattern matrix size → layout.
+4. **3rd-party responsive package** — chỉ khi thực sự cần feature không có.
+
+## Anti-Pattern Layout Phổ Biến
+
+| Anti-pattern | Hậu quả | Cách đúng |
+|---|---|---|
+| `Expanded` trong scroll axis của `SingleChildScrollView` | Unbounded constraint exception | Set explicit height hoặc dùng `Sliver` |
+| Nested scrolls cùng axis | Conflict, jank | Một scroll outer + `physics: NeverScrollableScrollPhysics()` cho inner |
+| Image không constrain | Overflow + memory | `BoxFit.cover` + max height/width |
+| `Row` chứa Text dài không wrap | RenderFlex overflow | `Expanded`/`Flexible` |
+| `IntrinsicHeight` ở list lớn | O(n²) layout | Set height cố định hoặc dùng `RenderObject` custom |
+| `Column` size huge để giữ all children | Memory + slow | `ListView.builder` lazy build |
+
+## Custom RenderObject - Khi Nào Cần
+
+99% trường hợp, compose widget có sẵn là đủ. Nhưng có lúc cần custom `RenderBox`:
+
+- Layout logic phức tạp không thể compose (chart, custom flow layout).
+- Performance critical (paint hàng nghìn dot).
+- Hit-test custom (ví dụ vùng cảm ứng hình bất kỳ).
+
+```dart
+class MyRenderBox extends RenderBox {
+  @override
+  void performLayout() {
+    size = constraints.constrain(Size(200, 100));
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    // direct canvas access
+  }
+}
+```
+
+Production warning: custom RenderObject bypass nhiều safety net. Phải tự handle `hitTest`, `semantics`, `RTL`, accessibility. Đắt về maintenance — chỉ khi profile chứng minh là bottleneck.
+
+## Linking Backend Mindset
+
+| Backend | Flutter Layout |
+|---|---|
+| Request → Response | Constraint → Size |
+| Schema validation | `BoxConstraints.checkValid()` |
+| Streaming response | Sliver lazy build |
+| Pagination | `ListView.builder` itemCount |
+| Backpressure | `physics` properties + `scroll_controller` |
+| O(n) algorithm constraint | Single-pass layout guarantee |
+
+## Checklist
+
+- [ ] Hiểu rõ constraint nào widget của bạn đang nhận (debug bằng Flutter Inspector → Widget Details).
+- [ ] Không lồng `SingleChildScrollView` với `ListView` cùng axis.
+- [ ] Image luôn có constraint rõ ràng (height hoặc width + fit).
+- [ ] Text trong Row có `Expanded`/`Flexible` để wrap.
+- [ ] Tránh `IntrinsicHeight`/`IntrinsicWidth` trong list/scrollable.
+- [ ] Dùng `Sliver*` cho mọi scroll phức tạp.
+- [ ] Test layout với content dài/ngắn (i18n string khác nhau).
+- [ ] Test với text scale = 1.5x, 2x (accessibility).
+
+Bài cuối series mental model: [[riverpod-architecture]] — state management chuẩn 2026 cho production app.

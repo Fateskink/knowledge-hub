@@ -74,6 +74,12 @@ const viToEn: Record<string, string> = {
   "devops/ci-cd-pipeline": "devops/ci-cd-pipeline",
   "devops/kubernetes-co-ban": "devops/kubernetes-basics",
   "devops/linux-command-line": "devops/linux-command-line",
+  // Flutter
+  "flutter/flutter-rendering-pipeline": "flutter/flutter-rendering-pipeline",
+  "flutter/widget-lifecycle": "flutter/widget-lifecycle",
+  "flutter/buildcontext": "flutter/buildcontext",
+  "flutter/constraint-layout-system": "flutter/constraint-layout-system",
+  "flutter/riverpod-architecture": "flutter/riverpod-architecture",
 };
 
 // Build reverse map

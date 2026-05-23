@@ -1,0 +1,315 @@
+---
+title: "Widget Lifecycle - State, Element Và Những Bẫy Async"
+description: "Phân tích sâu lifecycle của StatefulWidget: initState, didChangeDependencies, didUpdateWidget, deactivate, dispose. Anti-pattern async trong production và cách xử lý đúng."
+category: "flutter"
+author: "Knowledge Hub"
+date: "2026-05-23"
+readingTime: 20
+tags: ["flutter", "lifecycle", "state", "async", "memory-leak", "best-practices"]
+featured: false
+order: 2
+level: 4
+series: "flutter-mental-model"
+seriesOrder: 2
+seriesTitle: "Flutter Cho Backend Engineer"
+sources:
+  - title: "State class API"
+    url: "https://api.flutter.dev/flutter/widgets/State-class.html"
+  - title: "StatefulWidget API"
+    url: "https://api.flutter.dev/flutter/widgets/StatefulWidget-class.html"
+  - title: "Element class - lifecycle"
+    url: "https://api.flutter.dev/flutter/widgets/Element-class.html"
+  - title: "Flutter app lifecycle"
+    url: "https://docs.flutter.dev/get-started/flutter-for/uikit-devs#how-do-i-listen-to-application-lifecycle-events"
+---
+
+# Widget Lifecycle - State, Element Và Những Bẫy Async
+
+Backend engineer quen với object lifecycle ngắn (per-request) hoặc dài (singleton service). Trong Flutter, vòng đời nằm ở mức **Element** — không phải Widget. Hiểu nhầm điều này là nguyên nhân #1 của memory leak, async race condition và `setState() called after dispose` ở production.
+
+## Cốt Lõi: Widget Không Có Lifecycle
+
+`Widget` là immutable descriptor — nó được tạo lại mỗi `build()`. Cái có lifecycle là:
+
+- **Element** (đặc biệt `StatefulElement`)
+- **State** object (gắn 1-1 với `StatefulElement`)
+- **RenderObject** (gắn với `RenderObjectElement`)
+
+Khi bạn override `initState`, `dispose`, v.v., bạn đang viết code chạy ở mức `State` — instance này **sống xuyên qua nhiều rebuild** của widget. Tương tự backend: widget là DTO mỗi request, State là service-scoped instance.
+
+<Diagram chart="graph TB\n    A[Widget tạo lần đầu] --> B[createState]\n    B --> C[State.initState]\n    C --> D[State.didChangeDependencies]\n    D --> E[State.build]\n    E --> F{Có rebuild?}\n    F -->|setState| E\n    F -->|widget mới<br/>cùng type+key| G[State.didUpdateWidget]\n    G --> E\n    F -->|dependency thay đổi| D\n    F -->|move/remove| H[State.deactivate]\n    H --> I{Reinsert?}\n    I -->|Có| D\n    I -->|Không| J[State.dispose]" />
+
+## Phân Tích Từng Phase
+
+### `createState()` — Một Lần Duy Nhất
+
+Được gọi đúng một lần khi `StatefulElement` được tạo. State instance sẽ tồn tại đến khi element bị dispose.
+
+**Anti-pattern:** đưa logic phức tạp vào constructor của State — không có context, không thể truy cập `widget`.
+
+### `initState()` — One-Shot Setup
+
+Được gọi sau khi State được mount vào tree. Đây là nơi:
+
+- Khởi tạo `AnimationController`, `TextEditingController`, `ScrollController`.
+- Subscribe `Stream`, `Listenable`, lưu lại subscription để hủy ở `dispose`.
+- **KHÔNG** dùng `InheritedWidget` (`Theme.of`, `MediaQuery.of`) ở đây — chưa setup xong dependency. Dùng `didChangeDependencies`.
+- **KHÔNG** gọi async work blocking trực tiếp — UI sẽ giật.
+
+```dart
+@override
+void initState() {
+  super.initState();
+  _controller = AnimationController(vsync: this, duration: _kAnim);
+  _sub = bloc.events.listen(_handle);
+  // Async work: fire-and-forget với mounted check
+  _bootstrap();
+}
+
+Future<void> _bootstrap() async {
+  final data = await api.fetchProfile();
+  if (!mounted) return;  // QUAN TRỌNG
+  setState(() => _data = data);
+}
+```
+
+<Callout type="danger">
+**Production bug phổ biến:** `setState` sau khi widget bị dispose vì await xong network call thì user đã navigate đi. Luôn check `mounted` trước `setState` sau bất kỳ `await`.
+</Callout>
+
+### `didChangeDependencies()` — Inherited Widget Subscriptions
+
+Được gọi:
+1. Ngay sau `initState` (lần đầu mount).
+2. Mỗi khi một `InheritedWidget` mà State đăng ký (qua `context.dependOnInheritedWidgetOfExactType` hoặc `.of(context)`) thay đổi.
+
+Dùng để:
+- Đọc `Locale`, `Theme`, `MediaQuery` lần đầu và khi chúng thay đổi.
+- Khởi tạo cái gì cần `context`.
+
+```dart
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  final locale = Localizations.localeOf(context);
+  if (locale != _lastLocale) {
+    _lastLocale = locale;
+    _refreshLocalizedData();
+  }
+}
+```
+
+**Anti-pattern:** gọi network mỗi lần `didChangeDependencies` chạy mà không check delta — hàm này có thể chạy nhiều lần.
+
+### `didUpdateWidget(oldWidget)` — Khi Parent Rebuild
+
+Khi widget cha rebuild và truyền widget mới (cùng type, cùng key) xuống — Flutter **không** tạo State mới, mà gọi `didUpdateWidget`. Đây là cơ chế giữ state ổn định khi parent rebuild nhưng config (props) thay đổi.
+
+```dart
+@override
+void didUpdateWidget(covariant VideoPlayer oldWidget) {
+  super.didUpdateWidget(oldWidget);
+  if (oldWidget.videoUrl != widget.videoUrl) {
+    _controller.dispose();
+    _initController(widget.videoUrl);
+  }
+}
+```
+
+**Trade-off với backend mindset:** giống "config hot reload" cho một service đang chạy. Nếu config thay đổi (URL khác), bạn phải tự reconcile — framework không tự làm cho bạn.
+
+### `deactivate()` và `activate()` — Element Reparenting
+
+`deactivate` được gọi khi element bị **tạm thời** gỡ khỏi tree (ví dụ `GlobalKey` được move sang vị trí khác). Element vào "inactive list". Trong cùng frame:
+- Nếu re-insert → `activate` được gọi, state giữ nguyên.
+- Nếu không → `dispose` được gọi cuối frame.
+
+Hiếm khi cần override. Nhưng phải hiểu vì sự khác biệt **deactivate ≠ dispose** giải thích tại sao state survive được navigation với `GlobalKey`.
+
+### `dispose()` — Cleanup Bắt Buộc
+
+Đây là nơi **giải phóng** tất cả resource đăng ký ở `initState`:
+
+```dart
+@override
+void dispose() {
+  _controller.dispose();
+  _sub.cancel();
+  _focusNode.dispose();
+  _timer?.cancel();
+  super.dispose();  // luôn ở cuối
+}
+```
+
+**Production reality:** memory leak Flutter app gần như 100% do quên dispose `AnimationController`, `StreamSubscription`, `ChangeNotifier`. DevTools → Memory → "GC + Find leaked allocations" sẽ chỉ ra.
+
+## Bẫy Async Phổ Biến
+
+### Bẫy 1: setState After Dispose
+
+```dart
+// BAD
+Future<void> _load() async {
+  final data = await repo.fetch();
+  setState(() => _data = data);  // throw nếu disposed
+}
+```
+
+```dart
+// GOOD
+Future<void> _load() async {
+  final data = await repo.fetch();
+  if (!mounted) return;
+  setState(() => _data = data);
+}
+```
+
+### Bẫy 2: Async Race Condition
+
+User mở screen A → trigger fetch → quick swipe sang B → fetch xong → setState trên screen A đã dispose.
+
+Giải pháp tốt hơn: dùng **cancellation token** hoặc chuyển logic ra ngoài widget (Riverpod auto-dispose handles this — xem [[riverpod-architecture]]).
+
+### Bẫy 3: BuildContext Sau Await
+
+```dart
+// BAD (Dart 3 sẽ warning use_build_context_synchronously)
+Future<void> _save() async {
+  await api.save();
+  Navigator.of(context).pop();  // context có thể đã invalid
+}
+```
+
+```dart
+// GOOD
+Future<void> _save() async {
+  final navigator = Navigator.of(context);  // capture trước await
+  await api.save();
+  if (!mounted) return;
+  navigator.pop();
+}
+```
+
+### Bẫy 4: Listener Quên Hủy
+
+```dart
+// BAD: memory leak
+@override
+void initState() {
+  super.initState();
+  someChangeNotifier.addListener(_onChange);
+}
+
+// dispose() quên removeListener → State bị giữ trong listener list
+```
+
+```dart
+// GOOD
+@override
+void initState() {
+  super.initState();
+  someChangeNotifier.addListener(_onChange);
+}
+
+@override
+void dispose() {
+  someChangeNotifier.removeListener(_onChange);
+  super.dispose();
+}
+```
+
+## App Lifecycle (Khác Với Widget Lifecycle)
+
+Đừng nhầm hai khái niệm:
+
+- **Widget/State lifecycle:** ở mức Flutter framework, do framework gọi.
+- **App lifecycle:** ở mức OS (iOS UIApplicationState, Android Activity lifecycle), do platform gọi qua `AppLifecycleListener`.
+
+```dart
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  late AppLifecycleListener _listener;
+
+  @override
+  void initState() {
+    super.initState();
+    _listener = AppLifecycleListener(
+      onResume: _onResume,
+      onPause: _onPause,
+      onInactive: _onInactive,
+      onHide: _onHide,
+      onShow: _onShow,
+      onDetach: _onDetach,
+      onStateChange: _onStateChange,
+    );
+  }
+
+  @override
+  void dispose() {
+    _listener.dispose();
+    super.dispose();
+  }
+}
+```
+
+`AppLifecycleListener` (Flutter 3.13+) là API hiện đại, thay cho việc override `didChangeAppLifecycleState`. Production concern:
+
+- **iOS background:** chỉ có ~30s trước khi OS suspend. Long-running task phải dùng `background tasks` native hoặc workmanager.
+- **Android `onPause` không phải `onStop`** — vẫn có thể visible. Phân biệt rõ nếu bạn pause animation/video.
+
+## Lifecycle Trong Navigator
+
+Khi push màn hình mới, màn hình cũ **không bị dispose** — nó bị `deactivate` rồi `activate` lại khi pop. Implication:
+
+- `StreamSubscription` ở màn hình cũ vẫn chạy.
+- Animation vẫn tick (trừ khi pause thủ công).
+- Nếu app có nhiều màn hình stacked, tất cả đều đang cost CPU/memory.
+
+Best practice:
+
+```dart
+// Pause heavy work khi không visible
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  final route = ModalRoute.of(context);
+  route?.animation?.addStatusListener(_onRouteAnimationStatus);
+}
+```
+
+Hoặc dùng `RouteAware`/`RouteObserver` để biết screen hiện tại có đang ở top stack không.
+
+## Anti-Pattern Tổng Hợp
+
+| Anti-pattern | Hệ quả | Cách đúng |
+|---|---|---|
+| `Future` chạy trong `build()` | Trigger fetch mỗi rebuild | Dùng `FutureBuilder` với future cached, hoặc Riverpod |
+| `setState` trong `build()` | Infinite rebuild loop | Move logic ra `initState`/`didUpdateWidget` |
+| Theme.of trong `initState` | Crash hoặc giá trị sai | Move sang `didChangeDependencies` |
+| Tạo `Controller` trong `build()` | Leak + state reset mỗi frame | Tạo trong `initState`, dispose trong `dispose` |
+| Bỏ check `mounted` sau await | `setState after dispose` ở prod | Luôn check `if (!mounted) return;` |
+| `GlobalKey` lạm dụng | State move bất ngờ, perf issues | Chỉ dùng khi thực sự cần truy cập state từ ngoài |
+
+## Mindset Backend → Flutter
+
+| Backend pattern | Flutter equivalent |
+|---|---|
+| Connection pool init khi service start | `initState` |
+| Graceful shutdown handler | `dispose` |
+| Config hot reload | `didUpdateWidget` |
+| DI inject mỗi request | `didChangeDependencies` qua `InheritedWidget`/Provider |
+| Request scoped context | `BuildContext` (xem [[buildcontext]]) |
+| Async cancellation token | `mounted` check + `CancelToken` (dio) |
+
+Quan trọng: **lifecycle method không phải nơi đặt business logic nặng**. Coi nó như "wiring layer" — connect resource và cleanup. Logic thật nằm ở repository/service ngoài.
+
+## Checklist Thực Chiến
+
+- [ ] Mọi `Controller`/`Subscription` đều có dispose tương ứng.
+- [ ] `mounted` check sau mọi `await` trước khi gọi `setState`/`Navigator`/`ScaffoldMessenger`.
+- [ ] Capture `Navigator`/`ScaffoldMessenger`/`Theme` trước `await` nếu cần dùng sau đó.
+- [ ] Không dùng `InheritedWidget` trong `initState`.
+- [ ] `didUpdateWidget` so sánh kỹ field trước khi tear-down/rebuild expensive resource.
+- [ ] Heavy resource (video player, big list) tự pause khi `AppLifecycleState.paused`.
+- [ ] DevTools Memory check leak định kỳ trước release.
+
+Bài tiếp theo phân tích [[buildcontext]] — object mỏng nhất nhưng dễ hiểu sai nhất trong Flutter.
